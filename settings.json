@@ -44,7 +44,10 @@
       "MultiEdit",
       "Bash(mkdir *)",
       "Bash(git add *)",
-      "Bash(mv *)"
+      "Bash(git commit *)",
+      "Bash(mv *)",
+      "Bash(find *)",
+      "Bash(rg *)"
     ],
     "deny": [
       "Bash(git push*)"
