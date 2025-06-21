@@ -15,3 +15,5 @@ local/
 
 # Update lock file
 .update.lock
+
+.credentials.json
