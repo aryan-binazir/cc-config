@@ -1,0 +1,17 @@
+# Database files
+__store.db
+
+# Statsig tracking files
+statsig/
+
+# Project conversation histories
+projects/
+
+# Todo files
+todos/
+
+# Local directory
+local/
+
+# Update lock file
+.update.lock

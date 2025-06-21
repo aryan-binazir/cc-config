@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch",
+      "WebSearch",
+      "Read",
+      "Glob", 
+      "Grep",
+      "LS",
+      "NotebookRead",
+      "TodoRead",
+      "Bash(ls:*)",
+      "Bash(mkdir *)",
+      "Bash(cd *)",
+      "Bash(pwd)",
+      "Bash(tree *)",
+      "Bash(which *)",
+      "Bash(echo *)",
+      "Bash(date)",
+      "Bash(whoami)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(git status)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run test:*)",
+      "Bash(npm run build)",
+      "Bash(python -m *)",
+      "Bash(node *)",
+      "Bash(cargo check)",
+      "Bash(cargo test)",
+      "Bash(python -m venv *)",
+      "Bash(go mod tidy)",
+      "Bash(go run *.go)",
+      "Bash(make)",
+      "Bash(pip list)",
+      "Bash(pip show *)",
+      "Bash(docker ps)",
+      "Bash(docker images)",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "Bash(mkdir *)",
+      "Bash(git add *)",
+      "Bash(mv *)"
+    ],
+    "deny": [
+      "Bash(git push*)"
+    ]
+  }
+}
