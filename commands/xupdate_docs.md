@@ -1,3 +1,7 @@
+---
+description: Evaluate project and update documentation
+---
+
 Evaluate the current project and update documentation:
 
 1. Check root directory for CLAUDE.md and AGENTS.md for project-specific instructions

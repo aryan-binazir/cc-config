@@ -1,3 +1,7 @@
+---
+description: Format only Git-changed files with project-configured formatters
+---
+
 Format only Git-changed files with project-configured formatters:
 
 1. Check root directory for CLAUDE.md and AGENTS.md for project-specific instructions

@@ -1,3 +1,7 @@
+---
+description: Type check only Git-changed files with language-specific tools
+---
+
 Type check only Git-changed files with language-specific tools:
 
 1. Check root directory for CLAUDE.md and AGENTS.md for project-specific instructions

@@ -1,3 +1,7 @@
+---
+description: Create detailed commit with comprehensive description
+---
+
 Analyze staged changes and create a detailed commit message with comprehensive description:
 
 1. Check root directory for CLAUDE.md and AGENTS.md for project-specific instructions

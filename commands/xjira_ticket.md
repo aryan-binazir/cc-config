@@ -1,6 +1,5 @@
 ---
 description: Analyze branch changes and generate concise bullet points for JIRA ticket summaries
-allowed-tools: Bash(git*)
 ---
 
 # Generate JIRA Ticket Summary

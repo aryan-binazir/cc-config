@@ -1,3 +1,7 @@
+---
+description: Lint only Git-changed files with language-specific linters
+---
+
 Lint only files changed in Git with appropriate language-specific linters and auto-fix:
 
 1. Check root directory for CLAUDE.md and AGENTS.md for project-specific instructions

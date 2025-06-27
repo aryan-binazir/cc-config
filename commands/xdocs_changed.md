@@ -1,3 +1,7 @@
+---
+description: Update documentation affected by code changes in Git
+---
+
 Update documentation affected by code changes in Git:
 
 1. Check root directory for CLAUDE.md and AGENTS.md for project-specific instructions
