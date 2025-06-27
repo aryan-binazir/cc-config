@@ -1,10 +1,12 @@
-<command>
-  <n>meeting_notes</n>
-  <description>Clean up and organize a specified meeting notes file while preserving meaning and formatting for Obsidian</description>
-  <prompt>
+---
+description: Clean up and organize meeting notes while preserving meaning and formatting for Obsidian
+---
+
+# Clean Up Meeting Notes
+
 Take the specified meeting notes file and clean it up according to these guidelines:
 
-**Cleaning Process:**
+## Cleaning Process:
 1. Remove filler words, redundant phrases, and unnecessary repetition
 2. Consolidate similar points into single, clear statements
 3. Organize information into logical sections
@@ -12,7 +14,7 @@ Take the specified meeting notes file and clean it up according to these guideli
 5. **Preserve all existing [[]] Obsidian links** from the original content
 6. Maintain the original meaning while improving clarity and readability
 
-**Output in Markdown Format:**
+## Output Format:
 - Meeting title and date at the top (use # header)
 - Attendees list (if available) (use ## header)
 - Key discussion points organized by topic (use ## headers for topics)
@@ -21,7 +23,7 @@ Take the specified meeting notes file and clean it up according to these guideli
 - Next steps clearly outlined (use ## header)
 - Preserve all [[]] Obsidian links and references
 
-**Style Guidelines:**
+## Style Guidelines:
 - Output in clean, Obsidian-compatible Markdown
 - Use bullet points for easy scanning
 - Keep sentences concise but complete
@@ -35,5 +37,3 @@ Take the specified meeting notes file and clean it up according to these guideli
 - Use > blockquotes for important decisions or key takeaways
 
 The goal is to transform the provided meeting notes into a professional, actionable Obsidian-compatible summary that team members can quickly reference and act upon. Always prioritize clarity and completeness over brevity - don't sacrifice important information for the sake of being concise.
-  </prompt>
-</command>
