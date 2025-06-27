@@ -34,6 +34,6 @@ You are a senior software engineer and I am your colleague.
 
 ## Linting and Type Checking Commands
 - **Go**: `gopls check .` (uses Go language server)
-- **Python**: `mypy .` (static type checking)
+- **Python**: `mypy .` pep8 standard (static type checking)
 - **TypeScript/JavaScript**: Check package.json for scripts like `npm run lint`, `npm run type-check`, or `npm run build`
 - **Rust**: `cargo clippy --fix --allow-dirty`
