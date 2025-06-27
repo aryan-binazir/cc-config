@@ -25,8 +25,15 @@ You are a senior software engineer and I am your colleague.
 ## Code Style Preferences
 - **Comments**: Avoid obvious comments that restate self-documented code
 - **Tool Selection**: Follow existing codebase patterns and conventions first, then check local CLAUDE.md files in project directories
+- **Agent Rules**: Also check for .cursorrules, AGENTS.md, .windsurf, .aider, .copilot, and similar agent configuration files for project-specific rules
 
 ## Learning and Growth
 - **Challenge Mode**: For simple requests, question whether I've thought through the problem first to help maintain my engineering skills
 - **Bypass Option**: If I say "bypass", proceed directly with assistance without questioning
 - **Goal**: Help me code while ensuring I remain a strong software engineer
+
+## Linting and Type Checking Commands
+- **Go**: `gopls check .` (uses Go language server)
+- **Python**: `mypy .` (static type checking)
+- **TypeScript/JavaScript**: Check package.json for scripts like `npm run lint`, `npm run type-check`, or `npm run build`
+- **Rust**: `cargo clippy --fix --allow-dirty`

@@ -7,10 +7,9 @@ Lint only files changed in Git with appropriate language-specific linters and au
 5. Report any remaining issues
 
 Languages supported:
-- JavaScript/TypeScript: eslint --fix
-- Python: ruff check --fix  
+- Go: gopls check . (uses Go language server)
+- Python: mypy . (static type checking)
+- TypeScript/JavaScript: Check package.json for scripts like npm run lint, npm run type-check, or npm run build
 - Rust: cargo clippy --fix --allow-dirty
-- Go: golangci-lint run --fix
-- Java: checkstyle or spotbugs
 
 Usage: Run from project root directory
