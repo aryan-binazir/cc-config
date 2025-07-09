@@ -17,7 +17,15 @@
     ],
     "deny": [
       "Bash(git push:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(rm -rf *)",
+      "Bash(dd if=*)",
+      "Bash(rm -rf /)",
+      "Bash(curl * | sh)",
+      "Bash(wget * | sh)",
+      "Bash(mkfs.*)",
+      "Bash(docker rm -f *)"
     ]
-  }
+  },
+  "model": "sonnet"
 }
