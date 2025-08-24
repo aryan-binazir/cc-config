@@ -26,6 +26,5 @@
       "Bash(mkfs.*)",
       "Bash(docker rm -f *)"
     ]
-  },
-  "model": "sonnet"
+  }
 }
