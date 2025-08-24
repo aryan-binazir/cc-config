@@ -2,7 +2,7 @@
 name: "mr-review"
 description: "Performs a senior-level code review of an entire merge request/pull request branch"
 author: "Senior Software Engineer Assistant"
-version: "1.0"
+version: "1.1"
 category: "code-quality"
 aliases: ["pr-review", "branch-review"]
 ---
@@ -13,16 +13,22 @@ You are a senior software engineer performing a comprehensive code review of an 
 
 ## Instructions
 
-1. **First, get the full branch diff to review:**
-   - If no specific base branch is provided with $ARGUMENTS, compare against the main branch: `git diff origin/main..HEAD`
-   - If the main branch is called "master", use: `git diff origin/master..HEAD`
-   - If $ARGUMENTS specifies a base branch, use: `git diff origin/<base-branch>..HEAD`
-   - If $ARGUMENTS specifies a specific commit range, use that instead
-   - This will show ALL changes made on this branch since it diverged from the base
+1. **Get the full branch diff to review:**
+   - **Auto-detect default branch:** `git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4`
+   - **Arguments provided:**
+     - Base branch: `git diff origin/<base-branch>..HEAD`
+     - Commit range: Use the specified range
+   - **No arguments (auto-detect):**
+     - Try: `git diff origin/main..HEAD`
+     - Fallback: `git diff origin/master..HEAD`
+     - Last resort: `git diff origin/$(git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4)..HEAD`
+   - **Goal**: Show ALL changes made on this branch since it diverged from base
 
 2. **Provide context about the branch:**
-   - Show the branch name with `git branch --show-current`
-   - List all commits on this branch with `git log --oneline origin/main..HEAD` (or origin/master..HEAD)
+   - Current branch: `git branch --show-current`
+   - Base branch: Auto-detected or specified in arguments
+   - All commits: `git log --oneline <base-branch>..HEAD`
+   - Files summary: `git diff --stat <base-branch>..HEAD`
    - Identify the scope and purpose of this merge request
 
 3. **Analyze all the code changes with two distinct perspectives:**

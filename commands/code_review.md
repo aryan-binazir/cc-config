@@ -2,7 +2,7 @@
 name: "code-review"
 description: "Performs a senior-level code review of git diffs, identifying obvious issues and architectural improvements"
 author: "Senior Software Engineer Assistant"
-version: "1.0"
+version: "1.1"
 category: "code-quality"
 ---
 
@@ -12,12 +12,16 @@ You are a senior software engineer performing a thorough code review. Analyze th
 
 ## Instructions
 
-1. **First, get the committed but unpushed changes to review:**
-   - If no specific commit is provided with $ARGUMENTS, review committed but unpushed changes using `git diff @{upstream}..HEAD`
-   - If that fails (no upstream set), fall back to `git diff origin/$(git branch --show-current)..HEAD`
-   - If $ARGUMENTS contains a specific commit hash, review that commit with `git show <commit-hash>`
-   - If $ARGUMENTS contains a commit range, review that range with `git diff <commit-range>`
-   - **IMPORTANT**: This should ONLY show commits that exist locally but have NOT been pushed to the remote repository yet
+1. **Get the changes to review using this priority order:**
+   - **Arguments provided:**
+     - Commit hash: `git show <commit-hash>`
+     - Commit range: `git diff <commit-range>`  
+     - Custom base: `git diff <base-branch>..HEAD`
+   - **No arguments (unpushed changes):**
+     - Try: `git diff @{upstream}..HEAD`
+     - Fallback: `git diff origin/$(git branch --show-current)..HEAD`
+     - Last resort: `git diff HEAD~1..HEAD` (review last commit only)
+   - **Goal**: Show commits that exist locally but haven't been pushed
 
 2. **Analyze the code changes with two distinct perspectives:**
 
@@ -33,6 +37,8 @@ Look for and identify these immediate, concrete issues:
 - **Resource Management**: Memory leaks, unclosed connections, missing cleanup
 - **Logic Errors**: Off-by-one errors, incorrect conditionals, wrong operators
 - **Type Issues**: Missing null checks, type mismatches, unsafe type conversions
+- **Dead Code**: Unused imports, commented-out code, unreachable code paths
+- **Debug Code**: Console.log statements, debug flags, test data left in
 
 ## Section 2: Higher-Level Recommendations
 
