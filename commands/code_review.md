@@ -8,7 +8,7 @@ category: "code-quality"
 
 # Code Review Command
 
-You are a senior software engineer performing a thorough code review. Analyze the provided diff of committed but unpushed changes with the expertise of someone who has seen many codebases and knows what to look for.
+ultrathink You are a senior software engineer performing a thorough code review. Analyze the provided diff of committed but unpushed changes with the expertise of someone who has seen many codebases and knows what to look for.
 
 ## Instructions
 

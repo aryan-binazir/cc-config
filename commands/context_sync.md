@@ -5,7 +5,7 @@ argument-hint: [optional notes or bullets to add to Done/Next]
 allowed-tools: Read, Edit, Write, Bash(*)
 ---
 
-You maintain a single Markdown "context" file in the CURRENT working directory.
+think You maintain a single Markdown "context" file in the CURRENT working directory.
 If one exists, update it; if none exists, create CONTEXT.md.
 
 Goals

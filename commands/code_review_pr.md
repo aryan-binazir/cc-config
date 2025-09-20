@@ -9,7 +9,7 @@ aliases: ["pr-review", "branch-review"]
 
 # Merge Request / Pull Request Review Command
 
-You are a senior software engineer performing a comprehensive code review of an entire merge request or pull request. Analyze all the changes made on this branch from when it was created until now, with the expertise of someone reviewing code before it gets merged into the main codebase.
+You are a senior software engineer performing a comprehensive code review of an entire merge request or pull request. Be brutally honest. Analyze all the changes made on this branch from when it was created until now, with the expertise of someone reviewing code before it gets merged into the main codebase.
 
 ## Instructions
 
