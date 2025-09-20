@@ -59,5 +59,10 @@
       "Bash(git commit:*)"
     ],
     "ask": []
+  },
+  "model": "opus",
+  "statusLine": {
+    "type": "command",
+    "command": "echo \"$(whoami) $(basename \"$(pwd)\")\""
   }
 }
