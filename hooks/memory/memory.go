@@ -249,6 +249,13 @@ func openDB() *sql.DB {
 	return db
 }
 
+// withDB executes a function with a database connection, handling open/close automatically
+func withDB(fn func(*sql.DB) error) error {
+	db := openDB()
+	defer db.Close()
+	return fn(db)
+}
+
 func getCurrentBranch() string {
 	if output, err := exec.Command("git", "branch", "--show-current").Output(); err == nil {
 		return strings.TrimSpace(string(output))
@@ -334,6 +341,85 @@ func parseTime(timeStr string) time.Time {
 	return time.Now()
 }
 
+// getSessionStats retrieves session count and total minutes for a ticket
+func getSessionStats(db *sql.DB, ticket string) (sessionCount int, totalMinutes int) {
+	db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(duration_seconds)/60, 0) FROM sessions WHERE ticket = ?`, ticket).Scan(&sessionCount, &totalMinutes)
+	return
+}
+
+// displayContext prints formatted context information
+func displayContext(context *EnhancedContext, requirements string, ticket string, showBorder bool) {
+	if showBorder {
+		fmt.Printf(`
+╔════════════════════════════════════════════════════════════
+║ 🎯 %s
+╚════════════════════════════════════════════════════════════
+
+`, ticket)
+	}
+
+	if requirements != "" {
+		fmt.Printf("📋 REQUIREMENTS:\n%s\n\n", requirements)
+	}
+
+	// Display implementations
+	if len(context.Implementations) > 0 {
+		fmt.Printf("🏗️ IMPLEMENTATIONS (%d):\n", len(context.Implementations))
+		for _, p := range context.Implementations {
+			if p.IsUserDir {
+				fmt.Printf("  • 📌 %s\n", p.Text)
+			} else {
+				fmt.Printf("  • %s\n", p.Text)
+			}
+		}
+		fmt.Printf("\n")
+	}
+
+	// Display key decisions
+	if len(context.Decisions) > 0 {
+		fmt.Printf("💡 KEY DECISIONS (%d):\n", len(context.Decisions))
+		for _, p := range context.Decisions {
+			if p.IsUserDir {
+				fmt.Printf("  • 📌 %s\n", p.Text)
+			} else {
+				fmt.Printf("  • %s\n", p.Text)
+			}
+		}
+		fmt.Printf("\n")
+	}
+
+	// Display code patterns
+	if len(context.CodePatterns) > 0 {
+		fmt.Printf("🔧 CODE PATTERNS (%d):\n", len(context.CodePatterns))
+		for _, p := range context.CodePatterns {
+			fmt.Printf("  • %s\n", p.Text)
+		}
+		fmt.Printf("\n")
+	}
+
+	// Display current state
+	if len(context.CurrentState) > 0 {
+		fmt.Printf("📊 CURRENT STATE (%d):\n", len(context.CurrentState))
+		for _, p := range context.CurrentState {
+			fmt.Printf("  • %s\n", p.Text)
+		}
+		fmt.Printf("\n")
+	}
+
+	// Display next steps
+	if len(context.NextSteps) > 0 {
+		fmt.Printf("📝 NEXT STEPS (%d):\n", len(context.NextSteps))
+		for _, p := range context.NextSteps {
+			fmt.Printf("  • %s\n", p.Text)
+		}
+		fmt.Printf("\n")
+	}
+
+	if showBorder {
+		fmt.Printf("═══════════════════════════════════════════════════════════\n")
+	}
+}
+
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -344,71 +430,68 @@ func truncate(s string, n int) string {
 // Context management functions
 
 func loadTicketContext(ticket string) {
-	db := openDB()
-	defer db.Close()
+	withDB(func(db *sql.DB) error {
+		var requirements, contextJSON sql.NullString
+		err := db.QueryRow(`SELECT requirements, context_points FROM ticket_context WHERE ticket = ?`, ticket).Scan(&requirements, &contextJSON)
 
-	var requirements, contextJSON sql.NullString
-	err := db.QueryRow(`SELECT requirements, context_points FROM ticket_context WHERE ticket = ?`, ticket).Scan(&requirements, &contextJSON)
+		if err == sql.ErrNoRows {
+			fmt.Printf("📋 No context saved for %s\n", ticket)
+			return nil
+		}
+		if err != nil {
+			debugLog("Failed to query ticket context for %s: %v", ticket, err)
+			os.Exit(0)
+		}
 
-	if err == sql.ErrNoRows {
-		fmt.Printf("📋 No context saved for %s\n", ticket)
-		return
-	}
-	if err != nil {
-		debugLog("Failed to query ticket context for %s: %v", ticket, err)
-		os.Exit(0)
-	}
+		fmt.Printf("\n======================================\n")
+		fmt.Printf("📋 %s Context\n", ticket)
+		fmt.Printf("======================================\n\n")
 
-	fmt.Printf("\n======================================\n")
-	fmt.Printf("📋 %s Context\n", ticket)
-	fmt.Printf("======================================\n\n")
+		if requirements.Valid && requirements.String != "" {
+			fmt.Printf("📜 Requirements:\n%s\n\n", requirements.String)
+		}
 
-	if requirements.Valid && requirements.String != "" {
-		fmt.Printf("📜 Requirements:\n%s\n\n", requirements.String)
-	}
-
-	if contextJSON.Valid && contextJSON.String != "" {
-		var points []ContextPoint
-		if err := json.Unmarshal([]byte(contextJSON.String), &points); err != nil {
-			debugLog("Failed to parse context JSON in loadTicketContext for ticket %s: %v", ticket, err)
-		} else if len(points) > 0 {
-			fmt.Printf("📌 Critical Context:\n")
-			for _, point := range points {
-				if point.IsUserDir {
-					fmt.Printf("• 📌 %s\n", point.Text)
-				} else {
-					fmt.Printf("• %s\n", point.Text)
+		if contextJSON.Valid && contextJSON.String != "" {
+			var points []ContextPoint
+			if err := json.Unmarshal([]byte(contextJSON.String), &points); err != nil {
+				debugLog("Failed to parse context JSON in loadTicketContext for ticket %s: %v", ticket, err)
+			} else if len(points) > 0 {
+				fmt.Printf("📌 Critical Context:\n")
+				for _, point := range points {
+					if point.IsUserDir {
+						fmt.Printf("• 📌 %s\n", point.Text)
+					} else {
+						fmt.Printf("• %s\n", point.Text)
+					}
 				}
-			}
 
-			// Look for blockers
-			var blockers []ContextPoint
-			for _, point := range points {
-				lower := strings.ToLower(point.Text)
-				if strings.Contains(lower, "blocked") || strings.Contains(lower, "waiting") {
-					blockers = append(blockers, point)
+				// Look for blockers
+				var blockers []ContextPoint
+				for _, point := range points {
+					lower := strings.ToLower(point.Text)
+					if strings.Contains(lower, "blocked") || strings.Contains(lower, "waiting") {
+						blockers = append(blockers, point)
+					}
 				}
-			}
 
-			if len(blockers) > 0 {
-				fmt.Printf("\n⚠️  Blockers:\n")
-				for _, blocker := range blockers {
-					fmt.Printf("• %s\n", blocker.Text)
+				if len(blockers) > 0 {
+					fmt.Printf("\n⚠️  Blockers:\n")
+					for _, blocker := range blockers {
+						fmt.Printf("• %s\n", blocker.Text)
+					}
 				}
 			}
 		}
-	}
 
-	// Add session summary
-	var sessionCount int
-	var totalMinutes int
-	db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(duration_seconds)/60, 0) FROM sessions WHERE ticket = ?`, ticket).Scan(&sessionCount, &totalMinutes)
+		// Add session summary
+		sessionCount, totalMinutes := getSessionStats(db, ticket)
+		if sessionCount > 0 {
+			fmt.Printf("\n📊 Work Summary: %d sessions, %d minutes total\n", sessionCount, totalMinutes)
+		}
 
-	if sessionCount > 0 {
-		fmt.Printf("\n📊 Work Summary: %d sessions, %d minutes total\n", sessionCount, totalMinutes)
-	}
-
-	fmt.Printf("======================================\n")
+		fmt.Printf("======================================\n")
+		return nil
+	})
 }
 
 func saveContextPoint(ticket string, point string, isUserDirective bool) {
@@ -678,18 +761,18 @@ func extractPatternsFromGitDiff() []string {
 
 
 func setRequirements(ticket string, requirements string) {
-	db := openDB()
-	defer db.Close()
+	withDB(func(db *sql.DB) error {
+		_, err := db.Exec(`INSERT INTO ticket_context (ticket, requirements, last_updated)
+			VALUES (?, ?, CURRENT_TIMESTAMP)
+			ON CONFLICT(ticket) DO UPDATE SET
+			requirements = excluded.requirements,
+			last_updated = CURRENT_TIMESTAMP`, ticket, requirements)
 
-	_, err := db.Exec(`INSERT INTO ticket_context (ticket, requirements, last_updated)
-		VALUES (?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(ticket) DO UPDATE SET
-		requirements = excluded.requirements,
-		last_updated = CURRENT_TIMESTAMP`, ticket, requirements)
-
-	if err == nil {
-		fmt.Printf("📜 Requirements set for %s\n", ticket)
-	}
+		if err == nil {
+			fmt.Printf("📜 Requirements set for %s\n", ticket)
+		}
+		return err
+	})
 }
 
 func listTicketsWithContext() {
@@ -750,13 +833,13 @@ func clearContext(ticket string) {
 		return
 	}
 
-	db := openDB()
-	defer db.Close()
-
-	_, err := db.Exec(`DELETE FROM ticket_context WHERE ticket = ?`, ticket)
-	if err == nil {
-		fmt.Printf("✅ Context cleared for %s\n", ticket)
-	}
+	withDB(func(db *sql.DB) error {
+		_, err := db.Exec(`DELETE FROM ticket_context WHERE ticket = ?`, ticket)
+		if err == nil {
+			fmt.Printf("✅ Context cleared for %s\n", ticket)
+		}
+		return err
+	})
 }
 
 func removeContextItems(ticket string, category string) {
@@ -1091,12 +1174,39 @@ func categorizeContext(point string) ContextCategory {
 	return CategoryDecision
 }
 
+// MarshalFields converts all context fields to JSON strings
+func (ec *EnhancedContext) MarshalFields() (decisions, implementations, patterns, state, next string) {
+	decisionsJSON, _ := json.Marshal(ec.Decisions)
+	implementationsJSON, _ := json.Marshal(ec.Implementations)
+	patternsJSON, _ := json.Marshal(ec.CodePatterns)
+	stateJSON, _ := json.Marshal(ec.CurrentState)
+	nextJSON, _ := json.Marshal(ec.NextSteps)
+
+	return string(decisionsJSON), string(implementationsJSON),
+		string(patternsJSON), string(stateJSON), string(nextJSON)
+}
+
+// UnmarshalFields populates context fields from JSON strings
+func (ec *EnhancedContext) UnmarshalFields(decisionsJSON, implementationsJSON, patternsJSON, stateJSON, nextJSON sql.NullString) {
+	if decisionsJSON.Valid && decisionsJSON.String != "" {
+		json.Unmarshal([]byte(decisionsJSON.String), &ec.Decisions)
+	}
+	if implementationsJSON.Valid && implementationsJSON.String != "" {
+		json.Unmarshal([]byte(implementationsJSON.String), &ec.Implementations)
+	}
+	if patternsJSON.Valid && patternsJSON.String != "" {
+		json.Unmarshal([]byte(patternsJSON.String), &ec.CodePatterns)
+	}
+	if stateJSON.Valid && stateJSON.String != "" {
+		json.Unmarshal([]byte(stateJSON.String), &ec.CurrentState)
+	}
+	if nextJSON.Valid && nextJSON.String != "" {
+		json.Unmarshal([]byte(nextJSON.String), &ec.NextSteps)
+	}
+}
+
 func saveEnhancedContext(db *sql.DB, ticket string, requirements string, context *EnhancedContext) error {
-	decisionsJSON, _ := json.Marshal(context.Decisions)
-	implementationsJSON, _ := json.Marshal(context.Implementations)
-	patternsJSON, _ := json.Marshal(context.CodePatterns)
-	stateJSON, _ := json.Marshal(context.CurrentState)
-	nextJSON, _ := json.Marshal(context.NextSteps)
+	decisions, implementations, patterns, state, next := context.MarshalFields()
 
 	_, err := db.Exec(`INSERT INTO ticket_context_enhanced
 		(ticket, requirements, decisions, implementations, code_patterns, current_state, next_steps, last_updated)
@@ -1109,9 +1219,7 @@ func saveEnhancedContext(db *sql.DB, ticket string, requirements string, context
 		current_state = excluded.current_state,
 		next_steps = excluded.next_steps,
 		last_updated = CURRENT_TIMESTAMP`,
-		ticket, requirements,
-		string(decisionsJSON), string(implementationsJSON),
-		string(patternsJSON), string(stateJSON), string(nextJSON))
+		ticket, requirements, decisions, implementations, patterns, state, next)
 
 	return err
 }
@@ -1130,22 +1238,7 @@ func loadEnhancedContext(db *sql.DB, ticket string) (*EnhancedContext, string, e
 	}
 
 	context := &EnhancedContext{}
-
-	if decisionsJSON.Valid && decisionsJSON.String != "" {
-		json.Unmarshal([]byte(decisionsJSON.String), &context.Decisions)
-	}
-	if implementationsJSON.Valid && implementationsJSON.String != "" {
-		json.Unmarshal([]byte(implementationsJSON.String), &context.Implementations)
-	}
-	if patternsJSON.Valid && patternsJSON.String != "" {
-		json.Unmarshal([]byte(patternsJSON.String), &context.CodePatterns)
-	}
-	if stateJSON.Valid && stateJSON.String != "" {
-		json.Unmarshal([]byte(stateJSON.String), &context.CurrentState)
-	}
-	if nextJSON.Valid && nextJSON.String != "" {
-		json.Unmarshal([]byte(nextJSON.String), &context.NextSteps)
-	}
+	context.UnmarshalFields(decisionsJSON, implementationsJSON, patternsJSON, stateJSON, nextJSON)
 
 	return context, requirements.String, nil
 }
@@ -1185,50 +1278,51 @@ func saveEnhancedContextPoint(ticket string, point string, category ContextCateg
 		return
 	}
 
-	db := openDB()
-	defer db.Close()
-
-	// Load existing context
-	context, requirements, err := loadEnhancedContext(db, ticket)
-	if err != nil {
-		context = &EnhancedContext{
-			Decisions:       []ContextPoint{},
-			Implementations: []ContextPoint{},
-			CodePatterns:    []ContextPoint{},
-			CurrentState:    []ContextPoint{},
-			NextSteps:       []ContextPoint{},
+	withDB(func(db *sql.DB) error {
+		// Load existing context
+		context, requirements, err := loadEnhancedContext(db, ticket)
+		if err != nil {
+			context = &EnhancedContext{
+				Decisions:       []ContextPoint{},
+				Implementations: []ContextPoint{},
+				CodePatterns:    []ContextPoint{},
+				CurrentState:    []ContextPoint{},
+				NextSteps:       []ContextPoint{},
+			}
 		}
-	}
 
-	newPoint := ContextPoint{
-		Text:      point,
-		Category:  category,
-		Timestamp: time.Now(),
-		IsUserDir: isUserDirective,
-	}
-
-	// Add to appropriate category and enforce limits
-	var added bool
-	switch category {
-	case CategoryDecision:
-		added = addContextPoint(&context.Decisions, newPoint, MaxDecisions)
-	case CategoryImplementation:
-		added = addContextPoint(&context.Implementations, newPoint, MaxImplementations)
-	case CategoryPattern:
-		added = addContextPoint(&context.CodePatterns, newPoint, MaxCodePatterns)
-	case CategoryState:
-		added = addContextPoint(&context.CurrentState, newPoint, MaxCurrentState)
-	case CategoryNext:
-		added = addContextPoint(&context.NextSteps, newPoint, MaxNextSteps)
-	}
-
-	// Save back to database only if something was added
-	if added {
-		if err := saveEnhancedContext(db, ticket, requirements, context); err == nil {
-			emoji := getCategoryEmoji(category)
-			fmt.Printf("%s Context saved for %s (%s)\n", emoji, ticket, category)
+		newPoint := ContextPoint{
+			Text:      point,
+			Category:  category,
+			Timestamp: time.Now(),
+			IsUserDir: isUserDirective,
 		}
-	}
+
+		// Add to appropriate category and enforce limits
+		var added bool
+		switch category {
+		case CategoryDecision:
+			added = addContextPoint(&context.Decisions, newPoint, MaxDecisions)
+		case CategoryImplementation:
+			added = addContextPoint(&context.Implementations, newPoint, MaxImplementations)
+		case CategoryPattern:
+			added = addContextPoint(&context.CodePatterns, newPoint, MaxCodePatterns)
+		case CategoryState:
+			added = addContextPoint(&context.CurrentState, newPoint, MaxCurrentState)
+		case CategoryNext:
+			added = addContextPoint(&context.NextSteps, newPoint, MaxNextSteps)
+		}
+
+		// Save back to database only if something was added
+		if added {
+			if err := saveEnhancedContext(db, ticket, requirements, context); err == nil {
+				emoji := getCategoryEmoji(category)
+				fmt.Printf("%s Context saved for %s (%s)\n", emoji, ticket, category)
+			}
+			return err
+		}
+		return nil
+	})
 }
 
 func getCategoryEmoji(category ContextCategory) string {
@@ -1327,90 +1421,23 @@ func evaluateEnhancedContextImportance(point string, category ContextCategory) b
 }
 
 func loadEnhancedTicketContext(ticket string) {
-	db := openDB()
-	defer db.Close()
-
-	context, requirements, err := loadEnhancedContext(db, ticket)
-	if err != nil {
-		fmt.Printf("📋 No context saved for %s\n", ticket)
-		return
-	}
-
-	// Enhanced display format
-	fmt.Printf(`
-╔════════════════════════════════════════════════════════════
-║ 🎯 %s
-╚════════════════════════════════════════════════════════════
-
-`, ticket)
-
-	if requirements != "" {
-		fmt.Printf("📋 REQUIREMENTS:\n%s\n\n", requirements)
-	}
-
-	// Display implementations
-	if len(context.Implementations) > 0 {
-		fmt.Printf("🏗️ IMPLEMENTATIONS (%d):\n", len(context.Implementations))
-		for _, p := range context.Implementations {
-			if p.IsUserDir {
-				fmt.Printf("  • 📌 %s\n", p.Text)
-			} else {
-				fmt.Printf("  • %s\n", p.Text)
-			}
+	withDB(func(db *sql.DB) error {
+		context, requirements, err := loadEnhancedContext(db, ticket)
+		if err != nil {
+			fmt.Printf("📋 No context saved for %s\n", ticket)
+			return nil
 		}
-		fmt.Printf("\n")
-	}
 
-	// Display key decisions
-	if len(context.Decisions) > 0 {
-		fmt.Printf("💡 KEY DECISIONS (%d):\n", len(context.Decisions))
-		for _, p := range context.Decisions {
-			if p.IsUserDir {
-				fmt.Printf("  • 📌 %s\n", p.Text)
-			} else {
-				fmt.Printf("  • %s\n", p.Text)
-			}
+		displayContext(context, requirements, ticket, true)
+
+		// Add session summary
+		sessionCount, totalMinutes := getSessionStats(db, ticket)
+		if sessionCount > 0 {
+			fmt.Printf("📊 Work Summary: %d sessions, %d minutes total\n\n", sessionCount, totalMinutes)
+			fmt.Printf("═══════════════════════════════════════════════════════════\n")
 		}
-		fmt.Printf("\n")
-	}
-
-	// Display code patterns
-	if len(context.CodePatterns) > 0 {
-		fmt.Printf("🔧 CODE PATTERNS (%d):\n", len(context.CodePatterns))
-		for _, p := range context.CodePatterns {
-			fmt.Printf("  • %s\n", p.Text)
-		}
-		fmt.Printf("\n")
-	}
-
-	// Display current state
-	if len(context.CurrentState) > 0 {
-		fmt.Printf("📊 CURRENT STATE (%d):\n", len(context.CurrentState))
-		for _, p := range context.CurrentState {
-			fmt.Printf("  • %s\n", p.Text)
-		}
-		fmt.Printf("\n")
-	}
-
-	// Display next steps
-	if len(context.NextSteps) > 0 {
-		fmt.Printf("📝 NEXT STEPS (%d):\n", len(context.NextSteps))
-		for _, p := range context.NextSteps {
-			fmt.Printf("  • %s\n", p.Text)
-		}
-		fmt.Printf("\n")
-	}
-
-	// Add session summary
-	var sessionCount int
-	var totalMinutes int
-	db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(duration_seconds)/60, 0) FROM sessions WHERE ticket = ?`, ticket).Scan(&sessionCount, &totalMinutes)
-
-	if sessionCount > 0 {
-		fmt.Printf("📊 Work Summary: %d sessions, %d minutes total\n", sessionCount, totalMinutes)
-	}
-
-	fmt.Printf("═══════════════════════════════════════════════════════════\n")
+		return nil
+	})
 }
 
 func listEnhancedTicketsWithContext() {
@@ -1719,59 +1746,13 @@ func loadMemory() {
 	// Show full enhanced context
 	context, requirements, err := loadEnhancedContext(db, ticket)
 	if err == nil {
+		// Use custom header for "CONTEXT FOR" instead of just ticket name
 		fmt.Printf("\n╔════════════════════════════════════════════════════════════\n")
 		fmt.Printf("║ 🎯 CONTEXT FOR %s\n", ticket)
 		fmt.Printf("╚════════════════════════════════════════════════════════════\n\n")
 
-		if requirements != "" {
-			fmt.Printf("📋 REQUIREMENTS:\n%s\n\n", requirements)
-		}
-
-		// Show all context categories with full details
-		if len(context.Decisions) > 0 {
-			fmt.Printf("💡 KEY DECISIONS (%d):\n", len(context.Decisions))
-			for _, p := range context.Decisions {
-				if p.IsUserDir {
-					fmt.Printf("  • 📌 %s\n", p.Text)
-				} else {
-					fmt.Printf("  • %s\n", p.Text)
-				}
-			}
-			fmt.Printf("\n")
-		}
-
-		if len(context.Implementations) > 0 {
-			fmt.Printf("🏗️ IMPLEMENTATIONS (%d):\n", len(context.Implementations))
-			for _, p := range context.Implementations {
-				fmt.Printf("  • %s\n", p.Text)
-			}
-			fmt.Printf("\n")
-		}
-
-		if len(context.CodePatterns) > 0 {
-			fmt.Printf("🔧 CODE PATTERNS (%d):\n", len(context.CodePatterns))
-			for _, p := range context.CodePatterns {
-				fmt.Printf("  • %s\n", p.Text)
-			}
-			fmt.Printf("\n")
-		}
-
-		if len(context.CurrentState) > 0 {
-			fmt.Printf("📊 CURRENT STATE (%d):\n", len(context.CurrentState))
-			for _, p := range context.CurrentState {
-				fmt.Printf("  • %s\n", p.Text)
-			}
-			fmt.Printf("\n")
-		}
-
-		if len(context.NextSteps) > 0 {
-			fmt.Printf("📝 NEXT STEPS / TODOs (%d):\n", len(context.NextSteps))
-			for _, p := range context.NextSteps {
-				fmt.Printf("  • %s\n", p.Text)
-			}
-			fmt.Printf("\n")
-		}
-
+		// Display using helper (without border since we have custom header)
+		displayContext(context, requirements, ticket, false)
 		fmt.Printf("═══════════════════════════════════════════════════════════\n")
 	}
 }
