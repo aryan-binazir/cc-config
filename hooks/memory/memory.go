@@ -145,7 +145,7 @@ func handleContext() {
 			clearContext(os.Args[3])
 		}
 	case "remove":
-		// Format: memory context remove <category> [ticket]
+		// Format: memory context remove <category> [ticket] [items]
 		// or: memory context remove all (nuclear option)
 		if len(os.Args) > 3 {
 			if os.Args[3] == "all" {
@@ -154,15 +154,34 @@ func handleContext() {
 			} else {
 				category := os.Args[3]
 				var ticket string
+				var itemsToRemove string
+
+				// Parse arguments - can be:
+				// memory context remove <category> - interactive
+				// memory context remove <category> <items> - non-interactive with auto-detected ticket
+				// memory context remove <category> <ticket> <items> - non-interactive with explicit ticket
 				if len(os.Args) > 4 {
-					ticket = os.Args[4]
+					// Check if arg 4 looks like item numbers (contains digits/commas) or is "all"
+					if regexp.MustCompile(`^(\d+,?)+$|^all$`).MatchString(os.Args[4]) {
+						// It's items, auto-detect ticket
+						branch := getCurrentBranch()
+						ticket = extractTicket(branch)
+						itemsToRemove = os.Args[4]
+					} else {
+						// It's a ticket
+						ticket = os.Args[4]
+						if len(os.Args) > 5 {
+							itemsToRemove = os.Args[5]
+						}
+					}
 				} else {
 					// Auto-detect from branch
 					branch := getCurrentBranch()
 					ticket = extractTicket(branch)
 				}
+
 				if ticket != "" {
-					removeContextItems(ticket, category)
+					removeContextItems(ticket, category, itemsToRemove)
 				} else {
 					fmt.Println("❌ No ticket found in branch name")
 				}
@@ -256,11 +275,59 @@ func withDB(fn func(*sql.DB) error) error {
 	return fn(db)
 }
 
+// Helper functions for common patterns
+
+// unmarshalNullableJSON unmarshals a nullable SQL string into a target type
+func unmarshalNullableJSON[T any](nullStr sql.NullString, target *T) error {
+	if nullStr.Valid && nullStr.String != "" {
+		return json.Unmarshal([]byte(nullStr.String), target)
+	}
+	return nil
+}
+
+// execGitCommand executes a git command and returns trimmed output
+func execGitCommand(args ...string) (string, error) {
+	output, err := exec.Command("git", args...).Output()
+	if err != nil {
+		debugLog("Git command failed: git %v - %v", args, err)
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// parseNumberList parses comma-separated numbers or "all" into a map of indices
+func parseNumberList(input string, max int) map[int]bool {
+	result := make(map[int]bool)
+
+	if strings.ToLower(input) == "all" {
+		for i := 0; i < max; i++ {
+			result[i] = true
+		}
+		return result
+	}
+
+	for _, numStr := range strings.Split(input, ",") {
+		numStr = strings.TrimSpace(numStr)
+		if num, err := strconv.Atoi(numStr); err == nil && num > 0 && num <= max {
+			result[num-1] = true
+		}
+	}
+
+	return result
+}
+
+// countContextPoints counts the number of points in a nullable JSON string
+func countContextPoints(jsonStr sql.NullString) int {
+	var points []ContextPoint
+	if err := unmarshalNullableJSON(jsonStr, &points); err == nil {
+		return len(points)
+	}
+	return 0
+}
+
 func getCurrentBranch() string {
-	if output, err := exec.Command("git", "branch", "--show-current").Output(); err == nil {
-		return strings.TrimSpace(string(output))
-	} else {
-		debugLog("Failed to get current git branch: %v", err)
+	if branch, err := execGitCommand("branch", "--show-current"); err == nil {
+		return branch
 	}
 	return ""
 }
@@ -323,10 +390,8 @@ func getModifiedFiles() ([]string, int, int) {
 }
 
 func getLastCommitSha() string {
-	if output, err := exec.Command("git", "rev-parse", "HEAD").Output(); err == nil {
-		return strings.TrimSpace(string(output))
-	} else {
-		debugLog("Failed to get last commit SHA: %v", err)
+	if sha, err := execGitCommand("rev-parse", "HEAD"); err == nil {
+		return sha
 	}
 	return ""
 }
@@ -451,11 +516,10 @@ func loadTicketContext(ticket string) {
 			fmt.Printf("📜 Requirements:\n%s\n\n", requirements.String)
 		}
 
-		if contextJSON.Valid && contextJSON.String != "" {
-			var points []ContextPoint
-			if err := json.Unmarshal([]byte(contextJSON.String), &points); err != nil {
-				debugLog("Failed to parse context JSON in loadTicketContext for ticket %s: %v", ticket, err)
-			} else if len(points) > 0 {
+		var points []ContextPoint
+		if err := unmarshalNullableJSON(contextJSON, &points); err != nil {
+			debugLog("Failed to parse context JSON in loadTicketContext for ticket %s: %v", ticket, err)
+		} else if len(points) > 0 {
 				fmt.Printf("📌 Critical Context:\n")
 				for _, point := range points {
 					if point.IsUserDir {
@@ -481,7 +545,6 @@ func loadTicketContext(ticket string) {
 					}
 				}
 			}
-		}
 
 		// Add session summary
 		sessionCount, totalMinutes := getSessionStats(db, ticket)
@@ -508,8 +571,8 @@ func saveContextPoint(ticket string, point string, isUserDirective bool) {
 
 	err := db.QueryRow(`SELECT context_points FROM ticket_context WHERE ticket = ?`, ticket).Scan(&contextJSON)
 
-	if err == nil && contextJSON.Valid && contextJSON.String != "" {
-		if err := json.Unmarshal([]byte(contextJSON.String), &points); err != nil {
+	if err == nil {
+		if err := unmarshalNullableJSON(contextJSON, &points); err != nil {
 			debugLog("Failed to parse context JSON for ticket %s: %v", ticket, err)
 		}
 	}
@@ -799,13 +862,11 @@ func listTicketsWithContext() {
 		}
 
 		var pointCount int
-		if contextJSON.Valid && contextJSON.String != "" {
-			var points []ContextPoint
-			if err := json.Unmarshal([]byte(contextJSON.String), &points); err != nil {
-				debugLog("Failed to parse context JSON in listTicketsWithContext for ticket %s: %v", ticket, err)
-			} else {
-				pointCount = len(points)
-			}
+		var points []ContextPoint
+		if err := unmarshalNullableJSON(contextJSON, &points); err != nil {
+			debugLog("Failed to parse context JSON in listTicketsWithContext for ticket %s: %v", ticket, err)
+		} else {
+			pointCount = len(points)
 		}
 
 		fmt.Printf("• %s (%d context points) - Updated: %s\n",
@@ -842,7 +903,7 @@ func clearContext(ticket string) {
 	})
 }
 
-func removeContextItems(ticket string, category string) {
+func removeContextItems(ticket string, category string, itemsToRemove string) {
 	db := openDB()
 	defer db.Close()
 
@@ -889,19 +950,26 @@ func removeContextItems(ticket string, category string) {
 		fmt.Printf("%2d. %s\n", i+1, item.Text)
 	}
 
-	fmt.Printf("\nEnter numbers to remove (comma-separated), 'all' to remove all, or 'cancel': ")
-
-	// Use bufio.Scanner for proper input reading
-	scanner := bufio.NewScanner(os.Stdin)
+	// Check if items were provided as argument (non-interactive mode)
 	var input string
-	if scanner.Scan() {
-		input = strings.TrimSpace(scanner.Text())
-	}
+	if itemsToRemove != "" {
+		input = itemsToRemove
+		fmt.Printf("\nRemoving: %s\n", input)
+	} else {
+		// Interactive mode
+		fmt.Printf("\nEnter numbers to remove (comma-separated), 'all' to remove all, or 'cancel': ")
 
-	// If empty input or "cancel", cancel the operation
-	if input == "" || strings.ToLower(input) == "cancel" {
-		fmt.Println("Cancelled.")
-		return
+		// Use bufio.Scanner for proper input reading
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			input = strings.TrimSpace(scanner.Text())
+		}
+
+		// If empty input or "cancel", cancel the operation
+		if input == "" || strings.ToLower(input) == "cancel" {
+			fmt.Println("Cancelled.")
+			return
+		}
 	}
 
 	// Process removal
@@ -912,13 +980,7 @@ func removeContextItems(ticket string, category string) {
 		fmt.Printf("🗑️  Removing all %s\n", categoryName)
 	} else {
 		// Parse numbers
-		toRemove := make(map[int]bool)
-		for _, numStr := range strings.Split(input, ",") {
-			numStr = strings.TrimSpace(numStr)
-			if num, err := strconv.Atoi(numStr); err == nil && num > 0 && num <= len(items) {
-				toRemove[num-1] = true
-			}
-		}
+		toRemove := parseNumberList(input, len(items))
 
 		// Keep items not marked for removal
 		for i, item := range items {
@@ -1088,9 +1150,7 @@ func migrateContextData(db *sql.DB) {
 
 		// Parse old context points
 		var oldPoints []ContextPoint
-		if contextJSON.Valid && contextJSON.String != "" {
-			json.Unmarshal([]byte(contextJSON.String), &oldPoints)
-		}
+		unmarshalNullableJSON(contextJSON, &oldPoints)
 
 		// Categorize old points
 		enhanced := categorizeOldPoints(oldPoints)
@@ -1188,21 +1248,11 @@ func (ec *EnhancedContext) MarshalFields() (decisions, implementations, patterns
 
 // UnmarshalFields populates context fields from JSON strings
 func (ec *EnhancedContext) UnmarshalFields(decisionsJSON, implementationsJSON, patternsJSON, stateJSON, nextJSON sql.NullString) {
-	if decisionsJSON.Valid && decisionsJSON.String != "" {
-		json.Unmarshal([]byte(decisionsJSON.String), &ec.Decisions)
-	}
-	if implementationsJSON.Valid && implementationsJSON.String != "" {
-		json.Unmarshal([]byte(implementationsJSON.String), &ec.Implementations)
-	}
-	if patternsJSON.Valid && patternsJSON.String != "" {
-		json.Unmarshal([]byte(patternsJSON.String), &ec.CodePatterns)
-	}
-	if stateJSON.Valid && stateJSON.String != "" {
-		json.Unmarshal([]byte(stateJSON.String), &ec.CurrentState)
-	}
-	if nextJSON.Valid && nextJSON.String != "" {
-		json.Unmarshal([]byte(nextJSON.String), &ec.NextSteps)
-	}
+	unmarshalNullableJSON(decisionsJSON, &ec.Decisions)
+	unmarshalNullableJSON(implementationsJSON, &ec.Implementations)
+	unmarshalNullableJSON(patternsJSON, &ec.CodePatterns)
+	unmarshalNullableJSON(stateJSON, &ec.CurrentState)
+	unmarshalNullableJSON(nextJSON, &ec.NextSteps)
 }
 
 func saveEnhancedContext(db *sql.DB, ticket string, requirements string, context *EnhancedContext) error {
@@ -1252,9 +1302,7 @@ func loadLegacyContext(db *sql.DB, ticket string) (*EnhancedContext, string, err
 	}
 
 	var oldPoints []ContextPoint
-	if contextJSON.Valid && contextJSON.String != "" {
-		json.Unmarshal([]byte(contextJSON.String), &oldPoints)
-	}
+	unmarshalNullableJSON(contextJSON, &oldPoints)
 
 	enhanced := categorizeOldPoints(oldPoints)
 	return enhanced, requirements.String, nil
@@ -1470,42 +1518,11 @@ func listEnhancedTicketsWithContext() {
 
 		// Count points in each category
 		counts := map[string]int{
-			"decisions":       0,
-			"implementations": 0,
-			"patterns":        0,
-			"state":           0,
-			"next":            0,
-		}
-
-		if decisionsJSON.Valid && decisionsJSON.String != "" {
-			var points []ContextPoint
-			if json.Unmarshal([]byte(decisionsJSON.String), &points) == nil {
-				counts["decisions"] = len(points)
-			}
-		}
-		if implementationsJSON.Valid && implementationsJSON.String != "" {
-			var points []ContextPoint
-			if json.Unmarshal([]byte(implementationsJSON.String), &points) == nil {
-				counts["implementations"] = len(points)
-			}
-		}
-		if patternsJSON.Valid && patternsJSON.String != "" {
-			var points []ContextPoint
-			if json.Unmarshal([]byte(patternsJSON.String), &points) == nil {
-				counts["patterns"] = len(points)
-			}
-		}
-		if stateJSON.Valid && stateJSON.String != "" {
-			var points []ContextPoint
-			if json.Unmarshal([]byte(stateJSON.String), &points) == nil {
-				counts["state"] = len(points)
-			}
-		}
-		if nextJSON.Valid && nextJSON.String != "" {
-			var points []ContextPoint
-			if json.Unmarshal([]byte(nextJSON.String), &points) == nil {
-				counts["next"] = len(points)
-			}
+			"decisions":       countContextPoints(decisionsJSON),
+			"implementations": countContextPoints(implementationsJSON),
+			"patterns":        countContextPoints(patternsJSON),
+			"state":           countContextPoints(stateJSON),
+			"next":            countContextPoints(nextJSON),
 		}
 
 		totalPoints := counts["decisions"] + counts["implementations"] + counts["patterns"] +
