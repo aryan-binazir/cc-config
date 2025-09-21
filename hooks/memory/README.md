@@ -10,7 +10,6 @@ An intelligent memory system for Claude Code that automatically captures and cat
 - **100-point capacity** intelligently distributed across categories
 - **Session tracking** with git modifications and task descriptions
 - **Ticket-based organization** from git branch names (JIRA-123, PROJ-456)
-- **Dual implementation** - Go binary with bash fallback
 
 ## Quick Installation
 
@@ -26,11 +25,10 @@ Installs to `~/.claude/hooks/memory/` and configures minimal hooks (SessionStart
 
 - Go 1.25+ (for building)
 - SQLite3
-- jq (optional, for bash fallback)
 
 ## How It Works
 
-Hybrid approach combining:
+The memory system uses:
 - **SessionStart Hook** - Auto-loads context from SQLite database
 - **Slash Commands** - Manual capture after Claude works (since hooks can't see Claude's output)
 - **Git Integration** - Extracts actual code changes from git diff

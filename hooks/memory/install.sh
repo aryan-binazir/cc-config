@@ -93,11 +93,6 @@ main() {
         exit 1
     fi
 
-    if [ ! -f "$SOURCE_DIR/memory.sh" ]; then
-        log_error "memory.sh not found in $SOURCE_DIR"
-        exit 1
-    fi
-
     log_success "All required files found"
 
     # Step 4: Install Go dependencies
@@ -158,11 +153,6 @@ main() {
         exit 1
     }
 
-    cp "$SOURCE_DIR/memory.sh" "$INSTALL_DIR/" || {
-        log_error "Failed to copy memory.sh"
-        exit 1
-    }
-
     # Copy query binary if it exists
     if [ -f "$SOURCE_DIR/query" ]; then
         cp "$SOURCE_DIR/query" "$INSTALL_DIR/"
@@ -177,7 +167,6 @@ main() {
 
     # Set executable permissions
     chmod +x "$INSTALL_DIR/memory"
-    chmod +x "$INSTALL_DIR/memory.sh"
 
     log_success "Files installed to $INSTALL_DIR"
 
@@ -295,17 +284,6 @@ EOF
         log_warning "Go binary test inconclusive (this is normal for first run)"
     fi
 
-    # Test bash fallback
-    if command_exists sqlite3 && command_exists jq; then
-        if "$INSTALL_DIR/memory.sh" load >/dev/null 2>&1; then
-            log_success "Bash fallback test passed"
-        else
-            log_warning "Bash fallback test inconclusive"
-        fi
-    else
-        log_warning "sqlite3 or jq not found - bash fallback will not work"
-        log_info "Install with: brew install sqlite jq (macOS) or apt-get install sqlite3 jq (Linux)"
-    fi
 
     # Step 10: Configure Claude Code hooks
     log_info "Step 10: Configuring Claude Code hooks..."
@@ -326,7 +304,7 @@ EOF
   "SessionStart": [{
     "hooks": [{
       "type": "command",
-      "command": "$HOME/.claude/hooks/memory/memory load || $HOME/.claude/hooks/memory/memory.sh load"
+      "command": "$HOME/.claude/hooks/memory/memory load"
     }]
   }]
 }
@@ -356,7 +334,7 @@ EOF
     "SessionStart": [{
       "hooks": [{
         "type": "command",
-        "command": "$HOME/.claude/hooks/memory/memory load || $HOME/.claude/hooks/memory/memory.sh load"
+        "command": "$HOME/.claude/hooks/memory/memory load"
       }]
     }]
   }
@@ -388,7 +366,7 @@ EOF
     "SessionStart": [{
       "hooks": [{
         "type": "command",
-        "command": "$HOME/.claude/hooks/memory/memory load || $HOME/.claude/hooks/memory/memory.sh load"
+        "command": "$HOME/.claude/hooks/memory/memory load"
       }]
     }]
   }
