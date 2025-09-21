@@ -78,6 +78,12 @@ func main() {
 		handleContext()
 	case "cleanup":
 		cleanupOldSessions()
+	case "extract-ticket":
+		// Helper command for slash commands
+		if len(os.Args) > 2 {
+			ticket := extractTicket(os.Args[2])
+			fmt.Print(ticket)
+		}
 	default:
 		os.Exit(0)
 	}
@@ -146,6 +152,30 @@ func handleContext() {
 	case "clear":
 		if len(os.Args) > 3 {
 			clearContext(os.Args[3])
+		}
+	case "remove":
+		// Format: memory context remove <category> [ticket]
+		// or: memory context remove all (nuclear option)
+		if len(os.Args) > 3 {
+			if os.Args[3] == "all" {
+				// Nuclear option
+				dropAllTables()
+			} else {
+				category := os.Args[3]
+				var ticket string
+				if len(os.Args) > 4 {
+					ticket = os.Args[4]
+				} else {
+					// Auto-detect from branch
+					branch := getCurrentBranch()
+					ticket = extractTicket(branch)
+				}
+				if ticket != "" {
+					removeContextItems(ticket, category)
+				} else {
+					fmt.Println("❌ No ticket found in branch name")
+				}
+			}
 		}
 	}
 }
@@ -740,6 +770,151 @@ func clearContext(ticket string) {
 	if err == nil {
 		fmt.Printf("✅ Context cleared for %s\n", ticket)
 	}
+}
+
+func removeContextItems(ticket string, category string) {
+	db := openDB()
+	defer db.Close()
+
+	context, _, err := loadEnhancedContext(db, ticket)
+	if err != nil {
+		fmt.Printf("❌ No context found for %s\n", ticket)
+		return
+	}
+
+	// Map category to the appropriate field
+	var items []ContextPoint
+	var categoryName string
+
+	switch strings.ToLower(category) {
+	case "decisions", "decision":
+		items = context.Decisions
+		categoryName = "decisions"
+	case "implementations", "implementation", "impl":
+		items = context.Implementations
+		categoryName = "implementations"
+	case "patterns", "pattern", "code":
+		items = context.CodePatterns
+		categoryName = "code_patterns"
+	case "state", "status":
+		items = context.CurrentState
+		categoryName = "current_state"
+	case "next", "todo", "todos", "blocker", "blockers":
+		items = context.NextSteps
+		categoryName = "next_steps"
+	default:
+		fmt.Printf("❌ Invalid category: %s\n", category)
+		fmt.Println("Valid categories: decisions, implementations, patterns, state, next")
+		return
+	}
+
+	if len(items) == 0 {
+		fmt.Printf("📭 No %s found for %s\n", categoryName, ticket)
+		return
+	}
+
+	// Display items with numbers
+	fmt.Printf("\n📋 %s for %s:\n", strings.ToUpper(categoryName), ticket)
+	for i, item := range items {
+		fmt.Printf("%2d. %s\n", i+1, item.Text)
+	}
+
+	fmt.Printf("\nEnter numbers to remove (comma-separated), 'all' to remove all, or 'cancel': ")
+	var input string
+	fmt.Scanln(&input)
+
+	if strings.ToLower(input) == "cancel" {
+		fmt.Println("Cancelled.")
+		return
+	}
+
+	// Process removal
+	var toKeep []ContextPoint
+
+	if strings.ToLower(input) == "all" {
+		toKeep = []ContextPoint{}
+		fmt.Printf("🗑️  Removing all %s\n", categoryName)
+	} else {
+		// Parse numbers
+		toRemove := make(map[int]bool)
+		for _, numStr := range strings.Split(input, ",") {
+			numStr = strings.TrimSpace(numStr)
+			if num, err := strconv.Atoi(numStr); err == nil && num > 0 && num <= len(items) {
+				toRemove[num-1] = true
+			}
+		}
+
+		// Keep items not marked for removal
+		for i, item := range items {
+			if !toRemove[i] {
+				toKeep = append(toKeep, item)
+			}
+		}
+		fmt.Printf("🗑️  Removing %d items\n", len(toRemove))
+	}
+
+	// Update the context
+	switch categoryName {
+	case "decisions":
+		context.Decisions = toKeep
+	case "implementations":
+		context.Implementations = toKeep
+	case "code_patterns":
+		context.CodePatterns = toKeep
+	case "current_state":
+		context.CurrentState = toKeep
+	case "next_steps":
+		context.NextSteps = toKeep
+	}
+
+	// Save the updated context
+	err = saveEnhancedContext(db, ticket, "", context)
+	if err != nil {
+		fmt.Printf("❌ Failed to update context: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ Context updated for %s\n", ticket)
+}
+
+func dropAllTables() {
+	fmt.Println("⚠️  WARNING: This will DELETE ALL memory data!")
+	fmt.Println("Type 'DELETE EVERYTHING' to confirm: ")
+
+	var confirm string
+	fmt.Scanln(&confirm)
+
+	if confirm != "DELETE EVERYTHING" {
+		fmt.Println("Cancelled.")
+		return
+	}
+
+	db := openDB()
+	defer db.Close()
+
+	// Drop all tables
+	tables := []string{
+		"ticket_context_enhanced",
+		"ticket_context",
+		"sessions",
+	}
+
+	for _, table := range tables {
+		_, err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table))
+		if err != nil {
+			fmt.Printf("❌ Failed to drop %s: %v\n", table, err)
+			return
+		}
+	}
+
+	// Recreate tables
+	err := initDB(db)
+	if err != nil {
+		fmt.Printf("❌ Failed to recreate tables: %v\n", err)
+		return
+	}
+
+	fmt.Println("💥 All memory data has been deleted and tables recreated.")
 }
 
 func consolidatePoints(points []ContextPoint) []ContextPoint {
