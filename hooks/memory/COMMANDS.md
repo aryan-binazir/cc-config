@@ -140,14 +140,27 @@ memory context clear <ticket>
 
 ## Integration with Claude Code
 
-When using Claude Code, you can save context directly from your conversation:
+When using Claude Code, you can save context directly from your conversation using slash commands:
 
+**IMPORTANT NOTE**: Memory commands are for **documentation and tracking purposes only**.
+They do NOT automatically execute tasks or implement decisions. They simply record
+information to your project context for future reference and planning.
+
+### Slash Commands Behavior:
+- `/memory_todo` - Records a TODO to context, does NOT start working on it
+- `/memory_implementation` - Documents what was/will be implemented, does NOT execute code
+- `/memory_decision` - Records architectural decisions, does NOT implement them
+- `/memory_sync` - Captures current work state for documentation
+- `/memory_review` - Displays saved context for review
+
+### Examples:
 1. **For decisions**: "Remember: Using Paseto instead of JWT for better security"
-2. **For TODOs**: "TODO: Add refresh token endpoint"
+2. **For TODOs**: "TODO: Add refresh token endpoint" (recorded but not executed)
 3. **For blockers**: "BLOCKED: Waiting on DevOps for Redis credentials"
 4. **For state**: "✅ Authentication is now working"
 
-The system will automatically categorize and save these based on keywords and patterns.
+The system will automatically categorize and save these based on keywords and patterns,
+but will NOT automatically start working on them unless you explicitly request it.
 
 ## Tips for Effective Context Management
 

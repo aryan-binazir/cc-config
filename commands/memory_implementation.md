@@ -1,16 +1,23 @@
 ---
 name: Memory Implementation
-description: Save implementation details and what was built to memory
+description: Record implementation details to context (documentation only)
 argument-hint: [implementation description and details]
 ---
 
-Save implementation details to memory for the current ticket.
+Record implementation details to memory context for the current ticket.
 
-Usage: Provide details about what was implemented, including:
-- What was built or changed
-- How it works
-- Key components or files modified
+**IMPORTANT**: This command is for DOCUMENTATION purposes only. It records what
+has been implemented or what should be implemented, but does NOT execute any
+implementation work. Use this to track completed work or planned implementations
+for future reference.
+
+Usage: Provide details about what was/will be implemented, including:
+- What was built or needs to be built
+- How it works or should work
+- Key components or files modified/to modify
 - Any important implementation notes
+
+The implementation details will be saved to context for documentation and planning.
 
 $ARGUMENTS
 
