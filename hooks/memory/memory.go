@@ -25,7 +25,20 @@ func debugLog(format string, args ...interface{}) {
 }
 
 var (
-	ticketPattern = regexp.MustCompile(`([A-Z]+-\d+)`)
+	// Multiple patterns to try in order
+	ticketPatterns = []struct {
+		name    string
+		pattern *regexp.Regexp
+	}{
+		{"jira", regexp.MustCompile(`(?i)([A-Z]+-\d+)`)}, // JIRA style (case insensitive)
+		{"github", regexp.MustCompile(`#(\d+)`)},         // GitHub issue
+		{"prefixed", regexp.MustCompile(`(?i)((?:bug|issue|task|story|test)-\d+)`)}, // bug-123, issue-456
+		{"feature", regexp.MustCompile(`(?:feature|bugfix|hotfix|fix)/(.+)`)}, // feature branches
+		{"release", regexp.MustCompile(`(?:release|v)/?(\d+\.\d+(?:\.\d+)?)`)}, // version branches
+	}
+
+	// Fallback pattern for legacy code
+	ticketPattern = regexp.MustCompile(`(?i)([A-Z]+-\d+|[a-z]+-\d+)`)
 
 	// Patterns to reject (trivial updates)
 	trivialPatterns = []string{
@@ -234,10 +247,34 @@ func getCurrentBranch() string {
 }
 
 func extractTicket(branch string) string {
-	if matches := ticketPattern.FindStringSubmatch(branch); len(matches) > 1 {
-		return matches[1]
+	// Try each pattern in order
+	for _, tp := range ticketPatterns {
+		if matches := tp.pattern.FindStringSubmatch(branch); len(matches) > 1 {
+			return matches[1]
+		}
 	}
-	return ""
+
+	// If no pattern matches, use the branch name itself as the ticket
+	// This ensures EVERY branch gets tracked
+	if branch != "" {
+		// Clean up the branch name to make a reasonable ticket ID
+		ticket := branch
+		// Remove common remote prefixes
+		ticket = regexp.MustCompile(`^(origin|upstream)/`).ReplaceAllString(ticket, "")
+		// Replace special chars with dashes
+		ticket = regexp.MustCompile(`[/\\:*?"<>|]+`).ReplaceAllString(ticket, "-")
+		// Clean up multiple dashes
+		ticket = regexp.MustCompile(`-+`).ReplaceAllString(ticket, "-")
+		// Trim dashes from ends
+		ticket = strings.Trim(ticket, "-")
+
+		if ticket != "" {
+			return ticket
+		}
+	}
+
+	// Last resort fallback
+	return "default"
 }
 
 func getModifiedFiles() ([]string, int, int) {

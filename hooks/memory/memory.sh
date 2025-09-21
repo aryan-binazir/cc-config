@@ -14,8 +14,50 @@ MODE="${1:-load}"
 extract_ticket() {
     local branch
     branch=$(git branch --show-current 2>/dev/null || echo "")
-    if [[ -n "$branch" ]]; then
-        echo "$branch" | grep -oE '[A-Z]+-[0-9]+' || echo ""
+
+    if [[ -z "$branch" ]]; then
+        echo "default"
+        return
+    fi
+
+    # Try various patterns
+    # JIRA style (case insensitive)
+    if ticket=$(echo "$branch" | grep -ioE '[A-Z]+-[0-9]+' | head -1); then
+        echo "$ticket"
+        return
+    fi
+
+    # GitHub issue style
+    if ticket=$(echo "$branch" | grep -oE '#[0-9]+' | sed 's/#//' | head -1); then
+        echo "gh-$ticket"
+        return
+    fi
+
+    # Prefixed tickets (bug-123, issue-456, test-789)
+    if ticket=$(echo "$branch" | grep -ioE '(bug|issue|task|story|test)-[0-9]+' | head -1); then
+        echo "$ticket"
+        return
+    fi
+
+    # Feature/bugfix branches
+    if ticket=$(echo "$branch" | sed -n 's/^\(feature\|bugfix\|hotfix\|fix\)\/\(.*\)/\2/p'); then
+        echo "$ticket"
+        return
+    fi
+
+    # Release/version branches
+    if ticket=$(echo "$branch" | sed -n 's/^\(release\|v\)\/*\([0-9.]*\)/v\2/p'); then
+        echo "$ticket"
+        return
+    fi
+
+    # Fallback: use cleaned branch name
+    ticket=$(echo "$branch" | sed 's/^origin\///' | sed 's/[\/\\:*?"<>|]/-/g' | sed 's/-\+/-/g' | sed 's/^-*//;s/-*$//')
+
+    if [[ -n "$ticket" ]]; then
+        echo "$ticket"
+    else
+        echo "default"
     fi
 }
 
