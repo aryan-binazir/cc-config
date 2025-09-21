@@ -26,17 +26,7 @@ func debugLog(format string, args ...interface{}) {
 }
 
 var (
-	// Multiple patterns to try in order
-	ticketPatterns = []struct {
-		name    string
-		pattern *regexp.Regexp
-	}{
-		{"jira", regexp.MustCompile(`(?i)([A-Z]+-\d+)`)}, // JIRA style (case insensitive)
-		{"github", regexp.MustCompile(`#(\d+)`)},         // GitHub issue
-		{"prefixed", regexp.MustCompile(`(?i)((?:bug|issue|task|story|test)-\d+)`)}, // bug-123, issue-456
-		{"feature", regexp.MustCompile(`(?:feature|bugfix|hotfix|fix)/(.+)`)}, // feature branches
-		{"release", regexp.MustCompile(`(?:release|v)/?(\d+\.\d+(?:\.\d+)?)`)}, // version branches
-	}
+	// Removed ticketPatterns - now using branch name directly as ticket ID
 
 	// Fallback pattern for legacy code
 	ticketPattern = regexp.MustCompile(`(?i)([A-Z]+-\d+|[a-z]+-\d+)`)
@@ -269,26 +259,13 @@ func getCurrentBranch() string {
 }
 
 func extractTicket(branch string) string {
-	// Try each pattern in order
-	for _, tp := range ticketPatterns {
-		if matches := tp.pattern.FindStringSubmatch(branch); len(matches) > 1 {
-			return matches[1]
-		}
-	}
-
-	// If no pattern matches, use the branch name itself as the ticket
-	// This ensures EVERY branch gets tracked
+	// Directly use the branch name as the ticket ID
+	// No pattern matching - just use what we have
 	if branch != "" {
-		// Clean up the branch name to make a reasonable ticket ID
+		// Minimal cleanup: just remove remote prefixes if present
 		ticket := branch
 		// Remove common remote prefixes
 		ticket = regexp.MustCompile(`^(origin|upstream)/`).ReplaceAllString(ticket, "")
-		// Replace special chars with dashes
-		ticket = regexp.MustCompile(`[/\\:*?"<>|]+`).ReplaceAllString(ticket, "-")
-		// Clean up multiple dashes
-		ticket = regexp.MustCompile(`-+`).ReplaceAllString(ticket, "-")
-		// Trim dashes from ends
-		ticket = strings.Trim(ticket, "-")
 
 		if ticket != "" {
 			return ticket
