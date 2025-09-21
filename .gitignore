@@ -21,3 +21,8 @@ local/
 # Memory hook executables
 hooks/memory/memory
 hooks/memory/query
+
+# Context files
+CONTEXT.md
+context.md
+context/CONTEXT.json
