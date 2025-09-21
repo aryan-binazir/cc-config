@@ -259,20 +259,24 @@ func getCurrentBranch() string {
 }
 
 func extractTicket(branch string) string {
-	// Directly use the branch name as the ticket ID
-	// No pattern matching - just use what we have
-	if branch != "" {
-		// Minimal cleanup: just remove remote prefixes if present
-		ticket := branch
-		// Remove common remote prefixes
-		ticket = regexp.MustCompile(`^(origin|upstream)/`).ReplaceAllString(ticket, "")
-
-		if ticket != "" {
-			return ticket
-		}
+	if branch == "" {
+		return "default"
 	}
 
-	// Last resort fallback
+	// Remove common remote prefixes
+	ticket := regexp.MustCompile(`^(origin|upstream)/`).ReplaceAllString(branch, "")
+
+	// Skip common branch names that shouldn't be tracked
+	// These branches get "default" so no context is saved
+	commonBranches := regexp.MustCompile(`^(main|master|develop|dev|staging|prod|production|release.*)$`)
+	if commonBranches.MatchString(ticket) {
+		return "default"
+	}
+
+	if ticket != "" {
+		return ticket
+	}
+
 	return "default"
 }
 
