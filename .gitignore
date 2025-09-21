@@ -17,3 +17,7 @@ local/
 .update.lock
 
 .credentials.json
+
+# Memory hook executables
+hooks/memory/memory
+hooks/memory/query
