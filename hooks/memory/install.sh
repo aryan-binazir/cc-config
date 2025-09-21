@@ -218,61 +218,25 @@ CREATE INDEX IF NOT EXISTS idx_enhanced_ticket ON ticket_context_enhanced(ticket
         log_warning "sqlite3 not found - database will be created on first use"
     fi
 
-    # Step 8: Create slash commands
-    log_info "Step 8: Creating slash commands..."
+    # Step 8: Install memory slash commands
+    log_info "Step 8: Installing memory slash commands..."
 
     COMMANDS_DIR="$HOME/.claude/commands"
     mkdir -p "$COMMANDS_DIR"
 
-    # Create save_memory command (general)
-    cat > "$COMMANDS_DIR/save_memory.md" << 'EOF'
-Save important context to memory for the current ticket:
-$ARGUMENTS
-
-Run: `$HOME/.claude/hooks/memory/memory context add "$ARGUMENTS"`
-EOF
-
-    # Create save_decision command
-    cat > "$COMMANDS_DIR/save_decision.md" << 'EOF'
-Save an architectural or design decision to memory:
-$ARGUMENTS
-
-Run: `$HOME/.claude/hooks/memory/memory context save decision "$ARGUMENTS"`
-EOF
-
-    # Create save_pattern command
-    cat > "$COMMANDS_DIR/save_pattern.md" << 'EOF'
-Save a code pattern or function signature to memory:
-$ARGUMENTS
-
-Run: `$HOME/.claude/hooks/memory/memory context save pattern "$ARGUMENTS"`
-EOF
-
-    # Create save_implementation command
-    cat > "$COMMANDS_DIR/save_implementation.md" << 'EOF'
-Save an implementation detail (endpoint, function, feature) to memory:
-$ARGUMENTS
-
-Run: `$HOME/.claude/hooks/memory/memory context save implementation "$ARGUMENTS"`
-EOF
-
-    # Create save_state command
-    cat > "$COMMANDS_DIR/save_state.md" << 'EOF'
-Save current state (what works/what's broken) to memory:
-$ARGUMENTS
-
-Run: `$HOME/.claude/hooks/memory/memory context save state "$ARGUMENTS"`
-EOF
-
-    # Create save_todo command
-    cat > "$COMMANDS_DIR/save_todo.md" << 'EOF'
-Save a TODO or blocker to memory:
-$ARGUMENTS
-
-Run: `$HOME/.claude/hooks/memory/memory context save next "$ARGUMENTS"`
-EOF
-
-    log_success "Created slash commands in $COMMANDS_DIR"
+    # Copy command files from source to destination (always overwrite)
+    if [ -d "$SOURCE_DIR/commands" ]; then
+        for cmd_file in "$SOURCE_DIR"/commands/*.md; do
+            if [ -f "$cmd_file" ]; then
+                cmd_name=$(basename "$cmd_file")
+                cp "$cmd_file" "$COMMANDS_DIR/"
+                log_info "Installed/updated $cmd_name command"
+            fi
+        done
+        log_success "Memory slash commands are available in $COMMANDS_DIR"
+    else
+        log_warning "Commands directory not found in source, skipping slash command installation"
+    fi
 
     # Step 9: Test the installation
     log_info "Step 9: Testing installation..."
