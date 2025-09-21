@@ -19,6 +19,11 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// Add MaxDiffSize to existing constants
+const (
+	MaxDiffSize = 100 * 1024 // 100KB max for diff storage (~25k tokens)
+)
+
 func debugLog(format string, args ...interface{}) {
 	if os.Getenv("CLAUDE_MEMORY_DEBUG") != "" {
 		fmt.Printf("[DEBUG] "+format+"\n", args...)
@@ -53,6 +58,28 @@ var (
 		"remember:", "important:", "don't forget:", "note:",
 		"always", "never", "must", "make sure",
 	}
+
+	// Compiled regex patterns for extraction
+	codeBlockRegex = regexp.MustCompile("`([^`]+)`")
+	funcCallRegex = regexp.MustCompile(`\b(func\s+\w+\([^)]*\)|\w+\([^)]*\))`)
+	endpointRegex = regexp.MustCompile(`(GET|POST|PUT|DELETE|PATCH)\s+/[^\s]+`)
+	functionRegex = regexp.MustCompile(`^\+func\s+(\w+)`)
+	typeRegex = regexp.MustCompile(`^\+type\s+(\w+)`)
+	methodRegex = regexp.MustCompile(`^\+func\s+\([^)]+\)\s+(\w+)`)
+	interfaceRegex = regexp.MustCompile(`^\+type\s+(\w+)\s+interface`)
+	routeRegex = regexp.MustCompile(`\+?\s*router\.(HandleFunc|Method|Get|Post|Put|Delete)\([^)]+\)`)
+	apiEndpointRegex = regexp.MustCompile(`["'/](api|v\d+)?/[^"'\s]+["']`)
+	funcExtractRegex = regexp.MustCompile(`\+?\s*func\s+\w+\s*\([^)]*\)[^\n{]*`)
+	typeExtractRegex = regexp.MustCompile(`\+?\s*type\s+\w+\s+(struct|interface)(\s*{)?`)
+	funcNameRegex = regexp.MustCompile(`func\s+([A-Z]\w*)`)
+	typeNameRegex = regexp.MustCompile(`type\s+([A-Z]\w*)`)
+
+	// Other regex patterns used in various places
+	itemNumberRegex = regexp.MustCompile(`^(\d+,?)+$|^all$`)
+	remotePrefixRegex = regexp.MustCompile(`^(origin|upstream)/`)
+	commonBranchesRegex = regexp.MustCompile(`^(main|master|develop|dev|staging|prod|production|release.*)$`)
+	codePatternRegex = regexp.MustCompile(`\w+\([^)]*\)`)
+	restMethodRegex = regexp.MustCompile(`(GET|POST|PUT|DELETE|PATCH)\s+/`)
 )
 
 func main() {
@@ -162,7 +189,7 @@ func handleContext() {
 				// memory context remove <category> <ticket> <items> - non-interactive with explicit ticket
 				if len(os.Args) > 4 {
 					// Check if arg 4 looks like item numbers (contains digits/commas) or is "all"
-					if regexp.MustCompile(`^(\d+,?)+$|^all$`).MatchString(os.Args[4]) {
+					if itemNumberRegex.MatchString(os.Args[4]) {
 						// It's items, auto-detect ticket
 						branch := getCurrentBranch()
 						ticket = extractTicket(branch)
@@ -338,12 +365,11 @@ func extractTicket(branch string) string {
 	}
 
 	// Remove common remote prefixes
-	ticket := regexp.MustCompile(`^(origin|upstream)/`).ReplaceAllString(branch, "")
+	ticket := remotePrefixRegex.ReplaceAllString(branch, "")
 
 	// Skip common branch names that shouldn't be tracked
 	// These branches get "default" so no context is saved
-	commonBranches := regexp.MustCompile(`^(main|master|develop|dev|staging|prod|production|release.*)$`)
-	if commonBranches.MatchString(ticket) {
+	if commonBranchesRegex.MatchString(ticket) {
 		return "default"
 	}
 
@@ -355,34 +381,35 @@ func extractTicket(branch string) string {
 }
 
 func getModifiedFiles() ([]string, int, int) {
-	output, err := exec.Command("git", "diff", "--name-only", "HEAD").Output()
-	if err != nil {
-		debugLog("Failed to get modified files: %v", err)
-		return nil, 0, 0
-	}
-	files := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(files) == 1 && files[0] == "" {
-		files = nil
-	}
-
-	output, err = exec.Command("git", "diff", "--numstat", "HEAD").Output()
+	// Single git command to get both file names and stats
+	output, err := exec.Command("git", "diff", "--numstat", "HEAD").Output()
 	if err != nil {
 		debugLog("Failed to get git diff numstat: %v", err)
-		return files, 0, 0
+		return nil, 0, 0
 	}
 
+	var files []string
 	var added, removed int
+	seenFiles := make(map[string]bool)
+
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		if line == "" {
 			continue
 		}
 		parts := strings.Fields(line)
-		if len(parts) >= 2 {
+		if len(parts) >= 3 {
+			// Parse additions and deletions
 			if a, err := strconv.Atoi(parts[0]); err == nil {
 				added += a
 			}
 			if r, err := strconv.Atoi(parts[1]); err == nil {
 				removed += r
+			}
+			// Collect unique file names
+			fileName := parts[2]
+			if !seenFiles[fileName] {
+				files = append(files, fileName)
+				seenFiles[fileName] = true
 			}
 		}
 	}
@@ -678,7 +705,6 @@ func extractCodeFromMessage(message string) []string {
 	var patterns []string
 
 	// Look for function signatures in backticks
-	codeBlockRegex := regexp.MustCompile("`([^`]+)`")
 	if matches := codeBlockRegex.FindAllStringSubmatch(message, -1); matches != nil {
 		for _, match := range matches {
 			code := match[1]
@@ -691,7 +717,6 @@ func extractCodeFromMessage(message string) []string {
 	}
 
 	// Look for function calls or definitions outside backticks
-	funcCallRegex := regexp.MustCompile(`\b(func\s+\w+\([^)]*\)|\w+\([^)]*\))`)
 	if matches := funcCallRegex.FindAllString(message, -1); matches != nil {
 		for _, match := range matches {
 			if strings.Contains(match, "func ") && len(match) < 100 {
@@ -713,7 +738,7 @@ func extractImplementations(message string) []string {
 		if strings.Contains(lower, "implement") || strings.Contains(lower, "create") ||
 		   strings.Contains(lower, "add") || strings.Contains(lower, "build") {
 			// Look for endpoints
-			if endpointRegex := regexp.MustCompile(`(GET|POST|PUT|DELETE|PATCH)\s+/[^\s]+`); endpointRegex.MatchString(line) {
+			if endpointRegex.MatchString(line) {
 				if match := endpointRegex.FindString(line); match != "" {
 					implementations = append(implementations, match)
 				}
@@ -746,6 +771,200 @@ func extractTodos(message string) []string {
 	return todos
 }
 
+// ExtractedContent holds all extracted content from a message
+type ExtractedContent struct {
+	directives       []string
+	codePatterns     []string
+	implementations  []string
+	todos            []string
+	hasErrorState    bool
+}
+
+// extractAllFromMessage performs single-pass extraction of all content types
+func extractAllFromMessage(message string) *ExtractedContent {
+	result := &ExtractedContent{
+		directives:      []string{},
+		codePatterns:    []string{},
+		implementations: []string{},
+		todos:           []string{},
+		hasErrorState:   false,
+	}
+
+	lowerMessage := strings.ToLower(message)
+	result.hasErrorState = strings.Contains(lowerMessage, "error") ||
+		strings.Contains(lowerMessage, "fails") ||
+		strings.Contains(lowerMessage, "broken")
+
+	// Extract code blocks in backticks first (before line processing)
+	if matches := codeBlockRegex.FindAllStringSubmatch(message, -1); matches != nil {
+		for _, match := range matches {
+			code := match[1]
+			if strings.Contains(code, "(") || strings.Contains(code, "func ") ||
+			   strings.Contains(code, "type ") || strings.Contains(code, "interface ") {
+				result.codePatterns = append(result.codePatterns, code)
+			}
+		}
+	}
+
+	// Extract function calls outside backticks
+	if matches := funcCallRegex.FindAllString(message, -1); matches != nil {
+		for _, match := range matches {
+			if strings.Contains(match, "func ") && len(match) < 100 {
+				result.codePatterns = append(result.codePatterns, match)
+			}
+		}
+	}
+
+	// Single pass through lines for everything else
+	lines := strings.Split(message, "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		lower := strings.ToLower(line)
+		trimmedLine := strings.TrimSpace(line)
+
+		// Check for user directives
+		for _, pattern := range userDirectivePatterns {
+			if strings.Contains(lower, pattern) {
+				directive := trimmedLine
+				// Remove common prefixes
+				lowerDirective := strings.ToLower(directive)
+				for _, prefix := range []string{"remember:", "important:", "note:", "don't forget:"} {
+					if strings.HasPrefix(lowerDirective, prefix) {
+						directive = strings.TrimSpace(directive[len(prefix):])
+						break
+					}
+				}
+				if directive != "" && len(directive) < 200 && !contains(result.directives, directive) {
+					result.directives = append(result.directives, directive)
+				}
+				break // Move to next line after finding directive
+			}
+		}
+
+		// Check for implementations
+		if strings.Contains(lower, "implement") || strings.Contains(lower, "create") ||
+		   strings.Contains(lower, "add") || strings.Contains(lower, "build") {
+			if endpointRegex.MatchString(line) {
+				if match := endpointRegex.FindString(line); match != "" && !contains(result.implementations, match) {
+					result.implementations = append(result.implementations, match)
+				}
+			} else if len(line) < 150 && !contains(result.implementations, trimmedLine) {
+				result.implementations = append(result.implementations, trimmedLine)
+			}
+		}
+
+		// Check for TODOs
+		if strings.Contains(lower, "todo") || strings.Contains(lower, "fixme") ||
+		   strings.Contains(lower, "blocked") || strings.Contains(lower, "waiting") ||
+		   strings.Contains(lower, "need to") || strings.Contains(lower, "should") {
+			if len(line) < 150 && !contains(result.todos, trimmedLine) {
+				result.todos = append(result.todos, trimmedLine)
+			}
+		}
+	}
+
+	return result
+}
+
+// Helper function to check if slice contains string
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
+// addContextPointToCategory adds a point to the appropriate category in context
+func addContextPointToCategory(context *EnhancedContext, newPoint ContextPoint, category ContextCategory) {
+	// Ensure point text isn't too large
+	if len(newPoint.Text) > MaxDiffSize {
+		truncatedMsg := fmt.Sprintf("[Content truncated: %d bytes -> %d bytes]\n", len(newPoint.Text), MaxDiffSize)
+		newPoint.Text = truncatedMsg + newPoint.Text[:MaxDiffSize-len(truncatedMsg)-100] + "\n\n[... truncated ...]"
+	}
+
+	switch category {
+	case CategoryDecision:
+		if !isDuplicate(context.Decisions, newPoint.Text) {
+			context.Decisions = append(context.Decisions, newPoint)
+			if len(context.Decisions) > MaxDecisions {
+				context.Decisions = consolidateCategoryPoints(context.Decisions, MaxDecisions)
+			}
+		}
+	case CategoryImplementation:
+		if !isDuplicate(context.Implementations, newPoint.Text) {
+			context.Implementations = append(context.Implementations, newPoint)
+			if len(context.Implementations) > MaxImplementations {
+				context.Implementations = consolidateCategoryPoints(context.Implementations, MaxImplementations)
+			}
+		}
+	case CategoryPattern:
+		if !isDuplicate(context.CodePatterns, newPoint.Text) {
+			context.CodePatterns = append(context.CodePatterns, newPoint)
+			if len(context.CodePatterns) > MaxCodePatterns {
+				context.CodePatterns = consolidateCategoryPoints(context.CodePatterns, MaxCodePatterns)
+			}
+		}
+	case CategoryState:
+		if !isDuplicate(context.CurrentState, newPoint.Text) {
+			context.CurrentState = append(context.CurrentState, newPoint)
+			if len(context.CurrentState) > MaxCurrentState {
+				context.CurrentState = consolidateCategoryPoints(context.CurrentState, MaxCurrentState)
+			}
+		}
+	case CategoryNext:
+		if !isDuplicate(context.NextSteps, newPoint.Text) {
+			context.NextSteps = append(context.NextSteps, newPoint)
+			if len(context.NextSteps) > MaxNextSteps {
+				context.NextSteps = consolidateCategoryPoints(context.NextSteps, MaxNextSteps)
+			}
+		}
+	}
+}
+
+// loadEnhancedContextTx loads context within a transaction
+func loadEnhancedContextTx(tx *sql.Tx, ticket string) (*EnhancedContext, string, error) {
+	var requirements sql.NullString
+	var decisionsJSON, implementationsJSON, patternsJSON, stateJSON, nextJSON sql.NullString
+
+	err := tx.QueryRow(`SELECT requirements, decisions, implementations, code_patterns, current_state, next_steps
+		FROM ticket_context_enhanced WHERE ticket = ?`, ticket).Scan(
+		&requirements, &decisionsJSON, &implementationsJSON, &patternsJSON, &stateJSON, &nextJSON)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	context := &EnhancedContext{}
+	context.UnmarshalFields(decisionsJSON, implementationsJSON, patternsJSON, stateJSON, nextJSON)
+
+	return context, requirements.String, nil
+}
+
+// saveEnhancedContextTx saves context within a transaction
+func saveEnhancedContextTx(tx *sql.Tx, ticket string, requirements string, context *EnhancedContext) error {
+	decisions, implementations, patterns, state, next := context.MarshalFields()
+
+	_, err := tx.Exec(`INSERT INTO ticket_context_enhanced
+		(ticket, requirements, decisions, implementations, code_patterns, current_state, next_steps, last_updated)
+		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(ticket) DO UPDATE SET
+		requirements = excluded.requirements,
+		decisions = excluded.decisions,
+		implementations = excluded.implementations,
+		code_patterns = excluded.code_patterns,
+		current_state = excluded.current_state,
+		next_steps = excluded.next_steps,
+		last_updated = CURRENT_TIMESTAMP`,
+		ticket, requirements, decisions, implementations, patterns, state, next)
+
+	return err
+}
+
 func extractPatternsFromGitDiff() []string {
 	var patterns []string
 
@@ -763,11 +982,6 @@ func extractPatternsFromGitDiff() []string {
 	}
 
 	lines := strings.Split(string(output), "\n")
-	functionRegex := regexp.MustCompile(`^\+func\s+(\w+)`)
-	typeRegex := regexp.MustCompile(`^\+type\s+(\w+)`)
-	methodRegex := regexp.MustCompile(`^\+func\s+\([^)]+\)\s+(\w+)`)
-	interfaceRegex := regexp.MustCompile(`^\+type\s+(\w+)\s+interface`)
-
 	seenPatterns := make(map[string]bool)
 
 	for _, line := range lines {
@@ -1195,7 +1409,7 @@ func categorizeContext(point string) ContextCategory {
 	if strings.Contains(point, "func ") || strings.Contains(point, "type ") ||
 		strings.Contains(point, "struct{") || strings.Contains(point, "interface{") ||
 		strings.Contains(point, "()") || strings.Contains(point, "HandleFunc") ||
-		regexp.MustCompile(`\w+\([^)]*\)`).MatchString(point) {
+		codePatternRegex.MatchString(point) {
 		return CategoryPattern
 	}
 
@@ -1218,7 +1432,7 @@ func categorizeContext(point string) ContextCategory {
 	if strings.Contains(lowerPoint, "endpoint") || strings.Contains(lowerPoint, "api") ||
 		strings.Contains(lowerPoint, "function") || strings.Contains(lowerPoint, "created") ||
 		strings.Contains(lowerPoint, "implemented") || strings.Contains(lowerPoint, "added") ||
-		regexp.MustCompile(`(GET|POST|PUT|DELETE|PATCH)\s+/`).MatchString(point) {
+		restMethodRegex.MatchString(point) {
 		return CategoryImplementation
 	}
 
@@ -1322,6 +1536,12 @@ func addContextPoint(points *[]ContextPoint, newPoint ContextPoint, maxPoints in
 }
 
 func saveEnhancedContextPoint(ticket string, point string, category ContextCategory, isUserDirective bool) {
+	// Truncate large content to prevent database bloat
+	if len(point) > MaxDiffSize {
+		truncatedMsg := fmt.Sprintf("[Content truncated: %d bytes -> %d bytes]\n", len(point), MaxDiffSize)
+		point = truncatedMsg + point[:MaxDiffSize-len(truncatedMsg)-100] + "\n\n[... truncated ...]"
+	}
+
 	if !isUserDirective && !evaluateEnhancedContextImportance(point, category) {
 		return
 	}
@@ -1435,7 +1655,7 @@ func evaluateEnhancedContextImportance(point string, category ContextCategory) b
 	if category == CategoryPattern {
 		// Must contain actual code
 		return strings.Contains(point, "func ") || strings.Contains(point, "type ") ||
-			strings.Contains(point, "()") || regexp.MustCompile(`\w+\([^)]*\)`).MatchString(point)
+			strings.Contains(point, "()") || codePatternRegex.MatchString(point)
 	}
 
 	if category == CategoryDecision {
@@ -1448,7 +1668,7 @@ func evaluateEnhancedContextImportance(point string, category ContextCategory) b
 	if category == CategoryImplementation {
 		// Must be specific
 		lower := strings.ToLower(point)
-		return regexp.MustCompile(`(GET|POST|PUT|DELETE|PATCH)\s+/`).MatchString(point) ||
+		return restMethodRegex.MatchString(point) ||
 			strings.Contains(lower, "endpoint") || strings.Contains(lower, "api")
 	}
 
@@ -1546,8 +1766,7 @@ func extractCodePatternsFromDiff(gitDiff string) []string {
 	patterns := []string{}
 
 	// Extract function signatures - stop at newline or opening brace
-	funcRegex := regexp.MustCompile(`\+?\s*func\s+\w+\s*\([^)]*\)[^\n{]*`)
-	if matches := funcRegex.FindAllString(gitDiff, -1); matches != nil {
+	if matches := funcExtractRegex.FindAllString(gitDiff, -1); matches != nil {
 		for _, match := range matches {
 			// Clean up the match
 			match = strings.TrimPrefix(match, "+")
@@ -1564,8 +1783,7 @@ func extractCodePatternsFromDiff(gitDiff string) []string {
 	}
 
 	// Extract type definitions - just the declaration line
-	typeRegex := regexp.MustCompile(`\+?\s*type\s+\w+\s+(struct|interface)(\s*{)?`)
-	if matches := typeRegex.FindAllString(gitDiff, -1); matches != nil {
+	if matches := typeExtractRegex.FindAllString(gitDiff, -1); matches != nil {
 		for _, match := range matches {
 			match = strings.TrimPrefix(match, "+")
 			match = strings.TrimSpace(match)
@@ -1576,10 +1794,9 @@ func extractCodePatternsFromDiff(gitDiff string) []string {
 		}
 	}
 
-	// Note: Interface method signatures are already captured by funcRegex
+	// Note: Interface method signatures are already captured by funcExtractRegex
 
 	// Extract router patterns
-	routeRegex := regexp.MustCompile(`\+?\s*router\.(HandleFunc|Method|Get|Post|Put|Delete)\([^)]+\)`)
 	if matches := routeRegex.FindAllString(gitDiff, -1); matches != nil {
 		for _, match := range matches {
 			match = strings.TrimPrefix(match, "+")
@@ -1589,8 +1806,7 @@ func extractCodePatternsFromDiff(gitDiff string) []string {
 	}
 
 	// Extract API endpoints
-	endpointRegex := regexp.MustCompile(`["'/](api|v\d+)?/[^"'\s]+["']`)
-	if matches := endpointRegex.FindAllString(gitDiff, -1); matches != nil {
+	if matches := apiEndpointRegex.FindAllString(gitDiff, -1); matches != nil {
 		for _, match := range matches {
 			patterns = append(patterns, "endpoint: "+match)
 		}
@@ -1641,9 +1857,6 @@ func limitToMostImportant(patterns []string, max int) []string {
 
 func startsWithUppercase(s string) bool {
 	// Check if pattern starts with uppercase (public in Go)
-	funcNameRegex := regexp.MustCompile(`func\s+([A-Z]\w*)`)
-	typeNameRegex := regexp.MustCompile(`type\s+([A-Z]\w*)`)
-
 	return funcNameRegex.MatchString(s) || typeNameRegex.MatchString(s)
 }
 
@@ -1813,91 +2026,132 @@ func saveMemory() {
 		}
 	}
 
-	db := openDB()
-	defer db.Close()
-
-	now := time.Now()
-	commitSha := getLastCommitSha()
-
-	// Save session data
-	var existingID int
-	err = db.QueryRow("SELECT id FROM sessions WHERE session_id = ?", data.SessionID).Scan(&existingID)
-
-	if err == sql.ErrNoRows {
-		debugLog("Inserting new session: ID=%s, Message=%s", data.SessionID, data.LastHumanMessage)
-		_, err = db.Exec(`INSERT INTO sessions (ticket, branch_name, session_id, task_description,
-			files_modified, lines_added, lines_removed, start_time, end_time, duration_seconds, commit_sha)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			ticket, branch, data.SessionID, data.LastHumanMessage,
-			filesJson, added, removed, now, now, 0, commitSha)
+	// Use database transaction for all operations
+	withDB(func(db *sql.DB) error {
+		tx, err := db.Begin()
 		if err != nil {
-			debugLog("Failed to insert session: %v", err)
-			fmt.Printf("[Claude Memory Hook] Warning: Failed to save session data: %v\n", err)
-		} else {
+			return err
+		}
+		defer tx.Rollback()
+
+		now := time.Now()
+		commitSha := getLastCommitSha()
+
+		// Save session data in transaction
+		var existingID int
+		err = tx.QueryRow("SELECT id FROM sessions WHERE session_id = ?", data.SessionID).Scan(&existingID)
+
+		if err == sql.ErrNoRows {
+			debugLog("Inserting new session: ID=%s, Message=%s", data.SessionID, data.LastHumanMessage)
+			_, err = tx.Exec(`INSERT INTO sessions (ticket, branch_name, session_id, task_description,
+				files_modified, lines_added, lines_removed, start_time, end_time, duration_seconds, commit_sha)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				ticket, branch, data.SessionID, data.LastHumanMessage,
+				filesJson, added, removed, now, now, 0, commitSha)
+			if err != nil {
+				debugLog("Failed to insert session: %v", err)
+				return err
+			}
 			debugLog("Session inserted successfully")
-		}
-	} else if err == nil {
-		_, err = db.Exec(`UPDATE sessions SET task_description = ?, files_modified = ?,
-			lines_added = ?, lines_removed = ?, end_time = ?, commit_sha = ?
-			WHERE session_id = ?`,
-			data.LastHumanMessage, filesJson, added, removed, now, commitSha, data.SessionID)
-		if err != nil {
-			debugLog("Failed to update session: %v", err)
-			fmt.Printf("[Claude Memory Hook] Warning: Failed to update session data: %v\n", err)
-		}
-	}
-
-	// Extract code patterns from git diff
-	extractPatternsFromSession()
-
-	// Extract and save context from the message
-	if data.LastHumanMessage != "" {
-		// Extract user directives (remember:, important:, etc)
-		directives := extractUserDirectives(data.LastHumanMessage)
-		for _, directive := range directives {
-			category := categorizeContext(directive)
-			saveEnhancedContextPoint(ticket, directive, category, true)
-		}
-
-		// Extract code snippets from message
-		codePatterns := extractCodeFromMessage(data.LastHumanMessage)
-		for _, pattern := range codePatterns {
-			saveEnhancedContextPoint(ticket, pattern, CategoryPattern, false)
-		}
-
-		// Extract implementation descriptions
-		implementations := extractImplementations(data.LastHumanMessage)
-		for _, impl := range implementations {
-			saveEnhancedContextPoint(ticket, impl, CategoryImplementation, false)
-		}
-
-		// Extract TODOs and blockers
-		todos := extractTodos(data.LastHumanMessage)
-		for _, todo := range todos {
-			debugLog("Extracted TODO: %s", todo)
-			saveEnhancedContextPoint(ticket, todo, CategoryNext, false)
-		}
-
-		// Extract error states
-		if strings.Contains(strings.ToLower(data.LastHumanMessage), "error") ||
-		   strings.Contains(strings.ToLower(data.LastHumanMessage), "fails") ||
-		   strings.Contains(strings.ToLower(data.LastHumanMessage), "broken") {
-			if len(data.LastHumanMessage) < 200 {
-				saveEnhancedContextPoint(ticket, data.LastHumanMessage, CategoryState, false)
+		} else if err == nil {
+			_, err = tx.Exec(`UPDATE sessions SET task_description = ?, files_modified = ?,
+				lines_added = ?, lines_removed = ?, end_time = ?, commit_sha = ?
+				WHERE session_id = ?`,
+				data.LastHumanMessage, filesJson, added, removed, now, commitSha, data.SessionID)
+			if err != nil {
+				debugLog("Failed to update session: %v", err)
+				return err
 			}
 		}
 
-		// Check if the whole message is important context
-		if evaluateContextImportance(data.LastHumanMessage) {
-			// Don't duplicate if already extracted
-			if len(directives) == 0 && len(codePatterns) == 0 && len(implementations) == 0 && len(todos) == 0 {
-				category := categorizeContext(data.LastHumanMessage)
-				if len(data.LastHumanMessage) < 200 {
-					saveEnhancedContextPoint(ticket, data.LastHumanMessage, category, false)
+		// Extract and save context from the message using single-pass extraction
+		if data.LastHumanMessage != "" {
+			extractedContext := extractAllFromMessage(data.LastHumanMessage)
+
+			// Load existing context within transaction
+			context, requirements, err := loadEnhancedContextTx(tx, ticket)
+			if err != nil {
+				context = &EnhancedContext{
+					Decisions:       []ContextPoint{},
+					Implementations: []ContextPoint{},
+					CodePatterns:    []ContextPoint{},
+					CurrentState:    []ContextPoint{},
+					NextSteps:       []ContextPoint{},
 				}
+				requirements = ""
+			}
+
+			// Add all extracted context points
+			for _, directive := range extractedContext.directives {
+				category := categorizeContext(directive)
+				newPoint := ContextPoint{
+					Text:      directive,
+					Category:  category,
+					Timestamp: time.Now(),
+					IsUserDir: true,
+				}
+				addContextPointToCategory(context, newPoint, category)
+			}
+
+			for _, pattern := range extractedContext.codePatterns {
+				newPoint := ContextPoint{
+					Text:      pattern,
+					Category:  CategoryPattern,
+					Timestamp: time.Now(),
+					IsUserDir: false,
+				}
+				addContextPointToCategory(context, newPoint, CategoryPattern)
+			}
+
+			for _, impl := range extractedContext.implementations {
+				newPoint := ContextPoint{
+					Text:      impl,
+					Category:  CategoryImplementation,
+					Timestamp: time.Now(),
+					IsUserDir: false,
+				}
+				addContextPointToCategory(context, newPoint, CategoryImplementation)
+			}
+
+			for _, todo := range extractedContext.todos {
+				debugLog("Extracted TODO: %s", todo)
+				newPoint := ContextPoint{
+					Text:      todo,
+					Category:  CategoryNext,
+					Timestamp: time.Now(),
+					IsUserDir: false,
+				}
+				addContextPointToCategory(context, newPoint, CategoryNext)
+			}
+
+			// Check for error states
+			if extractedContext.hasErrorState && len(data.LastHumanMessage) < 200 {
+				message := data.LastHumanMessage
+				if len(message) > MaxDiffSize {
+					truncatedMsg := fmt.Sprintf("[Content truncated: %d bytes -> %d bytes]\n", len(message), MaxDiffSize)
+					message = truncatedMsg + message[:MaxDiffSize-len(truncatedMsg)-100] + "\n\n[... truncated ...]"
+				}
+				newPoint := ContextPoint{
+					Text:      message,
+					Category:  CategoryState,
+					Timestamp: time.Now(),
+					IsUserDir: false,
+				}
+				addContextPointToCategory(context, newPoint, CategoryState)
+			}
+
+			// Save the updated context in the transaction
+			if err := saveEnhancedContextTx(tx, ticket, requirements, context); err != nil {
+				return err
 			}
 		}
-	}
+
+		// Commit transaction
+		return tx.Commit()
+	})
+
+	// Extract code patterns from git diff (outside transaction)
+	extractPatternsFromSession()
 
 	fmt.Printf("[Claude Memory Hook] Context saved for ticket: %s\n", ticket)
 }

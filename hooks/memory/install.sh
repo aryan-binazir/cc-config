@@ -347,14 +347,19 @@ EOF
     echo "  Save: echo '{\"sessionId\":\"test-123\",\"lastHumanMessage\":\"Test task\"}' | $INSTALL_DIR/memory save"
     echo
     echo "📝 The memory system will:"
-    echo "  • Auto-load context at session start"
-    echo "  • Create/sync CONTEXT.md in working directory"
-    echo "  • Track work by git branch/ticket number"
+    echo "  • Auto-load context at session start (via hooks)"
+    echo "  • Track work sessions by git branch name"
+    echo "  • Store context categorized by type (decisions, implementations, etc.)"
+    echo "  • Automatically truncate large diffs to 100KB"
     echo ""
-    echo "📌 Use slash commands after Claude works:"
-    echo "  • /memory_sync - Capture git diff + sync CONTEXT.md"
-    echo "  • /memory_decision - Save architectural decisions"
-    echo "  • /memory_review - Review current ticket context"
+    echo "📌 Available memory commands:"
+    echo "  • memory load - Load context for current branch"
+    echo "  • memory save - Save session (called automatically by hooks)"
+    echo "  • memory context load [ticket] - Load specific ticket context"
+    echo "  • memory context save <category> <text> - Save context point"
+    echo "  • memory context list - List all tickets with context"
+    echo "  • memory context remove <category> [items] - Remove context items"
+    echo "  • memory cleanup [days] - Clean old sessions (default 30 days)"
     echo
 }
 

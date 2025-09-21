@@ -1,10 +1,13 @@
 ---
 name: Memory Remove State
 description: Remove outdated state entries from memory
-argument-hint: (interactive selection)
+argument-hint: (item numbers to remove, e.g., "1,3" or "all", or leave blank to see list)
 ---
 
-Interactively remove old state entries from the current ticket's memory.
+Remove old state entries from the current ticket's memory.
+
+If no arguments provided: Shows numbered list of state entries
+If arguments provided: Removes those items (e.g., "1,3" removes items 1 and 3, "all" removes all)
 
 Execute:
 ```bash
@@ -12,6 +15,15 @@ Execute:
 BRANCH=$(git branch --show-current 2>/dev/null || echo "no-branch")
 TICKET=$($HOME/.claude/hooks/memory/memory extract-ticket "$BRANCH" 2>/dev/null || echo "$BRANCH")
 
-echo "Removing state for ticket: $TICKET (branch: $BRANCH)"
-$HOME/.claude/hooks/memory/memory context remove state
+echo "State for ticket: $TICKET (branch: $BRANCH)"
+
+# Pass arguments if provided, otherwise show list only
+if [ -n "$ARGUMENTS" ]; then
+    $HOME/.claude/hooks/memory/memory context remove state "$ARGUMENTS"
+else
+    # Just show the list, no removal
+    $HOME/.claude/hooks/memory/memory context remove state | head -n -1
+    echo ""
+    echo "To remove items, run: /memory_remove_state 1,3  (or 'all' to remove all)"
+fi
 ```
