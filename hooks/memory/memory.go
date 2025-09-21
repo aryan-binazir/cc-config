@@ -19,49 +19,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// Context category types
-type ContextCategory string
-
+// Add MaxDiffSize to existing constants
 const (
-	CategoryDecision       ContextCategory = "decision"
-	CategoryImplementation ContextCategory = "implementation"
-	CategoryPattern        ContextCategory = "pattern"
-	CategoryState          ContextCategory = "state"
-	CategoryNext           ContextCategory = "next"
+	MaxDiffSize = 100 * 1024 // 100KB max for diff storage (~25k tokens)
 )
-
-// Limits for each category
-const (
-	MaxDecisions       = 20
-	MaxImplementations = 20
-	MaxCodePatterns    = 30
-	MaxCurrentState    = 15
-	MaxNextSteps       = 15
-	MaxTotalPoints     = 20 // Legacy limit
-)
-
-// ContextPoint represents a single context item
-type ContextPoint struct {
-	Text      string          `json:"text"`
-	Timestamp time.Time       `json:"timestamp"`
-	IsUserDir bool            `json:"is_user_directive,omitempty"`
-	Category  ContextCategory `json:"category,omitempty"`
-}
-
-// EnhancedContext represents categorized context for a ticket
-type EnhancedContext struct {
-	Decisions       []ContextPoint `json:"decisions"`
-	Implementations []ContextPoint `json:"implementations"`
-	CodePatterns    []ContextPoint `json:"code_patterns"`
-	CurrentState    []ContextPoint `json:"current_state"`
-	NextSteps       []ContextPoint `json:"next_steps"`
-}
-
-// InputData represents the JSON input from stdin
-type InputData struct {
-	SessionID        string `json:"session_id"`
-	LastHumanMessage string `json:"last_human_message"`
-}
 
 func debugLog(format string, args ...interface{}) {
 	if os.Getenv("CLAUDE_MEMORY_DEBUG") != "" {
@@ -112,6 +73,13 @@ var (
 	typeExtractRegex = regexp.MustCompile(`\+?\s*type\s+\w+\s+(struct|interface)(\s*{)?`)
 	funcNameRegex = regexp.MustCompile(`func\s+([A-Z]\w*)`)
 	typeNameRegex = regexp.MustCompile(`type\s+([A-Z]\w*)`)
+
+	// Other regex patterns used in various places
+	itemNumberRegex = regexp.MustCompile(`^(\d+,?)+$|^all$`)
+	remotePrefixRegex = regexp.MustCompile(`^(origin|upstream)/`)
+	commonBranchesRegex = regexp.MustCompile(`^(main|master|develop|dev|staging|prod|production|release.*)$`)
+	codePatternRegex = regexp.MustCompile(`\w+\([^)]*\)`)
+	restMethodRegex = regexp.MustCompile(`(GET|POST|PUT|DELETE|PATCH)\s+/`)
 )
 
 func main() {
@@ -221,7 +189,7 @@ func handleContext() {
 				// memory context remove <category> <ticket> <items> - non-interactive with explicit ticket
 				if len(os.Args) > 4 {
 					// Check if arg 4 looks like item numbers (contains digits/commas) or is "all"
-					if regexp.MustCompile(`^(\d+,?)+$|^all$`).MatchString(os.Args[4]) {
+					if itemNumberRegex.MatchString(os.Args[4]) {
 						// It's items, auto-detect ticket
 						branch := getCurrentBranch()
 						ticket = extractTicket(branch)
@@ -397,12 +365,11 @@ func extractTicket(branch string) string {
 	}
 
 	// Remove common remote prefixes
-	ticket := regexp.MustCompile(`^(origin|upstream)/`).ReplaceAllString(branch, "")
+	ticket := remotePrefixRegex.ReplaceAllString(branch, "")
 
 	// Skip common branch names that shouldn't be tracked
 	// These branches get "default" so no context is saved
-	commonBranches := regexp.MustCompile(`^(main|master|develop|dev|staging|prod|production|release.*)$`)
-	if commonBranches.MatchString(ticket) {
+	if commonBranchesRegex.MatchString(ticket) {
 		return "default"
 	}
 
@@ -914,6 +881,12 @@ func contains(slice []string, str string) bool {
 
 // addContextPointToCategory adds a point to the appropriate category in context
 func addContextPointToCategory(context *EnhancedContext, newPoint ContextPoint, category ContextCategory) {
+	// Ensure point text isn't too large
+	if len(newPoint.Text) > MaxDiffSize {
+		truncatedMsg := fmt.Sprintf("[Content truncated: %d bytes -> %d bytes]\n", len(newPoint.Text), MaxDiffSize)
+		newPoint.Text = truncatedMsg + newPoint.Text[:MaxDiffSize-len(truncatedMsg)-100] + "\n\n[... truncated ...]"
+	}
+
 	switch category {
 	case CategoryDecision:
 		if !isDuplicate(context.Decisions, newPoint.Text) {
@@ -1436,7 +1409,7 @@ func categorizeContext(point string) ContextCategory {
 	if strings.Contains(point, "func ") || strings.Contains(point, "type ") ||
 		strings.Contains(point, "struct{") || strings.Contains(point, "interface{") ||
 		strings.Contains(point, "()") || strings.Contains(point, "HandleFunc") ||
-		regexp.MustCompile(`\w+\([^)]*\)`).MatchString(point) {
+		codePatternRegex.MatchString(point) {
 		return CategoryPattern
 	}
 
@@ -1459,7 +1432,7 @@ func categorizeContext(point string) ContextCategory {
 	if strings.Contains(lowerPoint, "endpoint") || strings.Contains(lowerPoint, "api") ||
 		strings.Contains(lowerPoint, "function") || strings.Contains(lowerPoint, "created") ||
 		strings.Contains(lowerPoint, "implemented") || strings.Contains(lowerPoint, "added") ||
-		regexp.MustCompile(`(GET|POST|PUT|DELETE|PATCH)\s+/`).MatchString(point) {
+		restMethodRegex.MatchString(point) {
 		return CategoryImplementation
 	}
 
@@ -1563,6 +1536,12 @@ func addContextPoint(points *[]ContextPoint, newPoint ContextPoint, maxPoints in
 }
 
 func saveEnhancedContextPoint(ticket string, point string, category ContextCategory, isUserDirective bool) {
+	// Truncate large content to prevent database bloat
+	if len(point) > MaxDiffSize {
+		truncatedMsg := fmt.Sprintf("[Content truncated: %d bytes -> %d bytes]\n", len(point), MaxDiffSize)
+		point = truncatedMsg + point[:MaxDiffSize-len(truncatedMsg)-100] + "\n\n[... truncated ...]"
+	}
+
 	if !isUserDirective && !evaluateEnhancedContextImportance(point, category) {
 		return
 	}
@@ -1676,7 +1655,7 @@ func evaluateEnhancedContextImportance(point string, category ContextCategory) b
 	if category == CategoryPattern {
 		// Must contain actual code
 		return strings.Contains(point, "func ") || strings.Contains(point, "type ") ||
-			strings.Contains(point, "()") || regexp.MustCompile(`\w+\([^)]*\)`).MatchString(point)
+			strings.Contains(point, "()") || codePatternRegex.MatchString(point)
 	}
 
 	if category == CategoryDecision {
@@ -1689,7 +1668,7 @@ func evaluateEnhancedContextImportance(point string, category ContextCategory) b
 	if category == CategoryImplementation {
 		// Must be specific
 		lower := strings.ToLower(point)
-		return regexp.MustCompile(`(GET|POST|PUT|DELETE|PATCH)\s+/`).MatchString(point) ||
+		return restMethodRegex.MatchString(point) ||
 			strings.Contains(lower, "endpoint") || strings.Contains(lower, "api")
 	}
 
@@ -2147,8 +2126,13 @@ func saveMemory() {
 
 			// Check for error states
 			if extractedContext.hasErrorState && len(data.LastHumanMessage) < 200 {
+				message := data.LastHumanMessage
+				if len(message) > MaxDiffSize {
+					truncatedMsg := fmt.Sprintf("[Content truncated: %d bytes -> %d bytes]\n", len(message), MaxDiffSize)
+					message = truncatedMsg + message[:MaxDiffSize-len(truncatedMsg)-100] + "\n\n[... truncated ...]"
+				}
 				newPoint := ContextPoint{
-					Text:      data.LastHumanMessage,
+					Text:      message,
 					Category:  CategoryState,
 					Timestamp: time.Now(),
 					IsUserDir: false,
