@@ -6,12 +6,12 @@ import "time"
 
 // Constants for memory management
 const (
-	MaxTotalPoints     = 50
-	MaxDecisions       = 10
-	MaxImplementations = 15
-	MaxCodePatterns    = 15
-	MaxCurrentState    = 10
-	MaxNextSteps       = 10
+	MaxTotalPoints     = 100
+	MaxDecisions       = 20
+	MaxImplementations = 50
+	MaxCodePatterns    = 30
+	MaxCurrentState    = 20
+	MaxNextSteps       = 20
 )
 
 // ContextCategory defines the type of context

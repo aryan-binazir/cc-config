@@ -1,13 +1,13 @@
 # Claude Code Memory Hooks System
 
-An intelligent memory system for Claude Code that automatically captures and categorizes work context by git branch/ticket. Stores up to 50 categorized context points including code patterns, decisions, implementations, and TODOs.
+An intelligent memory system for Claude Code that automatically captures and categorizes work context by git branch/ticket. Stores up to 100 categorized context points including code patterns, decisions, implementations, and TODOs.
 
 ## Features
 
 - **Automatic context capture** from your Claude conversations
 - **Smart categorization** into 5 types: decisions, implementations, code patterns, state, next steps
 - **Code extraction** from messages and git diffs
-- **50-point capacity** intelligently distributed across categories
+- **100-point capacity** intelligently distributed across categories
 - **Session tracking** with git modifications and task descriptions
 - **Ticket-based organization** from git branch names (JIRA-123, PROJ-456)
 - **Dual implementation** - Go binary with bash fallback
@@ -38,29 +38,29 @@ Hybrid approach combining:
 
 ## Context Categories
 
-The system stores up to 50 context points across 5 categories:
+The system stores up to 100 context points across 5 categories:
 
-### 💡 Decisions (10 max)
+### 💡 Decisions (20 max)
 Strategic choices with reasoning:
 - "Use Redis because it handles horizontal scaling"
 - "Chose Paseto over JWT for better security"
 
-### 🏗️ Implementations (15 max)
+### 🏗️ Implementations (50 max)
 What's been built:
 - "POST /api/login - Returns JWT token"
 - "Added rate limiting middleware"
 
-### 🔧 Code Patterns (15 max)
+### 🔧 Code Patterns (30 max)
 Function signatures and types extracted from code:
 - `func AuthRequired(next http.HandlerFunc) http.HandlerFunc`
 - `type Token struct { UserID string; Exp int64 }`
 
-### 📊 Current State (10 max)
+### 📊 Current State (20 max)
 What works/what's broken:
 - "✅ Login endpoint working with rate limiting"
 - "❌ Refresh tokens not implemented"
 
-### 📝 Next Steps (10 max)
+### 📝 Next Steps (20 max)
 TODOs and blockers:
 - "TODO: Implement refresh tokens"
 - "BLOCKED: Need Redis credentials from DevOps"
@@ -211,16 +211,16 @@ The `/memory_sync` command captures from git diff:
 ## Database Schema
 
 ### ticket_context_enhanced
-Stores categorized context with up to 50 points total:
+Stores categorized context with up to 100 points total:
 ```sql
 CREATE TABLE ticket_context_enhanced (
     ticket TEXT PRIMARY KEY,
     requirements TEXT,
-    decisions TEXT,          -- JSON array (max 10)
-    implementations TEXT,    -- JSON array (max 15)
-    code_patterns TEXT,      -- JSON array (max 15)
-    current_state TEXT,      -- JSON array (max 10)
-    next_steps TEXT,         -- JSON array (max 10)
+    decisions TEXT,          -- JSON array (max 20)
+    implementations TEXT,    -- JSON array (max 50)
+    code_patterns TEXT,      -- JSON array (max 30)
+    current_state TEXT,      -- JSON array (max 20)
+    next_steps TEXT,         -- JSON array (max 20)
     created_at DATETIME,
     last_updated DATETIME
 );

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -755,8 +756,13 @@ func listTicketsWithContext() {
 func clearContext(ticket string) {
 	// Confirm before clearing
 	fmt.Printf("⚠️  Clear all context for %s? This cannot be undone. Type 'yes' to confirm: ", ticket)
+
+	// Use bufio.Scanner for proper input reading
+	scanner := bufio.NewScanner(os.Stdin)
 	var confirm string
-	fmt.Scanln(&confirm)
+	if scanner.Scan() {
+		confirm = strings.TrimSpace(scanner.Text())
+	}
 
 	if strings.ToLower(confirm) != "yes" {
 		fmt.Printf("Cancelled.\n")
@@ -820,10 +826,16 @@ func removeContextItems(ticket string, category string) {
 	}
 
 	fmt.Printf("\nEnter numbers to remove (comma-separated), 'all' to remove all, or 'cancel': ")
-	var input string
-	fmt.Scanln(&input)
 
-	if strings.ToLower(input) == "cancel" {
+	// Use bufio.Scanner for proper input reading
+	scanner := bufio.NewScanner(os.Stdin)
+	var input string
+	if scanner.Scan() {
+		input = strings.TrimSpace(scanner.Text())
+	}
+
+	// If empty input or "cancel", cancel the operation
+	if input == "" || strings.ToLower(input) == "cancel" {
 		fmt.Println("Cancelled.")
 		return
 	}
@@ -881,8 +893,12 @@ func dropAllTables() {
 	fmt.Println("⚠️  WARNING: This will DELETE ALL memory data!")
 	fmt.Println("Type 'DELETE EVERYTHING' to confirm: ")
 
+	// Use bufio.Scanner for proper input reading
+	scanner := bufio.NewScanner(os.Stdin)
 	var confirm string
-	fmt.Scanln(&confirm)
+	if scanner.Scan() {
+		confirm = strings.TrimSpace(scanner.Text())
+	}
 
 	if confirm != "DELETE EVERYTHING" {
 		fmt.Println("Cancelled.")
