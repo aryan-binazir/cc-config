@@ -21,4 +21,12 @@ The implementation details will be saved to context for documentation and planni
 
 $ARGUMENTS
 
-Run: `$HOME/.claude/hooks/memory/memory context save implementation "$ARGUMENTS"`
+Execute:
+```bash
+# Get actual current branch - don't trust context
+BRANCH=$(git branch --show-current 2>/dev/null || echo "no-branch")
+TICKET=$($HOME/.claude/hooks/memory/memory extract-ticket "$BRANCH" 2>/dev/null || echo "$BRANCH")
+
+# Save to memory using verified ticket
+$HOME/.claude/hooks/memory/memory context save implementation "$TICKET" "$ARGUMENTS"
+```

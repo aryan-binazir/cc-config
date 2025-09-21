@@ -15,9 +15,9 @@ Steps:
 
 Execute:
 ```bash
-# Get current branch/ticket
+# Get actual current branch - don't trust context
 BRANCH=$(git branch --show-current 2>/dev/null || echo "no-branch")
-TICKET=$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' || echo "no-ticket")
+TICKET=$($HOME/.claude/hooks/memory/memory extract-ticket "$BRANCH" 2>/dev/null || echo "$BRANCH")
 
 # Capture current state
 STATUS=$(git status --porcelain 2>/dev/null || echo "No git status available")
@@ -40,6 +40,6 @@ Additional Notes:
 $ARGUMENTS"
 fi
 
-# Save to memory
-$HOME/.claude/hooks/memory/memory context save state "$CONTEXT"
+# Save to memory using verified ticket
+$HOME/.claude/hooks/memory/memory context save state "$TICKET" "$CONTEXT"
 ```

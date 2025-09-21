@@ -21,4 +21,12 @@ The decision will be saved to context for documentation and future reference.
 
 $ARGUMENTS
 
-Run: `$HOME/.claude/hooks/memory/memory context save decision "$ARGUMENTS"`
+Execute:
+```bash
+# Get actual current branch - don't trust context
+BRANCH=$(git branch --show-current 2>/dev/null || echo "no-branch")
+TICKET=$($HOME/.claude/hooks/memory/memory extract-ticket "$BRANCH" 2>/dev/null || echo "$BRANCH")
+
+# Save to memory using verified ticket
+$HOME/.claude/hooks/memory/memory context save decision "$TICKET" "$ARGUMENTS"
+```

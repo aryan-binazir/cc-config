@@ -10,9 +10,9 @@ This command retrieves and displays all saved memory entries (decisions, impleme
 
 Execute:
 ```bash
-# Get current ticket from branch
+# Get actual current branch - don't trust context
 BRANCH=$(git branch --show-current 2>/dev/null || echo "no-branch")
-TICKET=$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' || echo "no-ticket")
+TICKET=$($HOME/.claude/hooks/memory/memory extract-ticket "$BRANCH" 2>/dev/null || echo "$BRANCH")
 
 echo "🔍 Reviewing memory for ticket: $TICKET"
 echo "Current branch: $BRANCH"
