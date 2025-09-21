@@ -92,13 +92,11 @@ func handleContext() {
 	case "load":
 		if len(os.Args) > 3 {
 			loadEnhancedTicketContext(os.Args[3])
-			syncWithContextMd(os.Args[3])
 		} else {
 			branch := getCurrentBranch()
 			ticket := extractTicket(branch)
 			if ticket != "" {
 				loadEnhancedTicketContext(ticket)
-				syncWithContextMd(ticket)
 			}
 		}
 	case "add":
@@ -144,13 +142,6 @@ func handleContext() {
 			} else {
 				fmt.Printf("📦 No new code patterns found in git diff\n")
 			}
-		}
-	case "sync-context":
-		// Sync with CONTEXT.md
-		branch := getCurrentBranch()
-		ticket := extractTicket(branch)
-		if ticket != "" {
-			syncWithContextMd(ticket)
 		}
 	case "clear":
 		if len(os.Args) > 3 {
@@ -672,170 +663,7 @@ func extractPatternsFromGitDiff() []string {
 	return patterns
 }
 
-func syncWithContextMd(ticket string) {
-	// Check if CONTEXT.md exists in current directory
-	contextPath := "CONTEXT.md"
-	if _, err := os.Stat(contextPath); os.IsNotExist(err) {
-		// Create new CONTEXT.md from database
-		createContextMdFromDB(ticket)
-		return
-	}
 
-	// Read existing CONTEXT.md
-	content, err := os.ReadFile(contextPath)
-	if err != nil {
-		debugLog("Failed to read CONTEXT.md: %v", err)
-		return
-	}
-
-	// Parse sections from CONTEXT.md
-	lines := strings.Split(string(content), "\n")
-	inManaged := false
-	currentSection := ""
-	sections := make(map[string][]string)
-
-	for _, line := range lines {
-		if strings.Contains(line, "<!-- context:managed:start -->") {
-			inManaged = true
-			continue
-		}
-		if strings.Contains(line, "<!-- context:managed:end -->") {
-			break
-		}
-		if !inManaged {
-			continue
-		}
-
-		// Detect sections
-		if strings.HasPrefix(line, "## ") {
-			currentSection = strings.TrimSpace(strings.TrimPrefix(line, "##"))
-			sections[currentSection] = []string{}
-			continue
-		}
-
-		// Add content to current section
-		if currentSection != "" && strings.HasPrefix(line, "- ") {
-			item := strings.TrimPrefix(line, "- ")
-			if item != "" {
-				sections[currentSection] = append(sections[currentSection], item)
-			}
-		}
-	}
-
-	// Update database from parsed sections
-	if decisions, ok := sections["Risks / Decisions"]; ok {
-		for _, decision := range decisions {
-			saveEnhancedContextPoint(ticket, decision, CategoryDecision, false)
-		}
-	}
-
-	if actions, ok := sections["Next Actions"]; ok {
-		for _, action := range actions {
-			saveEnhancedContextPoint(ticket, action, CategoryNext, false)
-		}
-	}
-
-	if done, ok := sections["Done Recently"]; ok {
-		for _, item := range done {
-			saveEnhancedContextPoint(ticket, item, CategoryImplementation, false)
-		}
-	}
-
-	fmt.Printf("📝 Synced CONTEXT.md with database for %s\n", ticket)
-}
-
-func createContextMdFromDB(ticket string) {
-	db := openDB()
-	defer db.Close()
-
-	// Load context from database
-	var requirements sql.NullString
-	var decisionsJSON, implementationsJSON, patternsJSON, stateJSON, nextStepsJSON sql.NullString
-
-	err := db.QueryRow(`SELECT requirements, decisions, implementations, code_patterns, current_state, next_steps
-		FROM ticket_context_enhanced WHERE ticket = ?`, ticket).Scan(
-		&requirements, &decisionsJSON, &implementationsJSON, &patternsJSON, &stateJSON, &nextStepsJSON)
-
-	if err != nil && err != sql.ErrNoRows {
-		debugLog("Failed to query enhanced context for CONTEXT.md: %v", err)
-		return
-	}
-
-	// Build CONTEXT.md content
-	var content strings.Builder
-	content.WriteString(fmt.Sprintf("# Project Context\n\n"))
-	content.WriteString(fmt.Sprintf("Last updated: %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
-	content.WriteString("<!-- context:managed:start -->\n\n")
-
-	// Plan section
-	content.WriteString("## Plan (Current)\n")
-	if requirements.Valid && requirements.String != "" {
-		content.WriteString(fmt.Sprintf("- %s\n", requirements.String))
-	} else {
-		content.WriteString("- [No plan defined]\n")
-	}
-	content.WriteString("\n")
-
-	// Needed Context
-	content.WriteString("## Needed Context / Open Questions\n")
-	content.WriteString("- [No open questions]\n\n")
-
-	// Next Actions
-	content.WriteString("## Next Actions\n")
-	if nextStepsJSON.Valid && nextStepsJSON.String != "" {
-		var items []EnhancedContextItem
-		if err := json.Unmarshal([]byte(nextStepsJSON.String), &items); err == nil {
-			for _, item := range items {
-				content.WriteString(fmt.Sprintf("- %s\n", item.Text))
-			}
-		}
-	} else {
-		content.WriteString("- [No next actions]\n")
-	}
-	content.WriteString("\n")
-
-	// Done Recently
-	content.WriteString("## Done Recently\n")
-	if implementationsJSON.Valid && implementationsJSON.String != "" {
-		var items []EnhancedContextItem
-		if err := json.Unmarshal([]byte(implementationsJSON.String), &items); err == nil {
-			for _, item := range items {
-				content.WriteString(fmt.Sprintf("- %s\n", item.Text))
-			}
-		}
-	} else {
-		content.WriteString("- [Nothing done yet]\n")
-	}
-	content.WriteString("\n")
-
-	// Risks / Decisions
-	content.WriteString("## Risks / Decisions\n")
-	if decisionsJSON.Valid && decisionsJSON.String != "" {
-		var items []EnhancedContextItem
-		if err := json.Unmarshal([]byte(decisionsJSON.String), &items); err == nil {
-			for _, item := range items {
-				content.WriteString(fmt.Sprintf("- %s\n", item.Text))
-			}
-		}
-	} else {
-		content.WriteString("- [No decisions made]\n")
-	}
-	content.WriteString("\n")
-
-	// Archive
-	content.WriteString("## Archive (auto)\n")
-	content.WriteString("- [Empty archive]\n\n")
-
-	content.WriteString("<!-- context:managed:end -->\n")
-
-	// Write to file
-	if err := os.WriteFile("CONTEXT.md", []byte(content.String()), 0644); err != nil {
-		debugLog("Failed to write CONTEXT.md: %v", err)
-		return
-	}
-
-	fmt.Printf("📝 Created CONTEXT.md from database for %s\n", ticket)
-}
 
 func setRequirements(ticket string, requirements string) {
 	db := openDB()

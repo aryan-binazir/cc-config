@@ -8,7 +8,7 @@ An intelligent memory system for Claude Code that automatically captures and cat
 - **Smart categorization** into 5 types: decisions, implementations, code patterns, state, next steps
 - **Code extraction** from messages and git diffs
 - **50-point capacity** intelligently distributed across categories
-- **Session tracking** with file modifications and task descriptions
+- **Session tracking** with git modifications and task descriptions
 - **Ticket-based organization** from git branch names (JIRA-123, PROJ-456)
 - **Dual implementation** - Go binary with bash fallback
 
@@ -31,10 +31,10 @@ Installs to `~/.claude/hooks/memory/` and configures minimal hooks (SessionStart
 ## How It Works
 
 Hybrid approach combining:
-- **SessionStart Hook** - Auto-loads context and creates/syncs CONTEXT.md
+- **SessionStart Hook** - Auto-loads context from SQLite database
 - **Slash Commands** - Manual capture after Claude works (since hooks can't see Claude's output)
 - **Git Integration** - Extracts actual code changes from git diff
-- **CONTEXT.md** - Visible context file that syncs with database
+- **SQLite Database** - Persistent storage for all context data
 
 ## Context Categories
 
@@ -69,7 +69,7 @@ TODOs and blockers:
 
 ```bash
 # After implementing something
-/memory_sync                    # Captures git diff + syncs CONTEXT.md
+/memory_sync                    # Captures git diff patterns
 
 # Save specific context
 /memory_decision [text]         # Save architectural decision
@@ -86,8 +86,6 @@ TODOs and blockers:
 # Sync with git diff
 ~/.claude/hooks/memory/memory context sync-git
 
-# Sync with CONTEXT.md
-~/.claude/hooks/memory/memory context sync-context
 
 # Manual saves
 ~/.claude/hooks/memory/memory context save decision PROJ-456 "Use Redis for scaling"
@@ -97,13 +95,13 @@ TODOs and blockers:
 ~/.claude/hooks/memory/memory context save next PROJ-456 "TODO: Add rate limiting"
 ```
 
-## CONTEXT.md Integration
+## SQLite-Only Storage
 
-The system maintains a CONTEXT.md file in your working directory:
-- Auto-created on session start if missing
-- Syncs bidirectionally with database
-- Visible to you and Claude during work
-- Standard format compatible with /context_sync command
+The system stores all context data in a SQLite database:
+- Located at `~/.claude/memory.db`
+- No file dependencies or syncing required
+- Fast queries and updates
+- Automatic categorization and limits
 
 ## Database Cleanup
 
@@ -186,7 +184,7 @@ Build JWT-based auth with 2FA support, 15-minute token expiry
 
 ## The Honest Workflow
 
-1. **Session starts**: Context auto-loads, CONTEXT.md created/synced
+1. **Session starts**: Context auto-loads from database
 2. **Work with Claude**: Makes implementations
 3. **After implementing**: Run `/memory_sync` to capture git diff
 4. **After decisions**: Run `/memory_decision [reasoning]`
@@ -208,7 +206,7 @@ The `/memory_sync` command captures from git diff:
 - Use hooks minimally (just to load context)
 - Use slash commands for manual capture after work
 - Use git diff to capture actual code changes
-- Use CONTEXT.md for visibility
+- Use SQLite for fast, reliable storage
 
 ## Database Schema
 
@@ -275,10 +273,10 @@ Note: We only use SessionStart because hooks can't capture Claude's actual work 
 - Use `/memory_sync` after Claude implements features
 - Use `/memory_decision` etc for specific captures
 
-**CONTEXT.md not syncing:**
-- File must be in current working directory
-- Must have managed block markers (<!-- context:managed:start/end -->)
-- Run `/memory_sync` to force sync
+**Context not saving:**
+- Check that database is writable at `~/.claude/memory.db`
+- Verify branch has a ticket pattern (JIRA-123, PROJ-456)
+- Use debug mode: `CLAUDE_MEMORY_DEBUG=1` to see detailed logs
 
 **Database location:**
 - Database is at `~/.claude/memory.db`
