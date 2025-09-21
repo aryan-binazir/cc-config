@@ -1167,6 +1167,19 @@ func loadLegacyContext(db *sql.DB, ticket string) (*EnhancedContext, string, err
 	return enhanced, requirements.String, nil
 }
 
+// addContextPoint adds a new point to the appropriate category list with deduplication and limit enforcement
+func addContextPoint(points *[]ContextPoint, newPoint ContextPoint, maxPoints int) bool {
+	if isDuplicate(*points, newPoint.Text) {
+		return false
+	}
+
+	*points = append(*points, newPoint)
+	if len(*points) > maxPoints {
+		*points = consolidateCategoryPoints(*points, maxPoints)
+	}
+	return true
+}
+
 func saveEnhancedContextPoint(ticket string, point string, category ContextCategory, isUserDirective bool) {
 	if !isUserDirective && !evaluateEnhancedContextImportance(point, category) {
 		return
@@ -1195,48 +1208,26 @@ func saveEnhancedContextPoint(ticket string, point string, category ContextCateg
 	}
 
 	// Add to appropriate category and enforce limits
+	var added bool
 	switch category {
 	case CategoryDecision:
-		if !isDuplicate(context.Decisions, point) {
-			context.Decisions = append(context.Decisions, newPoint)
-			if len(context.Decisions) > MaxDecisions {
-				context.Decisions = consolidateCategoryPoints(context.Decisions, MaxDecisions)
-			}
-		}
+		added = addContextPoint(&context.Decisions, newPoint, MaxDecisions)
 	case CategoryImplementation:
-		if !isDuplicate(context.Implementations, point) {
-			context.Implementations = append(context.Implementations, newPoint)
-			if len(context.Implementations) > MaxImplementations {
-				context.Implementations = consolidateCategoryPoints(context.Implementations, MaxImplementations)
-			}
-		}
+		added = addContextPoint(&context.Implementations, newPoint, MaxImplementations)
 	case CategoryPattern:
-		if !isDuplicate(context.CodePatterns, point) {
-			context.CodePatterns = append(context.CodePatterns, newPoint)
-			if len(context.CodePatterns) > MaxCodePatterns {
-				context.CodePatterns = consolidateCategoryPoints(context.CodePatterns, MaxCodePatterns)
-			}
-		}
+		added = addContextPoint(&context.CodePatterns, newPoint, MaxCodePatterns)
 	case CategoryState:
-		if !isDuplicate(context.CurrentState, point) {
-			context.CurrentState = append(context.CurrentState, newPoint)
-			if len(context.CurrentState) > MaxCurrentState {
-				context.CurrentState = consolidateCategoryPoints(context.CurrentState, MaxCurrentState)
-			}
-		}
+		added = addContextPoint(&context.CurrentState, newPoint, MaxCurrentState)
 	case CategoryNext:
-		if !isDuplicate(context.NextSteps, point) {
-			context.NextSteps = append(context.NextSteps, newPoint)
-			if len(context.NextSteps) > MaxNextSteps {
-				context.NextSteps = consolidateCategoryPoints(context.NextSteps, MaxNextSteps)
-			}
-		}
+		added = addContextPoint(&context.NextSteps, newPoint, MaxNextSteps)
 	}
 
-	// Save back to database
-	if err := saveEnhancedContext(db, ticket, requirements, context); err == nil {
-		emoji := getCategoryEmoji(category)
-		fmt.Printf("%s Context saved for %s (%s)\n", emoji, ticket, category)
+	// Save back to database only if something was added
+	if added {
+		if err := saveEnhancedContext(db, ticket, requirements, context); err == nil {
+			emoji := getCategoryEmoji(category)
+			fmt.Printf("%s Context saved for %s (%s)\n", emoji, ticket, category)
+		}
 	}
 }
 
