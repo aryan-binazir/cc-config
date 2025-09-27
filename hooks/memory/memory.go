@@ -443,9 +443,9 @@ func getSessionStats(db *sql.DB, ticket string) (sessionCount int, totalMinutes 
 func displayContext(context *EnhancedContext, requirements string, ticket string, showBorder bool) {
 	if showBorder {
 		fmt.Printf(`
-╔════════════════════════════════════════════════════════════
-║  %s
-╚════════════════════════════════════════════════════════════
+============================================================
+ CONTEXT FOR %s
+============================================================
 
 `, ticket)
 	}
@@ -508,7 +508,7 @@ func displayContext(context *EnhancedContext, requirements string, ticket string
 	}
 
 	if showBorder {
-		fmt.Printf("═══════════════════════════════════════════════════════════\n")
+		fmt.Printf("============================================================\n")
 	}
 }
 
@@ -540,7 +540,7 @@ func loadTicketContext(ticket string) {
 		fmt.Printf("======================================\n\n")
 
 		if requirements.Valid && requirements.String != "" {
-			fmt.Printf("📜 Requirements:\n%s\n\n", requirements.String)
+			fmt.Printf("Requirements:\n%s\n\n", requirements.String)
 		}
 
 		var points []ContextPoint
@@ -1086,7 +1086,7 @@ func setRequirements(ticket string, requirements string) {
 			last_updated = CURRENT_TIMESTAMP`, ticket, requirements)
 
 		if err == nil {
-			fmt.Printf("📜 Requirements set for %s\n", ticket)
+			fmt.Printf("Requirements set for %s\n", ticket)
 		}
 		return err
 	})
@@ -1742,7 +1742,7 @@ func loadEnhancedTicketContext(ticket string) {
 		sessionCount, totalMinutes := getSessionStats(db, ticket)
 		if sessionCount > 0 {
 			fmt.Printf(" Work Summary: %d sessions, %d minutes total\n\n", sessionCount, totalMinutes)
-			fmt.Printf("═══════════════════════════════════════════════════════════\n")
+			fmt.Printf("============================================================\n")
 		}
 		return nil
 	})
@@ -2064,13 +2064,13 @@ func loadMemory() {
 	context, requirements, err := loadEnhancedContext(db, ticket)
 	if err == nil {
 		// Use custom header for "CONTEXT FOR" instead of just ticket name
-		fmt.Printf("\n╔════════════════════════════════════════════════════════════\n")
-		fmt.Printf("║  CONTEXT FOR %s\n", ticket)
-		fmt.Printf("╚════════════════════════════════════════════════════════════\n\n")
+		fmt.Printf("\n============================================================\n")
+		fmt.Printf(" CONTEXT FOR %s\n", ticket)
+		fmt.Printf("============================================================\n\n")
 
 		// Display using helper (without border since we have custom header)
 		displayContext(context, requirements, ticket, false)
-		fmt.Printf("═══════════════════════════════════════════════════════════\n")
+		fmt.Printf("============================================================\n")
 	}
 }
 
