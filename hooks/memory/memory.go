@@ -180,6 +180,18 @@ func handleContext() {
 			fmt.Printf("Usage: memory context mark-complete <ticket> <number>\n")
 			os.Exit(1)
 		}
+	case "todos":
+		// Format: memory context todos <ticket>
+		if len(os.Args) > 3 {
+			displayTodos(os.Args[3])
+		} else {
+			// Auto-detect from branch
+			branch := getCurrentBranch()
+			ticket := extractTicket(branch)
+			if ticket != "" {
+				displayTodos(ticket)
+			}
+		}
 	case "remove":
 		// Format: memory context remove <category> [ticket] [items]
 		// or: memory context remove all (nuclear option)
@@ -1203,6 +1215,44 @@ func markTodoComplete(ticket string, numberStr string) {
 			fmt.Printf(" TODO #%d marked as complete for %s\n", todoNum, ticket)
 		} else {
 			fmt.Printf(" TODO #%d is already marked as complete\n", todoNum)
+		}
+
+		return nil
+	})
+}
+
+func displayTodos(ticket string) {
+	withDB(func(db *sql.DB) error {
+		// Load existing context
+		context, _, err := loadEnhancedContext(db, ticket)
+		if err != nil {
+			fmt.Printf("No TODOs found for %s\n", ticket)
+			return err
+		}
+
+		// Display TODOs
+		if len(context.NextSteps) == 0 {
+			fmt.Printf("No TODOs saved for %s\n", ticket)
+		} else {
+			pending := 0
+			complete := 0
+			for _, todo := range context.NextSteps {
+				if strings.HasPrefix(todo.Text, "[COMPLETE]") {
+					complete++
+				} else {
+					pending++
+				}
+			}
+
+			fmt.Printf("TODOs: %d total (%d pending, %d complete)\n\n", len(context.NextSteps), pending, complete)
+
+			for i, todo := range context.NextSteps {
+				if strings.HasPrefix(todo.Text, "[COMPLETE]") {
+					fmt.Printf("  %d. ✓ %s\n", i+1, strings.TrimPrefix(todo.Text, "[COMPLETE] "))
+				} else {
+					fmt.Printf("  %d. %s\n", i+1, todo.Text)
+				}
+			}
 		}
 
 		return nil
