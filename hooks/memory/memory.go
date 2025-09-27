@@ -162,9 +162,9 @@ func handleContext() {
 				saveEnhancedContextPoint(ticket, pattern, CategoryPattern, false)
 			}
 			if len(patterns) > 0 {
-				fmt.Printf("📦 Synced %d code patterns from git diff for %s\n", len(patterns), ticket)
+				fmt.Printf(" Synced %d code patterns from git diff for %s\n", len(patterns), ticket)
 			} else {
-				fmt.Printf("📦 No new code patterns found in git diff\n")
+				fmt.Printf(" No new code patterns found in git diff\n")
 			}
 		}
 	case "clear":
@@ -210,7 +210,7 @@ func handleContext() {
 				if ticket != "" {
 					removeContextItems(ticket, category, itemsToRemove)
 				} else {
-					fmt.Println("❌ No ticket found in branch name")
+					fmt.Println("ERROR: No ticket found in branch name")
 				}
 			}
 		}
@@ -444,22 +444,22 @@ func displayContext(context *EnhancedContext, requirements string, ticket string
 	if showBorder {
 		fmt.Printf(`
 ╔════════════════════════════════════════════════════════════
-║ 🎯 %s
+║  %s
 ╚════════════════════════════════════════════════════════════
 
 `, ticket)
 	}
 
 	if requirements != "" {
-		fmt.Printf("📋 REQUIREMENTS:\n%s\n\n", requirements)
+		fmt.Printf(" REQUIREMENTS:\n%s\n\n", requirements)
 	}
 
 	// Display implementations
 	if len(context.Implementations) > 0 {
-		fmt.Printf("🏗️ IMPLEMENTATIONS (%d):\n", len(context.Implementations))
+		fmt.Printf(" IMPLEMENTATIONS (%d):\n", len(context.Implementations))
 		for _, p := range context.Implementations {
 			if p.IsUserDir {
-				fmt.Printf("  • 📌 %s\n", p.Text)
+				fmt.Printf("  • * %s\n", p.Text)
 			} else {
 				fmt.Printf("  • %s\n", p.Text)
 			}
@@ -469,10 +469,10 @@ func displayContext(context *EnhancedContext, requirements string, ticket string
 
 	// Display key decisions
 	if len(context.Decisions) > 0 {
-		fmt.Printf("💡 KEY DECISIONS (%d):\n", len(context.Decisions))
+		fmt.Printf(" KEY DECISIONS (%d):\n", len(context.Decisions))
 		for _, p := range context.Decisions {
 			if p.IsUserDir {
-				fmt.Printf("  • 📌 %s\n", p.Text)
+				fmt.Printf("  • * %s\n", p.Text)
 			} else {
 				fmt.Printf("  • %s\n", p.Text)
 			}
@@ -482,7 +482,7 @@ func displayContext(context *EnhancedContext, requirements string, ticket string
 
 	// Display code patterns
 	if len(context.CodePatterns) > 0 {
-		fmt.Printf("🔧 CODE PATTERNS (%d):\n", len(context.CodePatterns))
+		fmt.Printf(" CODE PATTERNS (%d):\n", len(context.CodePatterns))
 		for _, p := range context.CodePatterns {
 			fmt.Printf("  • %s\n", p.Text)
 		}
@@ -491,7 +491,7 @@ func displayContext(context *EnhancedContext, requirements string, ticket string
 
 	// Display current state
 	if len(context.CurrentState) > 0 {
-		fmt.Printf("📊 CURRENT STATE (%d):\n", len(context.CurrentState))
+		fmt.Printf(" CURRENT STATE (%d):\n", len(context.CurrentState))
 		for _, p := range context.CurrentState {
 			fmt.Printf("  • %s\n", p.Text)
 		}
@@ -500,7 +500,7 @@ func displayContext(context *EnhancedContext, requirements string, ticket string
 
 	// Display next steps
 	if len(context.NextSteps) > 0 {
-		fmt.Printf("📝 NEXT STEPS (%d):\n", len(context.NextSteps))
+		fmt.Printf(" NEXT STEPS (%d):\n", len(context.NextSteps))
 		for _, p := range context.NextSteps {
 			fmt.Printf("  • %s\n", p.Text)
 		}
@@ -527,7 +527,7 @@ func loadTicketContext(ticket string) {
 		err := db.QueryRow(`SELECT requirements, context_points FROM ticket_context WHERE ticket = ?`, ticket).Scan(&requirements, &contextJSON)
 
 		if err == sql.ErrNoRows {
-			fmt.Printf("📋 No context saved for %s\n", ticket)
+			fmt.Printf(" No context saved for %s\n", ticket)
 			return nil
 		}
 		if err != nil {
@@ -536,7 +536,7 @@ func loadTicketContext(ticket string) {
 		}
 
 		fmt.Printf("\n======================================\n")
-		fmt.Printf("📋 %s Context\n", ticket)
+		fmt.Printf(" %s Context\n", ticket)
 		fmt.Printf("======================================\n\n")
 
 		if requirements.Valid && requirements.String != "" {
@@ -547,10 +547,10 @@ func loadTicketContext(ticket string) {
 		if err := unmarshalNullableJSON(contextJSON, &points); err != nil {
 			debugLog("Failed to parse context JSON in loadTicketContext for ticket %s: %v", ticket, err)
 		} else if len(points) > 0 {
-				fmt.Printf("📌 Critical Context:\n")
+				fmt.Printf("* Critical Context:\n")
 				for _, point := range points {
 					if point.IsUserDir {
-						fmt.Printf("• 📌 %s\n", point.Text)
+						fmt.Printf("• * %s\n", point.Text)
 					} else {
 						fmt.Printf("• %s\n", point.Text)
 					}
@@ -566,7 +566,7 @@ func loadTicketContext(ticket string) {
 				}
 
 				if len(blockers) > 0 {
-					fmt.Printf("\n⚠️  Blockers:\n")
+					fmt.Printf("\nWARNING:  Blockers:\n")
 					for _, blocker := range blockers {
 						fmt.Printf("• %s\n", blocker.Text)
 					}
@@ -576,7 +576,7 @@ func loadTicketContext(ticket string) {
 		// Add session summary
 		sessionCount, totalMinutes := getSessionStats(db, ticket)
 		if sessionCount > 0 {
-			fmt.Printf("\n📊 Work Summary: %d sessions, %d minutes total\n", sessionCount, totalMinutes)
+			fmt.Printf("\n Work Summary: %d sessions, %d minutes total\n", sessionCount, totalMinutes)
 		}
 
 		fmt.Printf("======================================\n")
@@ -638,7 +638,7 @@ func saveContextPoint(ticket string, point string, isUserDirective bool) {
 		last_updated = CURRENT_TIMESTAMP`, ticket, string(newJSON))
 
 	if err == nil {
-		fmt.Printf("📌 Context saved for %s\n", ticket)
+		fmt.Printf("* Context saved for %s\n", ticket)
 	}
 }
 
@@ -984,7 +984,10 @@ func extractPatternsFromGitDiff() []string {
 	lines := strings.Split(string(output), "\n")
 	seenPatterns := make(map[string]bool)
 
-	for _, line := range lines {
+	// Process lines with comment awareness
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+
 		// Skip diff headers
 		if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
 			continue
@@ -995,9 +998,30 @@ func extractPatternsFromGitDiff() []string {
 			continue
 		}
 
-		// Extract function signatures
+		cleanLine := strings.TrimSpace(strings.TrimPrefix(line, "+"))
+
+		// Skip pure comment lines
+		if strings.HasPrefix(cleanLine, "//") {
+			continue
+		}
+
+		// Look for preceding comment
+		var precedingComment string
+		if i > 0 && strings.HasPrefix(strings.TrimSpace(lines[i-1]), "+//") {
+			precedingComment = strings.TrimSpace(strings.TrimPrefix(lines[i-1], "+"))
+		}
+
+		// Extract function signatures with comments
 		if match := functionRegex.FindStringSubmatch(line); match != nil {
 			pattern := fmt.Sprintf("func %s", match[1])
+
+			// Add inline comment if present
+			if idx := strings.Index(cleanLine, "//"); idx > 0 {
+				pattern = pattern + " " + strings.TrimSpace(cleanLine[idx:])
+			} else if precedingComment != "" {
+				pattern = pattern + " " + precedingComment
+			}
+
 			if !seenPatterns[pattern] {
 				patterns = append(patterns, pattern)
 				seenPatterns[pattern] = true
@@ -1013,18 +1037,34 @@ func extractPatternsFromGitDiff() []string {
 			}
 		}
 
-		// Extract types
+		// Extract types with comments
 		if match := typeRegex.FindStringSubmatch(line); match != nil {
 			pattern := fmt.Sprintf("type %s", match[1])
+
+			// Add inline comment if present
+			if idx := strings.Index(cleanLine, "//"); idx > 0 {
+				pattern = pattern + " " + strings.TrimSpace(cleanLine[idx:])
+			} else if precedingComment != "" {
+				pattern = pattern + " " + precedingComment
+			}
+
 			if !seenPatterns[pattern] {
 				patterns = append(patterns, pattern)
 				seenPatterns[pattern] = true
 			}
 		}
 
-		// Extract interfaces
+		// Extract interfaces with comments
 		if match := interfaceRegex.FindStringSubmatch(line); match != nil {
 			pattern := fmt.Sprintf("interface %s", match[1])
+
+			// Add inline comment if present
+			if idx := strings.Index(cleanLine, "//"); idx > 0 {
+				pattern = pattern + " " + strings.TrimSpace(cleanLine[idx:])
+			} else if precedingComment != "" {
+				pattern = pattern + " " + precedingComment
+			}
+
 			if !seenPatterns[pattern] {
 				patterns = append(patterns, pattern)
 				seenPatterns[pattern] = true
@@ -1064,7 +1104,7 @@ func listTicketsWithContext() {
 	}
 	defer rows.Close()
 
-	fmt.Printf("📋 Tickets with Context:\n\n")
+	fmt.Printf(" Tickets with Context:\n\n")
 
 	for rows.Next() {
 		var ticket string
@@ -1094,7 +1134,7 @@ func listTicketsWithContext() {
 
 func clearContext(ticket string) {
 	// Confirm before clearing
-	fmt.Printf("⚠️  Clear all context for %s? This cannot be undone. Type 'yes' to confirm: ", ticket)
+	fmt.Printf("WARNING:  Clear all context for %s? This cannot be undone. Type 'yes' to confirm: ", ticket)
 
 	// Use bufio.Scanner for proper input reading
 	scanner := bufio.NewScanner(os.Stdin)
@@ -1111,7 +1151,7 @@ func clearContext(ticket string) {
 	withDB(func(db *sql.DB) error {
 		_, err := db.Exec(`DELETE FROM ticket_context WHERE ticket = ?`, ticket)
 		if err == nil {
-			fmt.Printf("✅ Context cleared for %s\n", ticket)
+			fmt.Printf("SUCCESS: Context cleared for %s\n", ticket)
 		}
 		return err
 	})
@@ -1123,7 +1163,7 @@ func removeContextItems(ticket string, category string, itemsToRemove string) {
 
 	context, _, err := loadEnhancedContext(db, ticket)
 	if err != nil {
-		fmt.Printf("❌ No context found for %s\n", ticket)
+		fmt.Printf("ERROR: No context found for %s\n", ticket)
 		return
 	}
 
@@ -1148,7 +1188,7 @@ func removeContextItems(ticket string, category string, itemsToRemove string) {
 		items = context.NextSteps
 		categoryName = "next_steps"
 	default:
-		fmt.Printf("❌ Invalid category: %s\n", category)
+		fmt.Printf("ERROR: Invalid category: %s\n", category)
 		fmt.Println("Valid categories: decisions, implementations, patterns, state, next")
 		return
 	}
@@ -1159,7 +1199,7 @@ func removeContextItems(ticket string, category string, itemsToRemove string) {
 	}
 
 	// Display items with numbers
-	fmt.Printf("\n📋 %s for %s:\n", strings.ToUpper(categoryName), ticket)
+	fmt.Printf("\n %s for %s:\n", strings.ToUpper(categoryName), ticket)
 	for i, item := range items {
 		fmt.Printf("%2d. %s\n", i+1, item.Text)
 	}
@@ -1222,15 +1262,15 @@ func removeContextItems(ticket string, category string, itemsToRemove string) {
 	// Save the updated context
 	err = saveEnhancedContext(db, ticket, "", context)
 	if err != nil {
-		fmt.Printf("❌ Failed to update context: %v\n", err)
+		fmt.Printf("ERROR: Failed to update context: %v\n", err)
 		return
 	}
 
-	fmt.Printf("✅ Context updated for %s\n", ticket)
+	fmt.Printf("SUCCESS: Context updated for %s\n", ticket)
 }
 
 func dropAllTables() {
-	fmt.Println("⚠️  WARNING: This will DELETE ALL memory data!")
+	fmt.Println("WARNING:  WARNING: This will DELETE ALL memory data!")
 	fmt.Println("Type 'DELETE EVERYTHING' to confirm: ")
 
 	// Use bufio.Scanner for proper input reading
@@ -1258,7 +1298,7 @@ func dropAllTables() {
 	for _, table := range tables {
 		_, err := db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", table))
 		if err != nil {
-			fmt.Printf("❌ Failed to drop %s: %v\n", table, err)
+			fmt.Printf("ERROR: Failed to drop %s: %v\n", table, err)
 			return
 		}
 	}
@@ -1266,7 +1306,7 @@ func dropAllTables() {
 	// Recreate tables
 	err := initDB(db)
 	if err != nil {
-		fmt.Printf("❌ Failed to recreate tables: %v\n", err)
+		fmt.Printf("ERROR: Failed to recreate tables: %v\n", err)
 		return
 	}
 
@@ -1314,7 +1354,7 @@ func cleanupOldSessions() {
 	db.QueryRow("SELECT COUNT(*) FROM sessions WHERE end_time < ?", cutoffDate).Scan(&countBefore)
 
 	if countBefore == 0 {
-		fmt.Printf("✅ No sessions older than %d days to clean up\n", daysToKeep)
+		fmt.Printf("SUCCESS: No sessions older than %d days to clean up\n", daysToKeep)
 		return
 	}
 
@@ -1322,7 +1362,7 @@ func cleanupOldSessions() {
 	result, err := db.Exec("DELETE FROM sessions WHERE end_time < ?", cutoffDate)
 	if err != nil {
 		debugLog("Failed to cleanup old sessions: %v", err)
-		fmt.Println("❌ Failed to cleanup old sessions")
+		fmt.Println("ERROR: Failed to cleanup old sessions")
 		os.Exit(1)
 	}
 
@@ -1331,12 +1371,12 @@ func cleanupOldSessions() {
 	// Vacuum database to reclaim space
 	db.Exec("VACUUM")
 
-	fmt.Printf("✅ Cleaned up %d sessions older than %d days\n", rowsAffected, daysToKeep)
+	fmt.Printf("SUCCESS: Cleaned up %d sessions older than %d days\n", rowsAffected, daysToKeep)
 
 	// Show remaining session count
 	var countAfter int
 	db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&countAfter)
-	fmt.Printf("📊 Remaining sessions in database: %d\n", countAfter)
+	fmt.Printf(" Remaining sessions in database: %d\n", countAfter)
 }
 
 // Enhanced context functions
@@ -1424,7 +1464,7 @@ func categorizeContext(point string) ContextCategory {
 	if strings.Contains(lowerPoint, "working") || strings.Contains(lowerPoint, "broken") ||
 		strings.Contains(lowerPoint, "complete") || strings.Contains(lowerPoint, "fails") ||
 		strings.Contains(lowerPoint, "bug") || strings.Contains(lowerPoint, "fixed") ||
-		strings.Contains(point, "✅") || strings.Contains(point, "❌") || strings.Contains(point, "⚠️") {
+		strings.Contains(point, "SUCCESS:") || strings.Contains(point, "ERROR:") || strings.Contains(point, "WARNING:") {
 		return CategoryState
 	}
 
@@ -1596,17 +1636,17 @@ func saveEnhancedContextPoint(ticket string, point string, category ContextCateg
 func getCategoryEmoji(category ContextCategory) string {
 	switch category {
 	case CategoryDecision:
-		return "💡"
+		return ""
 	case CategoryImplementation:
-		return "🏗️"
+		return ""
 	case CategoryPattern:
-		return "🔧"
+		return ""
 	case CategoryState:
-		return "📊"
+		return ""
 	case CategoryNext:
-		return "📝"
+		return ""
 	default:
-		return "📌"
+		return "*"
 	}
 }
 
@@ -1674,8 +1714,8 @@ func evaluateEnhancedContextImportance(point string, category ContextCategory) b
 
 	if category == CategoryState {
 		// Must be actionable
-		return strings.Contains(point, "✅") || strings.Contains(point, "❌") ||
-			strings.Contains(point, "⚠️") || strings.Contains(strings.ToLower(point), "working") ||
+		return strings.Contains(point, "SUCCESS:") || strings.Contains(point, "ERROR:") ||
+			strings.Contains(point, "WARNING:") || strings.Contains(strings.ToLower(point), "working") ||
 			strings.Contains(strings.ToLower(point), "broken")
 	}
 
@@ -1692,7 +1732,7 @@ func loadEnhancedTicketContext(ticket string) {
 	withDB(func(db *sql.DB) error {
 		context, requirements, err := loadEnhancedContext(db, ticket)
 		if err != nil {
-			fmt.Printf("📋 No context saved for %s\n", ticket)
+			fmt.Printf(" No context saved for %s\n", ticket)
 			return nil
 		}
 
@@ -1701,7 +1741,7 @@ func loadEnhancedTicketContext(ticket string) {
 		// Add session summary
 		sessionCount, totalMinutes := getSessionStats(db, ticket)
 		if sessionCount > 0 {
-			fmt.Printf("📊 Work Summary: %d sessions, %d minutes total\n\n", sessionCount, totalMinutes)
+			fmt.Printf(" Work Summary: %d sessions, %d minutes total\n\n", sessionCount, totalMinutes)
 			fmt.Printf("═══════════════════════════════════════════════════════════\n")
 		}
 		return nil
@@ -1723,7 +1763,7 @@ func listEnhancedTicketsWithContext() {
 	}
 	defer rows.Close()
 
-	fmt.Printf("📋 Tickets with Enhanced Context:\n\n")
+	fmt.Printf(" Tickets with Enhanced Context:\n\n")
 
 	for rows.Next() {
 		var ticket string
@@ -1748,7 +1788,7 @@ func listEnhancedTicketsWithContext() {
 		totalPoints := counts["decisions"] + counts["implementations"] + counts["patterns"] +
 			counts["state"] + counts["next"]
 
-		fmt.Printf("• %s (%d total: 💡%d 🏗️%d 🔧%d 📊%d 📝%d) - Updated: %s\n",
+		fmt.Printf("• %s (%d total: %d %d %d %d %d) - Updated: %s\n",
 			ticket, totalPoints,
 			counts["decisions"], counts["implementations"], counts["patterns"],
 			counts["state"], counts["next"],
@@ -1764,32 +1804,79 @@ func listEnhancedTicketsWithContext() {
 
 func extractCodePatternsFromDiff(gitDiff string) []string {
 	patterns := []string{}
+	lines := strings.Split(gitDiff, "\n")
 
-	// Extract function signatures - stop at newline or opening brace
-	if matches := funcExtractRegex.FindAllString(gitDiff, -1); matches != nil {
-		for _, match := range matches {
-			// Clean up the match
-			match = strings.TrimPrefix(match, "+")
-			match = strings.TrimSpace(match)
-			// Remove everything after the first newline
-			if idx := strings.Index(match, "\n"); idx > 0 {
-				match = match[:idx]
-			}
-			// Skip commented lines and ensure it has a function name
-			if !strings.Contains(match, "//") && strings.Contains(match, "func ") {
-				patterns = append(patterns, strings.TrimSpace(match))
+	// Process lines to extract patterns with their comments
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		if !strings.HasPrefix(line, "+") || strings.Contains(line, "+++") {
+			continue
+		}
+
+		cleanLine := strings.TrimSpace(strings.TrimPrefix(line, "+"))
+		if strings.HasPrefix(cleanLine, "//") {
+			continue // Skip pure comment lines
+		}
+
+		var comment string
+		// Check for preceding comment line
+		if i > 0 {
+			prevLine := lines[i-1]
+			if strings.HasPrefix(strings.TrimSpace(prevLine), "+//") {
+				comment = strings.TrimSpace(strings.TrimPrefix(prevLine, "+"))
 			}
 		}
-	}
 
-	// Extract type definitions - just the declaration line
-	if matches := typeExtractRegex.FindAllString(gitDiff, -1); matches != nil {
-		for _, match := range matches {
-			match = strings.TrimPrefix(match, "+")
-			match = strings.TrimSpace(match)
-			if !strings.Contains(match, "//") && strings.Contains(match, "type ") {
-				// Just keep the type declaration, not the body
-				patterns = append(patterns, strings.TrimSpace(match))
+		// Check for function signatures
+		if strings.Contains(cleanLine, "func ") && funcNameRegex.MatchString(cleanLine) {
+			pattern := cleanLine
+			// Stop at opening brace
+			if idx := strings.Index(pattern, "{"); idx > 0 {
+				pattern = strings.TrimSpace(pattern[:idx])
+			}
+
+			// Extract function name
+			if match := funcNameRegex.FindStringSubmatch(pattern); match != nil {
+				funcSig := "func " + match[1]
+
+				// Add inline comment if present
+				if commentIdx := strings.Index(cleanLine, "//"); commentIdx > 0 {
+					funcSig = funcSig + " " + strings.TrimSpace(cleanLine[commentIdx:])
+				} else if comment != "" {
+					// Add preceding line comment
+					funcSig = funcSig + " " + comment
+				}
+
+				// Debug output
+				if os.Getenv("CLAUDE_MEMORY_DEBUG") != "" {
+					debugLog("Function found: %s, Comment: %s, Final: %s", match[1], comment, funcSig)
+				}
+
+				patterns = append(patterns, funcSig)
+			}
+		}
+
+		// Check for type definitions
+		if strings.Contains(cleanLine, "type ") && typeNameRegex.MatchString(cleanLine) {
+			pattern := cleanLine
+			// Stop at opening brace
+			if idx := strings.Index(pattern, "{"); idx > 0 {
+				pattern = strings.TrimSpace(pattern[:idx])
+			}
+
+			// Extract type name
+			if match := typeNameRegex.FindStringSubmatch(pattern); match != nil {
+				typeSig := "type " + match[1]
+
+				// Add inline comment if present
+				if commentIdx := strings.Index(cleanLine, "//"); commentIdx > 0 {
+					typeSig = typeSig + " " + strings.TrimSpace(cleanLine[commentIdx:])
+				} else if comment != "" {
+					// Add preceding line comment
+					typeSig = typeSig + " " + comment
+				}
+
+				patterns = append(patterns, typeSig)
 			}
 		}
 	}
@@ -1951,7 +2038,7 @@ func loadMemory() {
 	}
 
 	if len(sessions) > 0 {
-		fmt.Printf("📝 Recent work on %s:\n", ticket)
+		fmt.Printf(" Recent work on %s:\n", ticket)
 		for _, s := range sessions {
 			duration := s.duration / 60
 			if duration == 0 {
@@ -1968,9 +2055,9 @@ func loadMemory() {
 			fmt.Printf("  • %s (%dm): %s\n",
 				s.start.Format("2006-01-02 15:04"), duration, truncate(desc, 60))
 		}
-		fmt.Printf("\n📊 Total: %d sessions, %d minutes\n", totalSessions, totalMinutes)
+		fmt.Printf("\n Total: %d sessions, %d minutes\n", totalSessions, totalMinutes)
 	} else {
-		fmt.Printf("📝 No recent work found for %s\n", ticket)
+		fmt.Printf(" No recent work found for %s\n", ticket)
 	}
 
 	// Show full enhanced context
@@ -1978,7 +2065,7 @@ func loadMemory() {
 	if err == nil {
 		// Use custom header for "CONTEXT FOR" instead of just ticket name
 		fmt.Printf("\n╔════════════════════════════════════════════════════════════\n")
-		fmt.Printf("║ 🎯 CONTEXT FOR %s\n", ticket)
+		fmt.Printf("║  CONTEXT FOR %s\n", ticket)
 		fmt.Printf("╚════════════════════════════════════════════════════════════\n\n")
 
 		// Display using helper (without border since we have custom header)

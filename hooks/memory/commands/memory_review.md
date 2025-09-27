@@ -14,10 +14,10 @@ Execute:
 BRANCH=$(git branch --show-current 2>/dev/null || echo "no-branch")
 TICKET=$($HOME/.claude/hooks/memory/memory extract-ticket "$BRANCH" 2>/dev/null || echo "$BRANCH")
 
-echo "🔍 Reviewing memory for ticket: $TICKET"
+echo "Reviewing memory for ticket: $TICKET"
 echo "Current branch: $BRANCH"
 echo ""
 
-# Query memory for this ticket
-$HOME/.claude/hooks/memory/memory context query "$TICKET" "$ARGUMENTS"
+# Load enhanced context for this ticket
+$HOME/.claude/hooks/memory/memory context load "$TICKET"
 ```
