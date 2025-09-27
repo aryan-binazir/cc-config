@@ -171,6 +171,15 @@ func handleContext() {
 		if len(os.Args) > 3 {
 			clearContext(os.Args[3])
 		}
+	case "mark-complete":
+		// Format: memory context mark-complete <ticket> <number>
+		if len(os.Args) > 4 {
+			markTodoComplete(os.Args[3], os.Args[4])
+		} else {
+			fmt.Printf("Error: Please provide TODO number to mark complete\n")
+			fmt.Printf("Usage: memory context mark-complete <ticket> <number>\n")
+			os.Exit(1)
+		}
 	case "remove":
 		// Format: memory context remove <category> [ticket] [items]
 		// or: memory context remove all (nuclear option)
@@ -498,11 +507,11 @@ func displayContext(context *EnhancedContext, requirements string, ticket string
 		fmt.Printf("\n")
 	}
 
-	// Display next steps
+	// Display next steps with numbering
 	if len(context.NextSteps) > 0 {
 		fmt.Printf(" NEXT STEPS (%d):\n", len(context.NextSteps))
-		for _, p := range context.NextSteps {
-			fmt.Printf("  • %s\n", p.Text)
+		for i, p := range context.NextSteps {
+			fmt.Printf("  %d. %s\n", i+1, p.Text)
 		}
 		fmt.Printf("\n")
 	}
@@ -1154,6 +1163,49 @@ func clearContext(ticket string) {
 			fmt.Printf("SUCCESS: Context cleared for %s\n", ticket)
 		}
 		return err
+	})
+}
+
+func markTodoComplete(ticket string, numberStr string) {
+	// Parse the TODO number
+	todoNum, err := strconv.Atoi(numberStr)
+	if err != nil || todoNum < 1 {
+		fmt.Printf("Error: Invalid TODO number '%s'\n", numberStr)
+		return
+	}
+
+	withDB(func(db *sql.DB) error {
+		// Load existing context
+		context, requirements, err := loadEnhancedContext(db, ticket)
+		if err != nil {
+			fmt.Printf("No context found for %s\n", ticket)
+			return err
+		}
+
+		// Check if the number is valid
+		if todoNum > len(context.NextSteps) {
+			fmt.Printf("Error: TODO #%d not found (only %d TODOs exist)\n", todoNum, len(context.NextSteps))
+			return nil
+		}
+
+		// Mark the TODO as complete by adding [COMPLETE] prefix if not already present
+		idx := todoNum - 1
+		if !strings.HasPrefix(context.NextSteps[idx].Text, "[COMPLETE]") {
+			context.NextSteps[idx].Text = "[COMPLETE] " + context.NextSteps[idx].Text
+
+			// Save the updated context back
+			err = saveEnhancedContext(db, ticket, requirements, context)
+			if err != nil {
+				fmt.Printf("Error saving updated context: %v\n", err)
+				return err
+			}
+
+			fmt.Printf(" TODO #%d marked as complete for %s\n", todoNum, ticket)
+		} else {
+			fmt.Printf(" TODO #%d is already marked as complete\n", todoNum)
+		}
+
+		return nil
 	})
 }
 

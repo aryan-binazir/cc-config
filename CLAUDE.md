@@ -70,6 +70,13 @@ You have access to a memory system that tracks context by git branch/ticket. **Y
    - **TRIGGER**: Before starting new work to check context
    - Say: "Let me check the existing context for this ticket" when using
 
+6. **`/mark_todo_complete [number]`** - Mark a TODO as complete
+   - **TRIGGER**: Immediately after completing a TODO task
+   - **TRIGGER**: When you successfully finish implementing something from the TODO list
+   - Use the TODO number from `/memory_review` output
+   - Example: `/mark_todo_complete 3` (marks TODO #3 as [COMPLETE])
+   - Say: "Marking TODO #X as complete" when using
+
 ### Mandatory Workflow
 
 You MUST follow this workflow:
@@ -79,7 +86,8 @@ You MUST follow this workflow:
 3. **Making a technical choice** → Use SlashCommand with `/memory_decision [reasoning]`
 4. **Completing functionality** → Use SlashCommand with `/memory_implementation [what you built]`
 5. **Finding blockers/TODOs** → Use SlashCommand with `/memory_todo [description]`
-6. **Before session ends** → Final `/memory_sync` to capture last changes
+6. **Completing a TODO** → Use SlashCommand with `/mark_todo_complete [number]`
+7. **Before session ends** → Final `/memory_sync` to capture last changes
 
 ### Critical Requirements
 

@@ -51,6 +51,6 @@ type EnhancedContextItem struct {
 
 // InputData represents the data passed to the save command
 type InputData struct {
-	SessionID        string `json:"sessionId,omitempty"`
-	LastHumanMessage string `json:"lastHumanMessage,omitempty"`
+	SessionID        string `json:"session_id"`
+	LastHumanMessage string `json:"last_human_message"`
 }
