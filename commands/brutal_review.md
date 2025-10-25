@@ -1,6 +1,6 @@
-Ultrathink
+ultrathink
 
-Review all staged and unstaged changes on this branch (not pushed yet). Be brutally honest.
+No code changes. Be brutally honest. Review all staged and unstaged changes on this branch (not pushed yet).
 
 1. Do these changes actually do what they're supposed to? 
 2. Will they cause regressions? Check for breaking changes, performance hits, lost functionality, new bugs, missing tests.
