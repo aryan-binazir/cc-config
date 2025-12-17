@@ -1,5 +1,5 @@
 ---
-name: sub_agents_beta
+name: sub_agents
 description: Orchestrate sub-agents with explicit validation and integration
 version: "0.1"
 argument-hint: <task/request> [--fast|--deep|--no-agents]
@@ -124,4 +124,3 @@ Deliver a single integrated result. Include:
 - Remaining assumptions/open questions (if any)
 
 Now execute this workflow for the user request above.
-
