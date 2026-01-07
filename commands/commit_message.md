@@ -1,31 +1,32 @@
 ---
 description: Analyze staged changes and create a commit message
-version: "2.0"
+version: "3.0"
 ---
 
-# Quick Commit Command
+# Commit Message
 
-Analyze staged changes and create a concise commit message:
+Analyze staged changes and generate a commit message.
 
-## Process:
+## Process
 
-1. **Validate staged changes:**
-   - Run `git diff --cached --name-only` to check for staged files
-   - If no staged changes, exit with message "No staged changes to commit"
+1. Validate: `git diff --cached --name-only` — exit if nothing staged
+2. Context: `git log --oneline -5` — match project's commit style
+3. Analyze: `git diff --cached` — understand what changed and why
 
-2. **Check project context:**
-   - Look at recent commits with `git log --oneline -5` to understand commit message patterns
+## Output
 
-3. **Analyze and commit:**
-   - Run `git diff --cached` to see all staged changes
-   - Auto-detect branch: `git branch --show-current`
-   - Use format: `[branch-name] - [concise description]`
-   - Run `git commit -m "<generated message>"`
+```
+[title: imperative, <72 chars, what changed]
 
-## Guidelines:
-- Keep message under 72 characters for the first line
-- Focus on what changed, not how
-- Use imperative mood ("Add", "Fix", "Update")
-- Be specific but concise
+[body: why it changed, key files affected, any breaking changes]
+```
 
-Usage: Run without arguments (auto-detects current branch)
+Body is optional for trivial changes. Include it when:
+- Multiple files/components affected
+- Non-obvious reasoning
+- Breaking changes or migration notes
+
+## Guidelines
+- Imperative mood ("Add", "Fix", "Update")
+- Focus on why, not how (code shows how)
+- Be specific but not verbose

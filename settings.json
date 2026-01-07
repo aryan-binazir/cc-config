@@ -46,19 +46,24 @@
       "Bash(terraform:*)",
       "Bash(kubectl:*)"
     ],
-    "deny": [
+    "deny": [],
+    "ask": [
+      "Bash(rm:*)",
+      "Bash(rm)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -rf /)",
+      "Bash(git add:*)",
+      "Bash(git add)",
+      "Bash(git commit:*)",
+      "Bash(git commit)",
       "Bash(git push:*)",
       "Bash(git push)",
-      "Bash(rm -rf:*)",
       "Bash(dd if=:*)",
-      "Bash(rm -rf /)",
       "Bash(curl:*)",
       "Bash(wget:*)",
       "Bash(mkfs:*)",
-      "Bash(docker rm -f:*)",
-      "Bash(git commit:*)"
-    ],
-    "ask": []
+      "Bash(docker rm -f:*)"
+    ]
   },
   "model": "opus",
   "statusLine": {
