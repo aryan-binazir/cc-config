@@ -2,7 +2,7 @@
 name: sub_agents
 description: Orchestrate sub-agents with explicit validation and integration
 version: "1.0"
-argument-hint: <task/request> [--fast|--deep|--no-agents]
+argument-hint: <task/request> [--fast]
 ---
 
 ultrathink
@@ -15,13 +15,10 @@ $ARGUMENTS
 
 If `$ARGUMENTS` is empty, ask the user to restate the request and desired output format.
 
-## Modes (Optional Flags)
+## Modes
 
+- **Default (no flags)**: Higher rigor. Multiple sub-agents (design/review/test/risk). Stronger validation.
 - `--fast`: Minimum overhead. 1 sub-agent. Minimal planning. Proceed with explicit assumptions.
-- `--deep`: Higher rigor. Multiple sub-agents (design/review/test/risk). Stronger validation.
-- `--no-agents`: Only if explicitly requested. Proceed without sub-agents and explain why.
-
-Default: use sub-agents when they add real value; do not spawn agents for ceremony.
 
 ## Core Rules
 
