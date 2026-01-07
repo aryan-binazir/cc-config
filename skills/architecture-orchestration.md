@@ -1,6 +1,6 @@
 ---
 name: architecture-orchestration
-description: Coordinate multi-agent architectural changes with separate concerns for design, implementation, testing, and review. Use when making significant architectural changes, refactoring systems, or implementing complex features that need coordinated workflows.
+description: Coordinate multi-agent architectural changes with separate concerns for design, implementation, testing, and review.
 author: Architectural Coordinator
 version: "1.0"
 category: architecture
@@ -8,241 +8,131 @@ category: architecture
 
 # Architecture Orchestration
 
-## Overview
-For complex architectural work, coordinate multiple specialized workflows that can run in parallel or sequence. Each "agent" handles a specific concern while maintaining architectural coherence.
+Coordinate complex architectural work using specialized workflows for design, implementation, testing, and review.
 
-## Orchestration Pattern
+## Agent Roles
 
-When handling architectural changes:
-
-1. **Architecture Agent** - Design and document
-2. **Implementation Agent** - Code changes
-3. **Test Agent** - Verify behavior
-4. **Review Agent** - Quality assurance
-
-These can run in separate Claude Code sessions or sequentially in one session.
+| Agent | Responsibility | Outputs |
+|-------|---------------|---------|
+| **Architecture** | Design, documentation, impact analysis | ADR, migration plan, API contracts |
+| **Implementation** | Execute architectural changes | Code changes per ADR |
+| **Test** | Verify behavior | Unit/integration/regression tests |
+| **Review** | Quality assurance | Issues, recommendations, approval |
 
 ## 1. Architecture Agent
 
-**Responsibility:** Design decisions, documentation, impact analysis
-
-**Workflow:**
-```bash
-# Create/update ADR
-mkdir -p docs/architecture/decisions
-# Document:
-# - Context: Why this change?
-# - Decision: What are we doing?
-# - Consequences: What changes?
-# - Alternatives: What did we reject?
-```
-
-**Outputs:**
-- ADR (Architecture Decision Record)
-- Migration plan
-- Affected components list
-- API contracts/interfaces
-
-**Questions to answer:**
+**Questions to answer**:
 - What problem are we solving?
 - What are the trade-offs?
-- What breaks? What's the migration path?
-- What are the performance/security implications?
+- What breaks? Migration path?
+- Performance/security implications?
+
+**Output**: ADR in `docs/architecture/decisions/`
 
 ## 2. Implementation Agent
 
-**Responsibility:** Execute the architectural changes
+**Must reference**: ADR, component boundaries, interface contracts
 
-**Workflow:**
-```bash
-# Follow the architecture plan
-# Make changes to affected components
-# Update interfaces/APIs
-# Refactor as needed
-```
-
-**Must reference:**
-- ADR from Architecture Agent
-- Component boundaries
-- Interface contracts
-
-**Constraints:**
+**Constraints**:
 - Don't deviate from ADR without updating it
 - Implement incrementally
 - Keep commits atomic per component
 
 ## 3. Test Agent
 
-**Responsibility:** Verify the implementation
-
-**Workflow:**
-```bash
-# Unit tests for new behavior
-# Integration tests for component interactions
-# Regression tests for existing behavior
-# Performance tests if relevant
-```
-
-**Test levels:**
+**Test levels**:
 - Unit: New component behavior
 - Integration: Cross-component contracts
 - Regression: Nothing broke
 - Performance: No degradation
 
-**Reports:**
-- Test coverage of new code
-- Failed tests with root cause
-- Performance benchmarks
+**Report**: Coverage, failures with root cause, benchmarks
 
 ## 4. Review Agent
 
-**Responsibility:** Quality assurance and consistency
-
-**Checklist:**
+**Checklist**:
 - [ ] Code follows ADR
 - [ ] Tests cover success/failure paths
-- [ ] Error handling is appropriate
-- [ ] Documentation is updated
-- [ ] No security vulnerabilities introduced
-- [ ] Performance is acceptable
-- [ ] Migration path is clear
-- [ ] Rollback plan exists
-
-**Outputs:**
-- Issues found
-- Recommendations
-- Approval/block decision
+- [ ] Error handling appropriate
+- [ ] Documentation updated
+- [ ] No security vulnerabilities
+- [ ] Performance acceptable
+- [ ] Migration/rollback plan clear
 
 ## Orchestration Strategies
 
 ### Sequential (Single Session)
-Use when changes are tightly coupled:
+For tightly coupled changes:
 ```
-Architecture → Implementation → Testing → Review
+Architecture -> Implementation -> Testing -> Review
 ```
-
-Ask Claude: "Walk through the architecture orchestration process for [change]"
 
 ### Parallel (Multiple Sessions)
-Use for independent work:
+For independent work:
 ```
-Terminal 1: Architecture Agent - Design ADR
-Terminal 2: Test Agent - Write test cases from requirements
-Terminal 3: Implementation Agent - Implement to spec (once ADR ready)
-Terminal 4: Review Agent - Review completed work
+T1: Architecture Agent - Design ADR
+T2: Test Agent - Write test cases from requirements
+T3: Implementation Agent - Implement to spec (after ADR ready)
+T4: Review Agent - Review completed work
 ```
 
 ### Iterative (Feedback Loop)
-Use for complex/uncertain changes:
+For complex/uncertain changes:
 ```
-1. Architecture: Initial design
-2. Implementation: Prototype core
-3. Review: Identify issues
-4. Architecture: Revise design
-5. Implementation: Refine
-6. Test: Verify
-7. Review: Final check
+Design -> Prototype -> Review -> Revise -> Implement -> Test -> Final Review
 ```
 
-## Multi-Agent Communication
+## Coordination Points
 
-**Artifacts shared between agents:**
-- ADR documents (in `docs/architecture/decisions/`)
-- Interface definitions (in code)
-- Test specifications (in test files)
-- Review feedback (in PR or review.md)
-
-**Coordination points:**
 - Architecture blocks Implementation
 - Implementation blocks Testing
 - Testing blocks Review
 - Review may loop back to any stage
 
-## Examples
+**Artifacts**: ADRs, interface definitions, test specs, review feedback
 
-### Example 1: Refactor Database Layer
+## Example: Refactor Database Layer
 
-**Architecture Agent:**
-```bash
-# Terminal 1 or Step 1
-"Create an ADR for migrating from direct SQL to repository pattern"
-# Outputs: ADR-0015-repository-pattern.md
+```
+Architecture: "Create ADR for migrating to repository pattern"
+             -> Outputs ADR-0015-repository-pattern.md
+
+Implementation: "Implement repository pattern per ADR-0015"
+             -> Repository classes, updated service layer
+
+Test: "Write tests for new repository layer"
+             -> Unit tests, integration tests
+
+Review: "Review implementation against ADR-0015"
+             -> review.md with findings
 ```
 
-**Implementation Agent:**
-```bash
-# Terminal 2 or Step 2
-"Implement the repository pattern per ADR-0015"
-# Outputs: repository classes, updated service layer
-```
+## When to Use
 
-**Test Agent:**
-```bash
-# Terminal 3 or Step 3
-"Write tests for the new repository layer"
-# Outputs: test files, integration tests
-```
-
-**Review Agent:**
-```bash
-# Terminal 4 or Step 4
-"Review the repository pattern implementation against ADR-0015"
-# Outputs: review.md with findings
-```
-
-### Example 2: Add New API Endpoint
-
-**Single session orchestration:**
-```
-"Orchestrate adding a new /api/analytics endpoint:
-1. Architecture: Design the endpoint contract and data flow
-2. Implementation: Build the endpoint
-3. Testing: Write unit and integration tests
-4. Review: Check against our API standards"
-```
-
-### Example 3: Performance Optimization
-
-**Parallel with feedback:**
-```
-Architecture Agent: "Analyze performance bottleneck in data processing"
-Test Agent: "Create benchmark suite for data processing"
-Implementation Agent: "Optimize based on architecture analysis"
-Review Agent: "Verify optimization meets performance targets"
-```
-
-## When to Use This Skill
-
-✅ Use for:
+**Use for**:
 - Significant architectural changes
 - Cross-cutting refactors
 - New major features
 - System-wide optimizations
-- Complex debugging requiring multiple approaches
 
-❌ Don't use for:
+**Don't use for**:
 - Simple bug fixes
 - Single-file changes
-- Documentation updates
 - Trivial refactors
 
 ## Prompting Patterns
 
-**Full orchestration:**
-"Orchestrate [architectural change] using architecture, implementation, testing, and review agents"
+**Full orchestration**:
+"Orchestrate [change] using architecture, implementation, testing, and review agents"
 
-**Specific agent:**
+**Specific agent**:
 "Act as the Architecture Agent and design [change]"
-"Act as the Test Agent and verify [implementation]"
 "Act as the Review Agent and audit [code]"
-
-**Parallel coordination:**
-"I'll run Architecture Agent here. In another terminal, I want Implementation Agent to wait for the ADR, then proceed"
 
 ## Tips
 
-- **Start with architecture** - Don't code before you design
-- **Keep agents focused** - Each has one job
-- **Document handoffs** - ADRs, specs, test plans
-- **Review everything** - Even if you're confident
-- **Iterate when needed** - Don't force a bad design forward
+- Start with architecture - don't code before you design
+- Keep agents focused - each has one job
+- Document handoffs - ADRs, specs, test plans
+- Review everything - even when confident
+- Iterate when needed - don't force a bad design forward

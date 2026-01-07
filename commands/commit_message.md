@@ -1,33 +1,33 @@
 ---
 description: Analyze staged changes and create a commit message
-version: "1.1"
+version: "3.0"
 ---
 
-# Quick Commit Command
+# Commit Message
 
-Analyze staged changes and create a concise commit message:
+Analyze staged changes and generate a commit message.
 
-## Process:
+## Process
 
-1. **Validate staged changes:**
-   - Run `git diff --cached --name-only` to check for staged files
-   - If no staged changes, exit with message "No staged changes to commit"
-   
-2. **Check project context:**
-   - Check root directory for CLAUDE.md and AGENTS.md for project-specific instructions
-   - Look at recent commits with `git log --oneline -5` to understand commit message patterns
-   
-3. **Analyze and commit:**
-   - Run `git diff --cached` to see all staged changes
-   - Generate concise but descriptive commit message
-   - Auto-detect branch: `git branch --show-current`
-   - Use format: `[branch-name] - [concise description]`
-   - Run `git commit -m "<generated message>"`
+1. Validate: `git diff --cached --name-only` — exit if nothing staged
+2. Branch: `git branch --show-current` — extract ticket ID (strip leading initials like `ab-`)
+3. Context: `git log --oneline -5` — match project's commit style
+4. Analyze: `git diff --cached` — understand what changed and why
 
-## Guidelines:
-- Keep message under 72 characters for the first line
-- Focus on what changed, not how
-- Use imperative mood ("Add", "Fix", "Update")
-- Be specific but concise
+## Output
 
-Usage: Run without arguments (auto-detects current branch)
+```
+[TICKET-ID - title: imperative, <72 chars, what changed]
+
+[body: why it changed, key files affected, any breaking changes]
+```
+
+Body is optional for trivial changes. Include it when:
+- Multiple files/components affected
+- Non-obvious reasoning
+- Breaking changes or migration notes
+
+## Guidelines
+- Imperative mood ("Add", "Fix", "Update")
+- Focus on why, not how (code shows how)
+- Be specific but not verbose

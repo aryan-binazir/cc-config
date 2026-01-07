@@ -1,87 +1,51 @@
 ---
-name: "code-review"
-description: "Performs a senior-level code review of git diffs, identifying obvious issues and architectural improvements"
-author: "Senior Software Engineer Assistant"
-version: "1.1"
-category: "code-quality"
+description: Brutally honest review of committed code since branch diverged
+version: "2.0"
 ---
 
-# Code Review Command
+# Code Review
 
-ultrathink You are a senior software engineer performing a thorough code review. Analyze the provided diff of committed but unpushed changes with the expertise of someone who has seen many codebases and knows what to look for.
+ultrathink
 
-## Instructions
+Review all committed code on this branch since it diverged from base. Be brutally honest.
 
-1. **Get the changes to review using this priority order:**
-   - **Arguments provided:**
-     - Commit hash: `git show <commit-hash>`
-     - Commit range: `git diff <commit-range>`  
-     - Custom base: `git diff <base-branch>..HEAD`
-   - **No arguments (unpushed changes):**
-     - Try: `git diff @{upstream}..HEAD`
-     - Fallback: `git diff origin/$(git branch --show-current)..HEAD`
-     - Last resort: `git diff HEAD~1..HEAD` (review last commit only)
-   - **Goal**: Show commits that exist locally but haven't been pushed
+## Get Changes
 
-2. **Analyze the code changes with two distinct perspectives:**
+```bash
+# Auto-detect base branch
+git diff origin/main..HEAD      # Try main first
+git diff origin/master..HEAD    # Fallback to master
 
-## Section 1: Low-Hanging Fruit (Obvious Issues)
-
-Look for and identify these immediate, concrete issues:
-
-- **Syntax and Style Violations**: Inconsistent formatting, naming conventions, missing semicolons, etc.
-- **Code Smells**: Duplicated code, overly long functions/methods, deeply nested conditionals
-- **Error Handling**: Missing try-catch blocks, unhandled edge cases, improper error messages
-- **Security Concerns**: Hardcoded secrets, SQL injection risks, XSS vulnerabilities, insecure defaults
-- **Performance Red Flags**: Obvious inefficiencies like N+1 queries, unnecessary loops in loops, blocking operations
-- **Resource Management**: Memory leaks, unclosed connections, missing cleanup
-- **Logic Errors**: Off-by-one errors, incorrect conditionals, wrong operators
-- **Type Issues**: Missing null checks, type mismatches, unsafe type conversions
-- **Dead Code**: Unused imports, commented-out code, unreachable code paths
-- **Debug Code**: Console.log statements, debug flags, test data left in
-
-## Section 2: Higher-Level Recommendations
-
-Evaluate these architectural and design considerations:
-
-- **Design Patterns**: Could this benefit from better separation of concerns, dependency injection, or established patterns?
-- **Maintainability**: Is this code readable and maintainable? Are there better abstractions?
-- **Scalability**: Will this approach work as the system grows? Are there bottlenecks?
-- **Testing**: Are the changes testable? Do they break existing test patterns?
-- **API Design**: Are interfaces clean and intuitive? Is the contract clear?
-- **Dependencies**: Are new dependencies justified? Are there lighter alternatives?
-- **Documentation**: Does complex logic need better comments or documentation?
-- **Consistency**: Does this follow established patterns in the codebase?
-- **Future-Proofing**: Is this flexible enough for likely future changes?
-
-## Output Format
-
-Structure your response exactly like this:
-
-```
-# Code Review Results
-
-## 🔍 Low-Hanging Fruit (Obvious Issues)
-
-[List each obvious issue with specific line references and clear explanations]
-
-## 🏗️ Higher-Level Recommendations
-
-[Provide architectural insights and broader improvement suggestions]
-
-## 📊 Summary
-- **Issues Found**: [number] obvious issues
-- **Recommendations**: [number] architectural suggestions  
-- **Overall Assessment**: [Brief overall quality assessment]
+# Context
+git log --oneline origin/main..HEAD
+git diff --stat origin/main..HEAD
 ```
 
-## Important Notes
+## Review Focus
 
-- **Be specific**: Reference actual line numbers and code snippets when pointing out issues
-- **Explain the "why"**: Don't just identify problems, explain why they're problematic
-- **Prioritize**: Order issues by severity and impact
-- **Be constructive**: Suggest specific improvements, not just criticism
-- **Context matters**: Consider the apparent purpose and scope of the changes
-- **Know your limits**: Acknowledge when you need more context about the broader system
+1. **Correctness**: Does this code actually work? Logic errors, broken algorithms, wrong assumptions, failed edge cases.
 
-Remember: You're not perfect at catching everything, but focus on finding the obvious wins and providing valuable architectural insights that a senior engineer would notice.
+2. **Regressions**: Will merging this break existing functionality? Removed behavior, changed contracts, broken integrations.
+
+3. **Concerns**: Security issues, performance problems, maintainability red flags, missing error handling.
+
+## Output
+
+List only issues that need fixing. No compliments. No padding.
+
+```
+## Issues
+
+1. [file:line] - [what's wrong and why it matters]
+2. [file:line] - [what's wrong and why it matters]
+...
+
+## Concerns
+
+- [Any security, performance, or architectural concerns]
+
+## Verdict
+[APPROVE / NEEDS FIXES / REJECT] - [1 sentence summary]
+```
+
+If no issues found, say so and move on.
