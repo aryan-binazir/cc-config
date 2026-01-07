@@ -1,95 +1,51 @@
 ---
-name: "code-review"
-description: "Senior-level code review of commits or pull requests with auto-detection"
+description: Brutally honest review of committed code since branch diverged
 version: "2.0"
-category: "code-quality"
-aliases: ["review", "mr-review", "pr-review"]
 ---
 
-# Code Review Command
+# Code Review
 
-ultrathink You are a senior software engineer performing a thorough code review. Analyze the provided diff with the expertise of someone who has seen many codebases.
+ultrathink
 
-## Instructions
+Review all committed code on this branch since it diverged from base. Be brutally honest.
 
-1. **Detect review mode:**
-   - If args contain `--pr`, `--branch`, or `--mr` → **PR mode** (full branch review)
-   - Otherwise → **Commit mode** (unpushed changes only)
-   - User can specify base branch: `code-review main` or `code-review --pr origin/develop`
+## Get Changes
 
-2. **Get the changes to review:**
+```bash
+# Auto-detect base branch
+git diff origin/main..HEAD      # Try main first
+git diff origin/master..HEAD    # Fallback to master
 
-   **PR/Branch mode:**
-   - With base arg: `git diff origin/<base-branch>..HEAD`
-   - Auto-detect: Try `git diff origin/main..HEAD`, fallback `origin/master..HEAD`
-
-   **Commit mode (default):**
-   - Try: `git diff @{upstream}..HEAD`
-   - Fallback: `git diff origin/$(git branch --show-current)..HEAD`
-   - Last resort: `git diff HEAD~1..HEAD`
-
-3. **For PR mode, gather context:**
-   - Branch: `git branch --show-current`
-   - Commits: `git log --oneline <base>..HEAD`
-   - Files: `git diff --stat <base>..HEAD`
-
-## Analysis Framework
-
-### Section 1: Low-Hanging Fruit (Obvious Issues)
-- Syntax & style violations, code smells, duplicated code
-- Error handling gaps, unhandled edge cases
-- Security concerns: hardcoded secrets, SQL injection, XSS vulnerabilities
-- Performance red flags: N+1 queries, nested loops, blocking operations
-- Resource management: memory leaks, unclosed connections
-- Logic errors, type issues, missing null checks
-- Dead code, debug statements left in
-
-### Section 2: Higher-Level Recommendations
-- Design patterns, separation of concerns, maintainability
-- Scalability considerations, testing coverage & testability
-- API design clarity, database changes & migrations *(PR mode)*
-- Dependencies justified, documentation needs
-- Consistency with codebase patterns
-- Backward compatibility & breaking changes *(PR mode)*
-- Integration points & system-wide impact *(PR mode)*
-
-## Output Format
-
-**Commit mode:**
-```
-# Code Review Results
-
-## Low-Hanging Fruit
-[List issues with specific line references]
-
-## Higher-Level Recommendations
-[Architectural insights and suggestions]
-
-## Summary
-- Issues: [n] | Recommendations: [n]
-- Assessment: [brief quality verdict]
+# Context
+git log --oneline origin/main..HEAD
+git diff --stat origin/main..HEAD
 ```
 
-**PR mode (adds two sections):**
+## Review Focus
+
+1. **Correctness**: Does this code actually work? Logic errors, broken algorithms, wrong assumptions, failed edge cases.
+
+2. **Regressions**: Will merging this break existing functionality? Removed behavior, changed contracts, broken integrations.
+
+3. **Concerns**: Security issues, performance problems, maintainability red flags, missing error handling.
+
+## Output
+
+List only issues that need fixing. No compliments. No padding.
+
 ```
-# Merge Request Review Results
+## Issues
 
-## Branch Overview
-- Branch: [name] | Base: [branch] | Commits: [n]
-- Files: [summary]
-- Scope: [what this MR accomplishes]
+1. [file:line] - [what's wrong and why it matters]
+2. [file:line] - [what's wrong and why it matters]
+...
 
-## Low-Hanging Fruit
-[Issues with file and line references]
+## Concerns
 
-## Higher-Level Recommendations
-[Feature-level architectural insights]
+- [Any security, performance, or architectural concerns]
 
-## Merge Readiness
-- Blocking: [n] issues must fix before merge
-- Testing: [coverage assessment]
-- Documentation: [needs assessment]
-- Recommendation: [APPROVE / NEEDS_WORK / REJECT + reasoning]
+## Verdict
+[APPROVE / NEEDS FIXES / REJECT] - [1 sentence summary]
 ```
 
-Be specific with line references, explain why issues matter, prioritize by severity. In PR mode, assess production readiness holistically.
+If no issues found, say so and move on.
