@@ -10,13 +10,14 @@ Analyze staged changes and generate a commit message.
 ## Process
 
 1. Validate: `git diff --cached --name-only` — exit if nothing staged
-2. Context: `git log --oneline -5` — match project's commit style
-3. Analyze: `git diff --cached` — understand what changed and why
+2. Branch: `git branch --show-current` — extract ticket ID (strip leading initials like `ab-`)
+3. Context: `git log --oneline -5` — match project's commit style
+4. Analyze: `git diff --cached` — understand what changed and why
 
 ## Output
 
 ```
-[title: imperative, <72 chars, what changed]
+[TICKET-ID - title: imperative, <72 chars, what changed]
 
 [body: why it changed, key files affected, any breaking changes]
 ```

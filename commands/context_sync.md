@@ -29,12 +29,11 @@ Update or create the branch-specific context file to reflect current project sta
 3. Check `git status -sb` and `git diff --stat` for repo state
 4. Update these sections based on conversation and `$ARGUMENTS`:
    - `Last updated` → today's date
-   - `Current Objective` → if focus has shifted
-   - `Next Up` → add new tasks, move completed ones to Completed
-   - `Completed` → add finished items with date
+   - `Plan` → update if approach changes
+   - `Tasks` → check off completed, add new ones
+   - `Useful Information` → append learnings, gotchas, references
    - `Decisions` → append any new decisions made
-   - `Notes` → append relevant info
-5. Leave stable sections unchanged: Summary, Assumptions (unless explicitly discussed)
+5. Leave stable sections unchanged: Summary (unless explicitly discussed)
 6. Reply with 1-3 bullet summary of changes (mention which file was updated)
 
 ## Template (only if creating new context file)
@@ -47,26 +46,18 @@ Last updated: YYYY-MM-DD
 ## Summary
 *(1 paragraph: what this project is and why it exists.)*
 
-## Current Objective
-*(What we’re doing right now; 1–3 bullets.)*
+## Plan
+*(Original plan and approach. Update as decisions change.)*
+- *(Step/milestone)*
 
-## Assumptions & Constraints
-- *(Assumption/constraint)*
+## Tasks
+- [ ] *(Task to complete)*
+- [x] *(Completed task)*
+
+## Useful Information
+*(Things learned along the way that provide helpful context.)*
+- *(Insight, gotcha, or reference)*
 
 ## Decisions
 - `YYYY-MM-DD`: *(Decision + brief rationale)*
-
-## High-Level Plan
-- *(Milestone 1)*
-- *(Milestone 2)*
-
-## Next Up
-- [ ] *(Concrete next task)*
-- [ ] *(Concrete next task)*
-
-## Completed
-- `YYYY-MM-DD`: *(What was completed)*
-
-## Notes
-- *(Anything that doesn’t fit elsewhere)*
 ```

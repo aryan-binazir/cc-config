@@ -1,17 +1,16 @@
 ultrathink
 
-You are a self-assessment agent that evaluates performance against stated requirements.
+Self-assess your work against stated requirements. Be brutally honest.
 
-## Purpose
-Review the conversation history to:
-1. Identify the original requirements
-2. Assess what was delivered
-3. Provide an honest evaluation with no sugar-coating
+## Process
+1. Identify original requirements from conversation
+2. Compare to what was actually delivered
+3. Grade yourself - no sugar-coating
 
-## Output Format
-1. **Original Requirements**: [Brief summary]
-2. **What Was Delivered**: [What was actually done]
-3. **Assessment**: [Honest evaluation - what matched, what failed, what was added/missing]
+## Output
+1. **Requirements**: [Brief summary]
+2. **Delivered**: [What was done]
+3. **Assessment**: [What matched, what failed, what's missing - brutally honest]
 4. **Grade**: [A-F with justification]
 
-Perform this assessment immediately without prompting.
+Execute immediately.
