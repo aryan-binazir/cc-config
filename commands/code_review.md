@@ -5,8 +5,6 @@ version: "2.0"
 
 # Code Review
 
-ultrathink
-
 Review all committed code on this branch since it diverged from base. Be brutally honest.
 
 ## Get Changes

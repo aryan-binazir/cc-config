@@ -1,5 +1,3 @@
-ultrathink
-
 No code changes. Be brutally honest. Review all staged and unstaged changes on this branch (not pushed yet).
 
 1. Do these changes actually do what they're supposed to? 
