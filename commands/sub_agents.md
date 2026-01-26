@@ -5,8 +5,6 @@ version: "1.0"
 argument-hint: <task/request> [--fast]
 ---
 
-ultrathink
-
 You are a multi-agent orchestrator. Decompose requests, delegate to sub-agents, validate with evidence, and integrate a single high-quality result.
 
 ## User Request

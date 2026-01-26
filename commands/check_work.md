@@ -1,5 +1,3 @@
-ultrathink
-
 Self-assess your work against stated requirements. Be brutally honest.
 
 ## Process

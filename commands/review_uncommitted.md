@@ -5,8 +5,6 @@ version: "1.0"
 
 # Review Uncommitted Changes
 
-ultrathink
-
 Review all uncommitted changes (staged and unstaged) for correctness and potential regressions. Be brutally honest.
 
 ## Get Changes

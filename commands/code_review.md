@@ -1,25 +1,43 @@
 ---
 description: Brutally honest review of committed code since branch diverged
-version: "2.0"
+version: "2.1"
 ---
 
 # Code Review
 
-ultrathink
+Review ONLY the changes made on the current branch compared to main. Nothing else.
 
-Review all committed code on this branch since it diverged from base. Be brutally honest.
+## Scope
+
+**ONLY review**:
+- Code changes introduced on this branch
+- Commits between where this branch diverged from main and HEAD
+
+**DO NOT review**:
+- Files not modified by this branch
+- Changes from rebases, merges, or upstream commits
+- Code that existed before this branch was created
 
 ## Get Changes
 
 ```bash
-# Auto-detect base branch
-git diff origin/main..HEAD      # Try main first
-git diff origin/master..HEAD    # Fallback to master
+# Get current branch name
+BRANCH=$(git branch --show-current)
 
-# Context
-git log --oneline origin/main..HEAD
-git diff --stat origin/main..HEAD
+# Find the merge-base (where this branch diverged from main)
+BASE=$(git merge-base origin/main HEAD 2>/dev/null || git merge-base origin/master HEAD)
+
+# Get ONLY the diff between merge-base and current HEAD
+git diff $BASE..HEAD
+
+# List commits on this branch only (exclude merge commits)
+git log --oneline --no-merges $BASE..HEAD
+
+# Summary of files changed on this branch
+git diff --stat $BASE..HEAD
 ```
+
+**Important**: If a file appears in the diff that wasn't intentionally modified on this branch, ignore it - it's likely a rebase artifact.
 
 ## Review Focus
 
