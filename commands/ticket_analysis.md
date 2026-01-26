@@ -41,8 +41,8 @@ Perform a thorough codebase exploration to identify files and specific line numb
 
 ## Requirements
 
-1. Search broadly - consider multiple naming conventions, related concepts, and indirect dependencies
-2. Trace the flow: entry points → core logic → data models → tests
+1. Stay focused on the ticket's domain - only search areas directly relevant to the ticket's scope
+2. Trace the flow within that domain: entry points → core logic → data models → tests
 3. For each relevant file found, provide:
    - File path and specific line number(s)
    - WHY this file/location matters for understanding or implementing this ticket
@@ -146,6 +146,12 @@ Combine both phases into the final report.
 ## Part 2: Necessity Analysis
 
 {Phase 2 output}
+
+---
+
+## Reminder
+
+Before implementing, review the codebase conventions (naming patterns, file structure, error handling, testing approach) and ensure your implementation aligns with existing patterns.
 
 ---
 
