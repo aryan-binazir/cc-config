@@ -21,103 +21,44 @@ Results are written to BOTH:
 
 ## Workflow
 
-### Phase 1: File Research (Sonnet)
+### Phase 1: File Research
 
-Spawn a sub-agent using the Task tool with these parameters:
-- `subagent_type`: `"Explore"`
-- `model`: `"sonnet"`
-- Thoroughness: `"very thorough"`
-
-**Sub-agent prompt**:
+Spawn the `ticket-researcher` agent using the Task tool:
 
 ```
-## Ticket to Analyze
+Task tool parameters:
+- subagent_type: "Explore"
+- model: "sonnet"
 
-{paste ticket info from $ARGUMENTS}
+Prompt:
+## Ticket
 
-## Task
+{ticket info from $ARGUMENTS}
 
-Perform a thorough codebase exploration to identify files and specific line numbers relevant to this ticket. You are helping someone get familiar with the codebase before working on this ticket.
-
-## Requirements
-
-1. Stay focused on the ticket's domain - only search areas directly relevant to the ticket's scope
-2. Trace the flow within that domain: entry points → core logic → data models → tests
-3. For each relevant file found, provide:
-   - File path and specific line number(s)
-   - WHY this file/location matters for understanding or implementing this ticket
-   - What concept or component it represents
-
-## Output Format
-
-Return a structured analysis:
-
-### Entry Points
-(Where the feature/bug would be triggered or accessed)
-
-### Core Logic
-(Main implementation files that would need changes or understanding)
-
-### Data Models / Types
-(Relevant data structures, interfaces, schemas)
-
-### Tests
-(Existing test files that cover related functionality)
-
-### Configuration / Infrastructure
-(Config files, build setup, or infra that might be relevant)
-
-For each item, use format:
-- `path/to/file.ext:123-145` - [Why this matters for the ticket]
+Use the ticket-researcher agent behavior to identify relevant files and line numbers for this ticket.
 ```
 
 Capture the full output from Phase 1.
 
-### Phase 2: Need Analysis (Sonnet)
+### Phase 2: Need Analysis
 
-Spawn a second sub-agent using the Task tool with:
-- `subagent_type`: `"general-purpose"`
-- `model`: `"sonnet"`
-
-**Sub-agent prompt**:
+Spawn the `ticket-assessor` agent using the Task tool:
 
 ```
+Task tool parameters:
+- subagent_type: "general-purpose"
+- model: "sonnet"
+
+Prompt:
 ## Ticket
 
-{paste ticket info from $ARGUMENTS}
+{ticket info from $ARGUMENTS}
 
 ## Codebase Research Findings
 
-{paste Phase 1 output here}
+{Phase 1 output}
 
-## Task
-
-Based on the ticket description and the codebase research above, provide a critical analysis of this ticket's necessity and value.
-
-## Analysis Required
-
-1. **Why We Need This** (or **Why We Might Not**)
-   - What problem does this solve?
-   - Who benefits and how?
-   - What's the cost of NOT doing this?
-
-2. **Alternatives Considered**
-   - Are there simpler approaches?
-   - Could this be solved differently with existing code?
-   - Is this solving the right problem?
-
-3. **Risks & Concerns**
-   - What could go wrong?
-   - Hidden complexity or scope creep potential?
-   - Dependencies or blockers?
-
-4. **Recommendation**
-   - Clear verdict: Proceed / Needs refinement / Question the premise
-   - If "Proceed": key considerations for implementation
-   - If "Needs refinement": what questions need answers first
-   - If "Question the premise": what alternative should be explored
-
-Be direct and critical. It's better to challenge a ticket early than waste time on unnecessary work.
+Use the ticket-assessor agent behavior to critically evaluate this ticket's necessity and provide a recommendation.
 ```
 
 Capture the full output from Phase 2.
@@ -168,8 +109,13 @@ Before implementing, review the codebase conventions (naming patterns, file stru
    - Write to `context/initial_review-{branch}.md`
 3. Confirm: "Report saved to `context/initial_review-{branch}.md`"
 
+## Agents Used
+
+- **ticket-researcher**: Finds relevant files and line numbers within the ticket's domain
+- **ticket-assessor**: Critically evaluates necessity and provides recommendation
+
 ## Notes
 
-- Both sub-agents use Sonnet model for cost-effective thorough analysis
+- Both agents use Sonnet model for cost-effective thorough analysis
 - Phase 2 depends on Phase 1 findings, so they must run sequentially
 - If either phase fails, report partial results and note what failed
