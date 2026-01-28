@@ -1,9 +1,9 @@
 ---
-description: Brutally honest review of committed code since branch diverged
-version: "2.1"
+description: Parallel review of committed code since branch diverged
+version: "1.0"
 ---
 
-# Code Review
+# Code Review (Parallel)
 
 Review ONLY the changes made on the current branch compared to main. Nothing else.
 
@@ -36,13 +36,15 @@ git diff --stat $BASE..HEAD
 
 **Important**: If a file appears in the diff that wasn't intentionally modified on this branch, ignore it - it's likely a rebase artifact.
 
-## Review Focus
+## Parallel Review
 
-1. **Correctness**: Does this code actually work? Logic errors, broken algorithms, wrong assumptions, failed edge cases.
+Spawn sub-agents to check in parallel:
 
-2. **Regressions**: Will merging this break existing functionality? Removed behavior, changed contracts, broken integrations.
+- **Agent 1: Correctness** - Does this code actually work? Logic errors, broken algorithms, wrong assumptions, failed edge cases.
+- **Agent 2: Regressions** - Will merging this break existing functionality? Removed behavior, changed contracts, broken integrations.
+- **Agent 3: Concerns** - Security issues, performance problems, maintainability red flags, missing error handling, test coverage gaps.
 
-3. **Concerns**: Security issues, performance problems, maintainability red flags, missing error handling, test coverage gaps.
+Be specific. Point out exactly what's wrong and where. No padding.
 
 ## Output
 
