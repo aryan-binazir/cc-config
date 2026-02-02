@@ -2,7 +2,7 @@
 name: mermaid
 description: Generate Mermaid diagrams for system understanding
 version: "1.0"
-argument-hint: [--branch | --system <target> | <description>]
+argument-hint: [--md] [--branch | --system <target> | <description>]
 ---
 
 # Mermaid Diagram Generator
@@ -20,6 +20,11 @@ If `$ARGUMENTS` is empty, ask: "What should I diagram? Options: `--branch` (chan
 - `--branch`: Analyze changes on current branch vs main. Produce data flow diagram showing how data moves through the changed code.
 - `--system <target>`: Analyze a specific system, module, or flow. `<target>` can be a file path, directory, function name, or concept (e.g., "auth flow", "payment processing").
 - **Freeform**: Any other input is treated as a description of what to diagram.
+
+## Output Options
+
+- **Default**: HTML file with rendered diagram (self-contained, opens in browser)
+- `--md`: Output both HTML and markdown files
 
 ## Workflow
 
@@ -94,7 +99,53 @@ Default to `flowchart LR` for data flow unless another type is clearly better.
 
 ### 5. Output
 
-Generate a markdown file with:
+**Output location**: `context/diagrams/<name>.<ext>`
+
+Where `<name>` is derived from the mode:
+- `--branch`: `branch-<branch-name>-dataflow`
+- `--system`: `system-<target-slug>`
+- Freeform: `diagram-<slug>`
+
+#### Default: HTML Output (`.html`)
+
+Generate a self-contained HTML file that renders the Mermaid diagram in browser:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DIAGRAM_TITLE</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    h1 { border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; }
+    .mermaid { margin: 2rem 0; }
+    .notes { background: #f5f5f5; padding: 1rem; border-radius: 4px; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>DIAGRAM_TITLE</h1>
+  <p><strong>Scope:</strong> SCOPE_DESCRIPTION</p>
+
+  <div class="mermaid">
+    MERMAID_CODE_HERE
+  </div>
+
+  <div class="notes">
+    <h3>Notes</h3>
+    <ul>
+      <li>KEY_NOTES_HERE</li>
+    </ul>
+  </div>
+
+  <script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>
+```
+
+#### With `--md`: Additional Markdown Output (`.md`)
+
+When `--md` is specified, also generate a markdown file with:
 
 1. **Title**: What this diagram shows
 2. **Scope**: What's included/excluded
@@ -102,14 +153,61 @@ Generate a markdown file with:
 4. **Legend** (if needed): Explain non-obvious symbols
 5. **Notes**: Key assumptions, simplifications, or areas needing attention
 
-**Output location**: `context/diagrams/<name>.md`
-
-Where `<name>` is derived from the mode:
-- `--branch`: `branch-<branch-name>-dataflow.md`
-- `--system`: `system-<target-slug>.md`
-- Freeform: `diagram-<slug>.md`
-
 ## Example Output Structure
+
+### HTML (default)
+
+`context/diagrams/branch-oauth-refresh-dataflow.html`:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Data Flow: Authentication Changes</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    h1 { border-bottom: 1px solid #ccc; padding-bottom: 0.5rem; }
+    .mermaid { margin: 2rem 0; }
+    .notes { background: #f5f5f5; padding: 1rem; border-radius: 4px; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>Data Flow: Authentication Changes</h1>
+  <p><strong>Scope:</strong> Changes introduced in feature/oauth-refresh branch affecting auth flow.</p>
+
+  <div class="mermaid">
+flowchart LR
+    subgraph Client
+        A([Request]) --> B[Auth Middleware]
+    end
+    subgraph "Auth Service (modified)"
+        B --> C{Token Valid?}
+        C -->|Yes| D[Extract Claims]
+        C -->|No| E{Refresh Token?}
+        E -->|Yes| F[Refresh Flow]
+        E -->|No| G([401 Unauthorized])
+        F --> D
+    end
+    D --> H[Route Handler]
+  </div>
+
+  <div class="notes">
+    <h3>Notes</h3>
+    <ul>
+      <li>Refresh flow is new in this branch</li>
+      <li>Token validation logic moved from middleware to service</li>
+    </ul>
+  </div>
+
+  <script>mermaid.initialize({ startOnLoad: true });</script>
+</body>
+</html>
+```
+
+### Markdown (with `--md` flag)
+
+`context/diagrams/branch-oauth-refresh-dataflow.md`:
 
 ```markdown
 # Data Flow: Authentication Changes
