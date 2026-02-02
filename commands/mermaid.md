@@ -94,31 +94,110 @@ Default to `flowchart LR` for data flow unless another type is clearly better.
 
 ### 5. Output
 
-Generate a markdown file with:
+Generate an **HTML file** that renders diagrams directly in the browser.
 
-1. **Title**: What this diagram shows
-2. **Scope**: What's included/excluded
-3. **Diagram(s)**: The Mermaid code block(s)
-4. **Legend** (if needed): Explain non-obvious symbols
-5. **Notes**: Key assumptions, simplifications, or areas needing attention
-
-**Output location**: `context/diagrams/<name>.md`
+**Output location**: `context/diagrams/<name>.html`
 
 Where `<name>` is derived from the mode:
-- `--branch`: `branch-<branch-name>-dataflow.md`
-- `--system`: `system-<target-slug>.md`
-- Freeform: `diagram-<slug>.md`
+- `--branch`: `branch-<branch-name>-dataflow.html`
+- `--system`: `system-<target-slug>.html`
+- Freeform: `diagram-<slug>.html`
 
-## Example Output Structure
+## HTML Template
 
-```markdown
-# Data Flow: Authentication Changes
+Use this structure for the output file:
 
-**Scope**: Changes introduced in `feature/oauth-refresh` branch affecting auth flow.
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><!-- DIAGRAM TITLE --></title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #fafafa;
+        }
+        h1 { color: #1a1a1a; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.5rem; }
+        h2 { color: #333; margin-top: 2rem; }
+        .scope { background: #e8f4fd; padding: 1rem; border-radius: 6px; margin: 1rem 0; }
+        .diagram-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin: 1.5rem 0; }
+        .notes { background: #fff8e6; padding: 1rem; border-radius: 6px; margin-top: 2rem; }
+        .notes ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+        .legend { font-size: 0.9rem; color: #666; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1><!-- TITLE --></h1>
 
-## Request Flow
+    <div class="scope">
+        <strong>Scope:</strong> <!-- SCOPE DESCRIPTION -->
+    </div>
 
-```mermaid
+    <h2><!-- SECTION NAME --></h2>
+    <div class="diagram-container">
+        <pre class="mermaid">
+<!-- MERMAID DIAGRAM CODE -->
+        </pre>
+    </div>
+
+    <!-- Repeat diagram sections as needed -->
+
+    <div class="notes">
+        <strong>Notes:</strong>
+        <ul>
+            <!-- <li>Note 1</li> -->
+        </ul>
+    </div>
+
+    <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+</body>
+</html>
+```
+
+## Example Output
+
+For a branch analysis, the file `context/diagrams/branch-feature-oauth-refresh-dataflow.html` would contain:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Flow: Authentication Changes</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #fafafa;
+        }
+        h1 { color: #1a1a1a; border-bottom: 2px solid #e0e0e0; padding-bottom: 0.5rem; }
+        h2 { color: #333; margin-top: 2rem; }
+        .scope { background: #e8f4fd; padding: 1rem; border-radius: 6px; margin: 1rem 0; }
+        .diagram-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin: 1.5rem 0; }
+        .notes { background: #fff8e6; padding: 1rem; border-radius: 6px; margin-top: 2rem; }
+        .notes ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+    </style>
+</head>
+<body>
+    <h1>Data Flow: Authentication Changes</h1>
+
+    <div class="scope">
+        <strong>Scope:</strong> Changes introduced in <code>feature/oauth-refresh</code> branch affecting auth flow.
+    </div>
+
+    <h2>Request Flow</h2>
+    <div class="diagram-container">
+        <pre class="mermaid">
 flowchart LR
     subgraph Client
         A([Request]) --> B[Auth Middleware]
@@ -134,12 +213,20 @@ flowchart LR
     end
 
     D --> H[Route Handler]
-```
+        </pre>
+    </div>
 
-## Notes
+    <div class="notes">
+        <strong>Notes:</strong>
+        <ul>
+            <li>Refresh flow is new in this branch</li>
+            <li>Token validation logic moved from middleware to service</li>
+        </ul>
+    </div>
 
-- Refresh flow is new in this branch
-- Token validation logic moved from middleware to service
+    <script>mermaid.initialize({ startOnLoad: true, theme: 'default' });</script>
+</body>
+</html>
 ```
 
 ## Final Checklist
