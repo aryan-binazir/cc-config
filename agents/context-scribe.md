@@ -1,7 +1,9 @@
 ---
 name: context-scribe
 description: Agent for maintaining CONTEXT.md project tracking file. Use after completing tasks, when planning, or when decisions are made.
-model: inherit
+model: haiku
+tools: Read, Edit, Glob, Bash
+disallowedTools: Write, Task, WebSearch, WebFetch
 color: pink
 ---
 
