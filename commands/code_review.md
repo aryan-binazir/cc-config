@@ -1,6 +1,6 @@
 ---
 description: Brutally honest review of committed code since branch diverged
-version: "2.1"
+version: "2.2"
 ---
 
 # Code Review
@@ -38,26 +38,36 @@ git diff --stat $BASE..HEAD
 
 ## Review Focus
 
-1. **Correctness**: Does this code actually work? Logic errors, broken algorithms, wrong assumptions, failed edge cases.
+1. **Correctness**: Does this code actually work? Logic errors, broken algorithms, wrong assumptions.
 
 2. **Regressions**: Will merging this break existing functionality? Removed behavior, changed contracts, broken integrations.
 
-3. **Concerns**: Security issues, performance problems, maintainability red flags, missing error handling, test coverage gaps.
+3. **Security**: Injection risks, auth issues, data exposure, secrets in code.
+
+4. **Performance**: N+1 queries, unnecessary loops, memory leaks, expensive operations.
+
+5. **Maintainability**: Naming, complexity, duplication, missing error handling, test coverage gaps.
+
+6. **Edge Cases**: What inputs would break this? Null handling, empty arrays, boundary conditions, race conditions.
+
+**Important**: Only use information from the diff. If you're unsure whether something is an issue, say so rather than guessing.
 
 ## Output
 
 List only issues that need fixing. No compliments. No padding.
 
 ```
-## Issues
+## Critical (must fix before merge)
+- [file:line] - [what's wrong and why it matters]
 
-1. [file:line] - [what's wrong and why it matters]
-2. [file:line] - [what's wrong and why it matters]
-...
+## High (should fix)
+- [file:line] - [what's wrong and why it matters]
 
-## Concerns
+## Low (consider fixing)
+- [file:line] - [what's wrong and why it matters]
 
-- [Any security, performance, or architectural concerns]
+## Uncertain
+- [file:line] - [potential issue, but unsure - explain why]
 
 ## Verdict
 [APPROVE / NEEDS FIXES / REJECT] - [1 sentence summary]
