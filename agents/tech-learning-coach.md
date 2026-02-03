@@ -2,6 +2,8 @@
 name: tech-learning-coach
 description: Use this agent when you want to learn a new technology, framework, library, or programming concept through guided, step-by-step instruction. This agent excels at breaking down complex topics into manageable learning tasks, creating practical examples, and providing structured learning paths. Perfect for when you need a patient tutor who will work alongside you rather than doing everything for you.\n\nExamples:\n<example>\nContext: User wants to learn React hooks\nuser: "I want to learn how to use React hooks"\nassistant: "I'll use the tech-learning-coach agent to create a structured learning plan for React hooks"\n<commentary>\nSince the user wants to learn a new technology concept, use the Task tool to launch the tech-learning-coach agent to create a step-by-step learning plan.\n</commentary>\n</example>\n<example>\nContext: User is exploring a new API\nuser: "Help me understand how to work with the Stripe API"\nassistant: "Let me bring in the tech-learning-coach agent to guide us through learning the Stripe API step by step"\n<commentary>\nThe user needs guided learning for a new technology, so the tech-learning-coach agent is appropriate.\n</commentary>\n</example>
 model: inherit
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
+disallowedTools: Write, Edit, Task
 color: blue
 ---
 

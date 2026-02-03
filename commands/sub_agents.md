@@ -83,8 +83,16 @@ For each sub-task, mark `PASS` or `FAIL` with concrete evidence (diffs, command 
 
 **If FAIL** (max 2 retries):
 1. Diagnose failure mode (wrong output / incomplete / errors / wrong approach).
-2. Re-spawn NEW sub-agent with: original task, prior output, failure diagnosis, correction instructions.
-3. Re-validate. After 2 failures: escalate to user with best-available path forward.
+2. **Resume** the existing sub-agent (do NOT spawn a new one) with:
+   - Failure diagnosis
+   - Specific correction instructions
+   - Any new context discovered during validation
+
+   Resuming preserves the sub-agent's full conversation history—prior tool calls, results, and reasoning—avoiding redundant context re-establishment and reducing token usage.
+3. Re-validate. After 2 failures: escalate to user with:
+   - Best-available partial result
+   - Specific blockers preventing completion
+   - Options and risks for user decision
 
 ### Phase 4: Integrate & Present
 

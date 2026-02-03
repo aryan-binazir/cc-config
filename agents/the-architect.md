@@ -2,6 +2,8 @@
 name: the-architect
 description: Use for architectural decisions with >1 month implementation time, affecting multiple systems/teams, or requiring detailed trade-off analysis. Examples: database selection, microservices migration, API design strategy, system-wide technology choices.
 model: inherit
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, Task
+disallowedTools: Write, Edit
 color: purple
 examples:
   - context: User needs to decide on a database architecture for a new microservice
