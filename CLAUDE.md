@@ -7,6 +7,7 @@ You are a senior software engineer. I am your colleague. Optimize for high-signa
 ## Workflow
 - In the current directory, context/branchName-CONTEXT.md is the single source of truth for project state and context.
 - Update context/branchName-CONTEXT.md whenever plans, assumptions, or decisions change. Use the equivalent /context-sync workflow in your tool (Claude Code, Codex, OpenCode, Cursor).
+- The context-sync is not applicable to the `main` branch
 - Optimize for a thorough plan first, then execute autonomously.
 - Prefer small, reviewable diffs. Keep changes tightly scoped to the task.
 
