@@ -39,10 +39,6 @@
       "Bash(mv:*)",
       "Bash(touch:*)",
       "Bash(ln:*)",
-      "Bash(rm:*)",
-      "Bash(rm)",
-      "Bash(rm -rf:*)",
-      "Bash(rm -rf /)",
 
       "Bash(grep:*)",
       "Bash(egrep:*)",
@@ -133,6 +129,9 @@
       "Bash(gh:*)"
     ],
     "ask": [
+      "Bash(rm:*)",
+      "Bash(rm)",
+      "Bash(rm -rf:*)",
       "Bash"
     ]
   },
