@@ -44,10 +44,7 @@
       "Bash(gcloud:*)",
       "Bash(az:*)",
       "Bash(terraform:*)",
-      "Bash(kubectl:*)"
-    ],
-    "deny": [],
-    "ask": [
+      "Bash(kubectl:*)",
       "Bash(rm:*)",
       "Bash(rm)",
       "Bash(rm -rf:*)",
@@ -63,7 +60,11 @@
       "Bash(wget:*)",
       "Bash(mkfs:*)",
       "Bash(docker rm -f:*)"
-    ]
+    ],
+    "deny": [
+      "Bash(find:*)"
+    ],
+    "ask": []
   },
   "hooks": {
     "SessionStart": [
