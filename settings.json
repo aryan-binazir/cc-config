@@ -93,6 +93,7 @@
       "Bash(cargo:*)",
       "Bash(rustc:*)",
       "Bash(make:*)",
+      "Bash(bazel:*)",
       "Bash(gradle:*)",
       "Bash(mvn:*)",
       "Bash(git:*)",
