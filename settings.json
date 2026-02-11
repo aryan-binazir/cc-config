@@ -28,7 +28,6 @@
       "Bash(make:*)",
       "Bash(gradle:*)",
       "Bash(mvn:*)",
-      "Bash(gh:*)",
       "Bash(git:*)",
       "Bash(jest:*)",
       "Bash(pytest:*)",
@@ -62,7 +61,8 @@
       "Bash(docker rm -f:*)"
     ],
     "deny": [
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(gh:*)"
     ],
     "ask": []
   },
