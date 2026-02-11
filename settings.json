@@ -93,6 +93,7 @@
       "Bash(cargo:*)",
       "Bash(rustc:*)",
       "Bash(make:*)",
+      "Bash(bazel:*)",
       "Bash(gradle:*)",
       "Bash(mvn:*)",
       "Bash(git:*)",
@@ -131,8 +132,7 @@
     "ask": [
       "Bash(rm:*)",
       "Bash(rm)",
-      "Bash(rm -rf:*)",
-      "Bash"
+      "Bash(rm -rf:*)"
     ]
   },
   "hooks": {
