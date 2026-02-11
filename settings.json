@@ -131,8 +131,7 @@
     "ask": [
       "Bash(rm:*)",
       "Bash(rm)",
-      "Bash(rm -rf:*)",
-      "Bash"
+      "Bash(rm -rf:*)"
     ]
   },
   "hooks": {
