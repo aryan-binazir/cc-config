@@ -9,6 +9,8 @@ Walk me through this PR starting from the base of the changes. Help me understan
 
 This is a guided tour, not a code review. No suggestions. No judgments. Just clear explanation.
 
+Explain everything in plain language as if the reader is not familiar with this codebase. Avoid jargon or internal shorthand — if a concept needs context, give it. Name things by what they do, not just what they're called.
+
 ## Get Changes
 
 ```bash
