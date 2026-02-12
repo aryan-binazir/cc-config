@@ -28,6 +28,12 @@ git diff $BASE..HEAD
 
 # Files changed summary
 git diff --stat $BASE..HEAD
+
+# GitHub repo URL and HEAD SHA for constructing clickable file links
+REPO_URL=$(git remote get-url origin | sed 's/\.git$//' | sed 's|git@github.com:|https://github.com/|')
+HEAD_SHA=$(git rev-parse HEAD)
+echo "REPO_URL=$REPO_URL"
+echo "HEAD_SHA=$HEAD_SHA"
 ```
 
 ## Build the Walkthrough
@@ -48,9 +54,9 @@ If a change doesn't fit neatly, place it where it first becomes relevant.
 For each layer (foundations → core logic → wiring → entry points), walk through the changes:
 
 - **What changed**: name the function/type/file and what was added or modified.
-- **Where**: `file:line` reference so the reader can jump directly to it.
+- **Where**: clickable `file:line` link so the reader can jump directly to it (see File Link Format below).
 - **Why it exists**: one sentence on the purpose. Connect it to the broader goal of the PR.
-- **How it connects**: which other changes in this PR call it, depend on it, or are affected by it. Give `file:line` for each connection.
+- **How it connects**: which other changes in this PR call it, depend on it, or are affected by it. Give a clickable `file:line` link for each connection.
 
 If commits are well-structured (each commit is a logical step), follow commit order within each layer. Otherwise, follow the dependency graph.
 
@@ -58,9 +64,19 @@ If commits are well-structured (each commit is a logical step), follow commit or
 
 After walking the layers, trace 1-3 key paths through the changes end-to-end:
 
-> "When [trigger] happens, it hits [entry point] at `file:line`, which calls [core function] at `file:line`, which uses [foundation] at `file:line`."
+> "When [trigger] happens, it hits [entry point] at [`file:line`](link), which calls [core function] at [`file:line`](link), which uses [foundation] at [`file:line`](link)."
 
 Pick paths that best illustrate how the PR works as a whole.
+
+## File Link Format
+
+All file references must be **clickable GitHub links** using markdown syntax. Construct them from `REPO_URL` and `HEAD_SHA` gathered above:
+
+```
+[`path/to/file.go:42`](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42)
+```
+
+For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough — in **Where**, **Uses**, **Called by**, **Connects to**, and **Key Paths** — must use this format. No bare backtick-only paths.
 
 ## Output Format
 
@@ -75,9 +91,9 @@ Pick paths that best illustrate how the PR works as a whole.
 ### Foundations
 
 #### `functionOrTypeName` — short description
-- **Where**: `path/to/file.go:42`
+- **Where**: [`path/to/file.go:42`](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42)
 - **What**: Describe concretely what was added or changed.
-- **Connects to**: `callerFunction` at `path/to/other.go:88`
+- **Connects to**: `callerFunction` at [`path/to/other.go:88`](REPO_URL/blob/HEAD_SHA/path/to/other.go#L88)
 
 #### ...
 
@@ -86,10 +102,10 @@ Pick paths that best illustrate how the PR works as a whole.
 ### Core Logic
 
 #### `functionName` — short description
-- **Where**: `path/to/file.go:100`
+- **Where**: [`path/to/file.go:100`](REPO_URL/blob/HEAD_SHA/path/to/file.go#L100)
 - **What**: Describe what this does.
-- **Uses**: `foundationType` at `path/to/file.go:42`
-- **Called by**: `handlerName` at `path/to/handler.go:55`
+- **Uses**: `foundationType` at [`path/to/file.go:42`](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42)
+- **Called by**: `handlerName` at [`path/to/handler.go:55`](REPO_URL/blob/HEAD_SHA/path/to/handler.go#L55)
 
 #### ...
 
@@ -109,9 +125,9 @@ Pick paths that best illustrate how the PR works as a whole.
 
 ### Key Paths
 
-1. **[Name the flow]**: `entryPoint` (`file:line`) → `coreFunction` (`file:line`) → `foundation` (`file:line`)
+1. **[Name the flow]**: `entryPoint` ([`file:line`](REPO_URL/blob/HEAD_SHA/file#Lline)) → `coreFunction` ([`file:line`](REPO_URL/blob/HEAD_SHA/file#Lline)) → `foundation` ([`file:line`](REPO_URL/blob/HEAD_SHA/file#Lline))
 
 2. ...
 ```
 
-Keep descriptions concrete. One to two sentences max per item. Let the `file:line` links do the heavy lifting — the reader will go look at the code.
+Keep descriptions concrete. One to two sentences max per item. Let the clickable file links do the heavy lifting — the reader will click through to the code.
