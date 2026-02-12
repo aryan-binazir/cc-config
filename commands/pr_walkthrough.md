@@ -28,12 +28,6 @@ git diff $BASE..HEAD
 
 # Files changed summary
 git diff --stat $BASE..HEAD
-
-# GitHub repo URL and HEAD SHA for constructing clickable file links
-REPO_URL=$(git remote get-url origin | sed 's/\.git$//' | sed 's|git@github.com:|https://github.com/|')
-HEAD_SHA=$(git rev-parse HEAD)
-echo "REPO_URL=$REPO_URL"
-echo "HEAD_SHA=$HEAD_SHA"
 ```
 
 ## Build the Walkthrough
@@ -54,9 +48,9 @@ If a change doesn't fit neatly, place it where it first becomes relevant.
 For each layer (foundations → core logic → wiring → entry points), walk through the changes:
 
 - **What changed**: name the function/type/file and what was added or modified.
-- **Where**: clickable `file:line` link so the reader can jump directly to it (see File Link Format below).
+- **Where**: `file:line` reference so the reader can jump directly to it.
 - **Why it exists**: one sentence on the purpose. Connect it to the broader goal of the PR.
-- **How it connects**: which other changes in this PR call it, depend on it, or are affected by it. Give a clickable `file:line` link for each connection.
+- **How it connects**: which other changes in this PR call it, depend on it, or are affected by it. Give `file:line` references for each connection.
 
 If commits are well-structured (each commit is a logical step), follow commit order within each layer. Otherwise, follow the dependency graph.
 
@@ -64,19 +58,13 @@ If commits are well-structured (each commit is a logical step), follow commit or
 
 After walking the layers, trace 1-3 key paths through the changes end-to-end:
 
-> "When [trigger] happens, it hits [entry point] at `file:line` ([link](url)), which calls [core function] at `file:line` ([link](url)), which uses [foundation] at `file:line` ([link](url))."
+> "When [trigger] happens, it hits [entry point] at `file:line`, which calls [core function] at `file:line`, which uses [foundation] at `file:line`."
 
 Pick paths that best illustrate how the PR works as a whole.
 
 ## File Link Format
 
-All file references must include a **visible backtick path** followed by a **clickable GitHub link** in parentheses. Construct links from `REPO_URL` and `HEAD_SHA` gathered above:
-
-```
-`path/to/file.go:42` ([link](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42))
-```
-
-For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough — in **Where**, **Uses**, **Called by**, **Connects to**, and **Key Paths** — must use this format. The backtick path ensures the location is always readable even if the link fails to render.
+All file references use backtick `path/to/file.go:42` format. IDEs make these clickable automatically. For line ranges, use `path/to/file.go:10-25`.
 
 ## Output Format
 
@@ -91,9 +79,9 @@ For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough 
 ### Foundations
 
 #### `functionOrTypeName` — short description
-- **Where**: `path/to/file.go:42` ([link](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42))
+- **Where**: `path/to/file.go:42`
 - **What**: Describe concretely what was added or changed.
-- **Connects to**: `callerFunction` at `path/to/other.go:88` ([link](REPO_URL/blob/HEAD_SHA/path/to/other.go#L88))
+- **Connects to**: `callerFunction` at `path/to/other.go:88`
 
 #### ...
 
@@ -102,10 +90,10 @@ For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough 
 ### Core Logic
 
 #### `functionName` — short description
-- **Where**: `path/to/file.go:100` ([link](REPO_URL/blob/HEAD_SHA/path/to/file.go#L100))
+- **Where**: `path/to/file.go:100`
 - **What**: Describe what this does.
-- **Uses**: `foundationType` at `path/to/file.go:42` ([link](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42))
-- **Called by**: `handlerName` at `path/to/handler.go:55` ([link](REPO_URL/blob/HEAD_SHA/path/to/handler.go#L55))
+- **Uses**: `foundationType` at `path/to/file.go:42`
+- **Called by**: `handlerName` at `path/to/handler.go:55`
 
 #### ...
 
@@ -125,9 +113,9 @@ For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough 
 
 ### Key Paths
 
-1. **[Name the flow]**: `entryPoint` at `file:line` ([link](REPO_URL/blob/HEAD_SHA/file#Lline)) → `coreFunction` at `file:line` ([link](REPO_URL/blob/HEAD_SHA/file#Lline)) → `foundation` at `file:line` ([link](REPO_URL/blob/HEAD_SHA/file#Lline))
+1. **[Name the flow]**: `entryPoint` at `file:line` → `coreFunction` at `file:line` → `foundation` at `file:line`
 
 2. ...
 ```
 
-Keep descriptions concrete. One to two sentences max per item. Let the clickable file links do the heavy lifting — the reader will click through to the code.
+Keep descriptions concrete. One to two sentences max per item. Let the `file:line` references do the heavy lifting — the reader will click through to the code in their IDE.
