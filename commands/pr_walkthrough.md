@@ -64,19 +64,19 @@ If commits are well-structured (each commit is a logical step), follow commit or
 
 After walking the layers, trace 1-3 key paths through the changes end-to-end:
 
-> "When [trigger] happens, it hits [entry point] at [`file:line`](link), which calls [core function] at [`file:line`](link), which uses [foundation] at [`file:line`](link)."
+> "When [trigger] happens, it hits [entry point] at `file:line` ([link](url)), which calls [core function] at `file:line` ([link](url)), which uses [foundation] at `file:line` ([link](url))."
 
 Pick paths that best illustrate how the PR works as a whole.
 
 ## File Link Format
 
-All file references must be **clickable GitHub links** using markdown syntax. Construct them from `REPO_URL` and `HEAD_SHA` gathered above:
+All file references must include a **visible backtick path** followed by a **clickable GitHub link** in parentheses. Construct links from `REPO_URL` and `HEAD_SHA` gathered above:
 
 ```
-[`path/to/file.go:42`](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42)
+`path/to/file.go:42` ([link](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42))
 ```
 
-For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough — in **Where**, **Uses**, **Called by**, **Connects to**, and **Key Paths** — must use this format. No bare backtick-only paths.
+For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough — in **Where**, **Uses**, **Called by**, **Connects to**, and **Key Paths** — must use this format. The backtick path ensures the location is always readable even if the link fails to render.
 
 ## Output Format
 
@@ -91,9 +91,9 @@ For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough 
 ### Foundations
 
 #### `functionOrTypeName` — short description
-- **Where**: [`path/to/file.go:42`](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42)
+- **Where**: `path/to/file.go:42` ([link](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42))
 - **What**: Describe concretely what was added or changed.
-- **Connects to**: `callerFunction` at [`path/to/other.go:88`](REPO_URL/blob/HEAD_SHA/path/to/other.go#L88)
+- **Connects to**: `callerFunction` at `path/to/other.go:88` ([link](REPO_URL/blob/HEAD_SHA/path/to/other.go#L88))
 
 #### ...
 
@@ -102,10 +102,10 @@ For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough 
 ### Core Logic
 
 #### `functionName` — short description
-- **Where**: [`path/to/file.go:100`](REPO_URL/blob/HEAD_SHA/path/to/file.go#L100)
+- **Where**: `path/to/file.go:100` ([link](REPO_URL/blob/HEAD_SHA/path/to/file.go#L100))
 - **What**: Describe what this does.
-- **Uses**: `foundationType` at [`path/to/file.go:42`](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42)
-- **Called by**: `handlerName` at [`path/to/handler.go:55`](REPO_URL/blob/HEAD_SHA/path/to/handler.go#L55)
+- **Uses**: `foundationType` at `path/to/file.go:42` ([link](REPO_URL/blob/HEAD_SHA/path/to/file.go#L42))
+- **Called by**: `handlerName` at `path/to/handler.go:55` ([link](REPO_URL/blob/HEAD_SHA/path/to/handler.go#L55))
 
 #### ...
 
@@ -125,7 +125,7 @@ For line ranges, use `#L10-L25`. Every `file:line` reference in the walkthrough 
 
 ### Key Paths
 
-1. **[Name the flow]**: `entryPoint` ([`file:line`](REPO_URL/blob/HEAD_SHA/file#Lline)) → `coreFunction` ([`file:line`](REPO_URL/blob/HEAD_SHA/file#Lline)) → `foundation` ([`file:line`](REPO_URL/blob/HEAD_SHA/file#Lline))
+1. **[Name the flow]**: `entryPoint` at `file:line` ([link](REPO_URL/blob/HEAD_SHA/file#Lline)) → `coreFunction` at `file:line` ([link](REPO_URL/blob/HEAD_SHA/file#Lline)) → `foundation` at `file:line` ([link](REPO_URL/blob/HEAD_SHA/file#Lline))
 
 2. ...
 ```
