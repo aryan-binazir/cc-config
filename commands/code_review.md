@@ -1,6 +1,6 @@
 ---
 description: Brutally honest review of committed code since branch diverged
-version: "2.2"
+version: "2.3"
 ---
 
 # Code Review
@@ -57,6 +57,11 @@ git diff --stat $BASE..HEAD
 List only issues that need fixing. No compliments. No padding.
 
 ```
+## Summary
+[2-4 sentences: what these changes do, what motivated them, and what
+areas of the codebase are affected. Plain language for someone
+unfamiliar with this branch.]
+
 ## Critical (must fix before merge)
 - [file:line] - [what's wrong and why it matters]
 

@@ -1,6 +1,6 @@
 ---
 description: Parallel review of uncommitted changes
-version: "1.1"
+version: "1.2"
 ---
 
 # Uncommitted Review (Parallel)
@@ -47,6 +47,11 @@ Be specific. Point out exactly what's wrong and where. No padding.
 List only issues that need fixing. No compliments. No padding.
 
 ```
+## Summary
+[2-4 sentences: what these changes do, what motivated them, and what
+areas of the codebase are affected. Plain language for someone
+unfamiliar with these changes.]
+
 ## Critical (must fix before commit)
 - [file:line] - [what's wrong and why it matters]
 

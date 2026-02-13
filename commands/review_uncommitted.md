@@ -1,6 +1,6 @@
 ---
 description: Brutally honest review of uncommitted changes for correctness and regressions
-version: "1.0"
+version: "1.1"
 ---
 
 # Review Uncommitted Changes
@@ -27,6 +27,11 @@ git diff --stat HEAD   # Summary
 List only issues that need fixing. No compliments. No padding.
 
 ```
+## Summary
+[2-4 sentences: what these changes do, what motivated them, and what
+areas of the codebase are affected. Plain language for someone
+unfamiliar with these changes.]
+
 ## Issues
 
 1. [file:line] - [what's wrong and why it matters]

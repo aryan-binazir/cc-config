@@ -1,6 +1,6 @@
 ---
 description: Brutally honest review of uncommitted changes
-version: "2.1"
+version: "2.2"
 ---
 
 # Uncommitted Review
@@ -51,6 +51,11 @@ git status --short
 List only issues that need fixing. No compliments. No padding.
 
 ```
+## Summary
+[2-4 sentences: what these changes do, what motivated them, and what
+areas of the codebase are affected. Plain language for someone
+unfamiliar with these changes.]
+
 ## Critical (must fix before commit)
 - [file:line] - [what's wrong and why it matters]
 
