@@ -17,7 +17,7 @@ If `$ARGUMENTS` is empty, ask the user to provide the ticket title and/or descri
 
 Results are written to BOTH:
 1. Screen (displayed to user)
-2. `context/initial_review-{branch}.md` where `{branch}` comes from `git branch --show-current` (with `/` replaced by `-`)
+2. `_context/initial_review-{branch}.md` where `{branch}` comes from `git branch --show-current` (with `/` replaced by `-`)
 
 ## Workflow
 
@@ -102,12 +102,12 @@ Before implementing, review the codebase conventions (naming patterns, file stru
 **Output Actions**:
 
 1. Display the full report to the user
-2. Write the report to `context/initial_review-{branch}.md`:
+2. Write the report to `_context/initial_review-{branch}.md`:
    - Get branch: `git branch --show-current`
    - Replace `/` with `-` in branch name
-   - Create `context/` directory if it doesn't exist
-   - Write to `context/initial_review-{branch}.md`
-3. Confirm: "Report saved to `context/initial_review-{branch}.md`"
+   - Create `_context/` directory if it doesn't exist
+   - Write to `_context/initial_review-{branch}.md`
+3. Confirm: "Report saved to `_context/initial_review-{branch}.md`"
 
 ## Agents Used
 

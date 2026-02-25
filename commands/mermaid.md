@@ -159,7 +159,7 @@ Explicitly state what the diagram covers:
 
 ### 6. Output
 
-**Output location**: `context/diagrams/<name>.<ext>`
+**Output location**: `_context/diagrams/<name>.<ext>`
 
 Where `<name>` is derived from the mode:
 - `--branch`: `branch-<branch-name>-dataflow`
@@ -298,7 +298,7 @@ When `--md` is specified, also generate a markdown file.
 
 ### HTML (default, `--branch` mode)
 
-`context/diagrams/branch-oauth-refresh-dataflow.html`:
+`_context/diagrams/branch-oauth-refresh-dataflow.html`:
 
 ```html
 <!DOCTYPE html>
@@ -375,7 +375,7 @@ flowchart LR
 
 ### Markdown (with `--md` flag, `--branch` mode)
 
-`context/diagrams/branch-oauth-refresh-dataflow.md`:
+`_context/diagrams/branch-oauth-refresh-dataflow.md`:
 
 ```markdown
 # Data Flow: OAuth Refresh (Branch Changes)
@@ -427,7 +427,7 @@ flowchart LR
 
 ### HTML (default, `--system` mode — unchanged from v1)
 
-`context/diagrams/system-auth-flow.html`:
+`_context/diagrams/system-auth-flow.html`:
 
 ```html
 <!DOCTYPE html>
