@@ -25,4 +25,4 @@ hooks/memory/query
 # Context files
 CONTEXT.md
 context.md
-context/CONTEXT.json
+_context/CONTEXT.json
