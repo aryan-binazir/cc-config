@@ -9,6 +9,12 @@
 - Update it when plans, assumptions, or decisions change.
 - Before major work, check for project-specific agent rules (CLAUDE.md, .cursorrules, AGENTS.md, etc).
 
+# Self-Improvement Loop
+- After ANY correction from the user: update _context/lessons.md with the pattern.
+- Write rules for yourself that prevent the same mistake.
+- Ruthlessly iterate on these lessons until mistake rate drops.
+- Review lessons at session start for relevant project.
+
 # Git Rules
 - Do not create commits.
 - Do not push, force-push, or rewrite history.
