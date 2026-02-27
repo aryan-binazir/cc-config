@@ -129,9 +129,9 @@ Pick a number to discuss.
 
 ## Learning Repository
 
-When a PR comment teaches something worth remembering — a pattern, a gotcha, a domain rule, a better approach — capture it in `_context/` as a topic file (e.g., `_context/error-handling.md`, `_context/api-pagination.md`). These files are for agent consumption, not human readability.
+When a PR comment teaches something worth remembering — a pattern, a gotcha, a domain rule, a better approach — capture it in `_context/agent_notes/` as a topic file (e.g., `_context/agent_notes/error-handling.md`, `_context/agent_notes/api-pagination.md`). These files are for agent consumption, not human readability.
 
-- Before creating a new file, search `_context/` for an existing file on the same topic. Update it if one exists.
+- Before creating a new file, search `_context/agent_notes/` for an existing file on the same topic. Update it if one exists.
 - File naming: lowercase, hyphenated, descriptive of the topic (not the PR or branch).
 - Content and structure are at your discretion. Optimize for usefulness as future context when working on related tickets.
 - This is opt-in by judgment — only write when there's a genuine takeaway, not for every comment.
