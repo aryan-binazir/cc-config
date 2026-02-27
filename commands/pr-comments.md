@@ -42,7 +42,7 @@ Pull the currently checked-out PR's comments (all types), assign stable numbers,
 
 ## Active-Only Filter
 
-- For review comments: check the **thread-level** `isResolved` field. If a thread is resolved, exclude **all** comments in that thread. Individual review comments do not carry their own resolution state on GitHub — it lives on the thread.
+- For review comments: first check the **thread-level** `isResolved` field. If a thread is resolved, exclude **all** comments in that thread. Within unresolved threads, still exclude individual comments that are minimized, deleted, or outdated.
 - For other comment types: exclude items marked outdated, minimized, or deleted.
 - If a comment type does not expose activity state, treat returned items as active.
 
