@@ -6,7 +6,7 @@
 
 # Workflow
 - _context/CONTEXT-{branch}.md is the source of truth for project state (not applicable to main).
-- Update it when plans, assumptions, or decisions change.
+- Update context when plans, assumptions, or decisions change.
 - Before major work, check for project-specific agent rules (CLAUDE.md, .cursorrules, AGENTS.md, etc).
 
 # Self-Improvement Loop
