@@ -127,6 +127,15 @@ For each item summary, include: comment type, author, short body excerpt, file/l
 Pick a number to discuss.
 ```
 
+## Learning Repository
+
+When a PR comment teaches something worth remembering — a pattern, a gotcha, a domain rule, a better approach — capture it in `_context/` as a topic file (e.g., `_context/error-handling.md`, `_context/api-pagination.md`). These files are for agent consumption, not human readability.
+
+- Before creating a new file, search `_context/` for an existing file on the same topic. Update it if one exists.
+- File naming: lowercase, hyphenated, descriptive of the topic (not the PR or branch).
+- Content and structure are at your discretion. Optimize for usefulness as future context when working on related tickets.
+- This is opt-in by judgment — only write when there's a genuine takeaway, not for every comment.
+
 ## Command Intent
 
 This command is for rolling PR-comment triage and discussion tracking. Re-running it should return the current checklist state, including previously handled items.

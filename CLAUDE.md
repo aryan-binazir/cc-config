@@ -16,6 +16,4 @@
 - Review lessons at session start for relevant project.
 
 # Git Rules
-- Do not create commits.
-- Do not push, force-push, or rewrite history.
-- Use git diff and patches to present changes for review.
+- Do not force-push or rewrite history.
