@@ -1,70 +1,50 @@
 ---
-description: Analyze branch changes and generate concise bullet points for JIRA ticket summaries
-version: "1.1"
+description: Generate a tight PR/JIRA summary with title, why, and what changed
+version: "1.2"
 ---
 
-# Generate JIRA Ticket Summary
+# Generate JIRA Ticket / PR Summary
 
-Analyze all commits on the current branch since it diverged from the base branch and create a concise bullet-point summary suitable for copying into a JIRA ticket.
+Analyze the current branch against its base branch and produce a short, paste-ready summary.
 
-## Process:
+## Process
 
-1. **Detect branch context:**
+1. **Detect branch context**
    - Current branch: `git branch --show-current`
-   - Auto-detect base branch: `git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4`
-   - Fallback order: main → master → develop
-   - Validate base branch exists: `git rev-parse --verify origin/<base-branch>`
+   - Base branch: `git symbolic-ref refs/remotes/origin/HEAD | cut -d'/' -f4`
+   - Fallbacks: `main`, then `master`, then `develop`
+   - Verify base exists: `git rev-parse --verify origin/<base-branch>`
 
-2. **Gather commit information:**
-   - All commits: `git log --oneline <base-branch>..HEAD`
-   - Commit count: `git rev-list --count <base-branch>..HEAD`
-   - Time range: `git log --pretty=format:'%ai' <base-branch>..HEAD | head -1` and `tail -1`
-
-3. **Analyze changes:**
+2. **Collect diffs and commits**
+   - Commits: `git log --oneline <base-branch>..HEAD`
    - Files changed: `git diff --name-status <base-branch>...HEAD`
-   - Change summary: `git diff --stat <base-branch>...HEAD`
-   - Identify file types and components affected
+   - Stats: `git diff --stat <base-branch>...HEAD`
 
-4. **Generate summary:**
-   - Categorize by type: features, bugfixes, refactoring, tests, docs
-   - Focus on business value and user impact
-   - Highlight breaking changes or deployment requirements
-   - Keep technical details minimal
+3. **Summarize with minimal detail**
+   - Prioritize user/business impact over implementation details
+   - Group related changes into 2–5 bullets max
+   - Mention risk/deployment note only if truly needed
 
-## Output Template:
+## Output Template
 
-```
-# Branch: [branch-name]
-**Commits:** [count] | **Files Changed:** [count] | **Period:** [date-range]
+```markdown
+## Title
+[Short PR-style title in sentence case]
 
-## 🎯 Key Accomplishments
-- [Most important business value delivered]
-- [Secondary features or fixes]
-- [Supporting changes or improvements]
+## Why this change was needed
+[1-2 sentences max. Problem or goal this change addresses.]
 
-## 📋 Technical Summary  
-- **Features**: [count] new capabilities added
-- **Bugfixes**: [count] issues resolved
-- **Refactoring**: [count] code improvements
-- **Tests**: [count] test files updated
-- **Documentation**: [count] docs updated
-
-## 🚀 Deployment Notes
-- [Any breaking changes or migration requirements]
-- [Database changes or configuration updates needed]
-- [Performance or security improvements]
-
-## 📁 Components Modified
-- [List of main areas/modules affected]
+## What changed
+- [Tight bullet describing the primary change]
+- [Tight bullet describing secondary change]
+- [Optional bullet for tests/docs/risk only if relevant]
 ```
 
-## Guidelines:
+## Rules
 
-- **Business first**: Lead with user-facing value and impact
-- **Concise bullets**: One line per accomplishment, action-oriented
-- **Group related**: Cluster similar changes together  
-- **Flag risks**: Highlight breaking changes or deployment needs
-- **Skip implementation**: Focus on what was delivered, not how
-- **Ready to paste**: Format for direct use in JIRA ticket descriptions
+- Keep it tight; avoid fluff, repetition, and generic language.
+- Do not include raw commit logs.
+- Do not include sections beyond **Title**, **Why this change was needed**, and **What changed**.
+- If information is missing, state assumptions briefly and continue.
 
-Usage: Run from any branch to generate summary against detected base branch
+Usage: Run from any branch to generate a concise summary for JIRA or PR description.
