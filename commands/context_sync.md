@@ -28,6 +28,8 @@ Update or create the branch-specific context file to reflect current project sta
    - **If exists**: Read current file, then selectively update (see step 4)
 3. Check `git status -sb` and `git diff --stat` for repo state
 4. Update these sections based on conversation and `$ARGUMENTS`:
+   - `Status` → first line in file, one of: `In Progress`, `In PR`, `Merged`
+   - `Links` → directly below `Status`; include Jira and GitHub PR links when available
    - `Last updated` → today's date
    - `Plan` → update if approach changes
    - `Tasks` → check off completed, add new ones
@@ -40,6 +42,12 @@ Update or create the branch-specific context file to reflect current project sta
 
 ```md
 # Project Context
+
+Status: In Progress
+
+## Links
+- Jira: *(link or N/A)*
+- GitHub PR: *(link or N/A)*
 
 Last updated: YYYY-MM-DD
 
