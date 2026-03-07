@@ -9,9 +9,9 @@ Update or create the branch-specific context file to reflect current project sta
 ## File Naming
 
 - Get current branch: `git branch --show-current`
-- Store all context files in `_context/` directory (create if needed)
-- If branch is `main` or `master`: use `_context/CONTEXT.md`
-- Otherwise: use `_context/CONTEXT-{branch}.md` (e.g., `_context/CONTEXT-feature-auth.md`)
+- Store all context files in `_scratch/context/` directory (create if needed)
+- Use `_scratch/context/{branch}.md` where `{branch}` is the current branch name with `/` replaced by `-`
+- Example: `_scratch/context/feature-auth.md`
 
 ## Rules
 

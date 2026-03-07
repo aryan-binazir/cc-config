@@ -5,7 +5,7 @@
 - If a decision is hard to undo or changes user-facing behavior/scope, stop and ask.
 
 # Workflow
-- _context/CONTEXT-{branch}.md is the source of truth for project state (not applicable to main).
+- _scratch/context/{branch}.md is the source of truth for project state.
 - Update context when plans, assumptions, or decisions change.
 - Before major work, check for project-specific agent rules (CLAUDE.md, .cursorrules, AGENTS.md, etc).
 
