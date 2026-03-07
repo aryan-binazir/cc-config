@@ -1,4 +1,5 @@
 ---
+name: branch_abstractions
 description: Analyze current branch diff and map abstractions introduced or used
 version: "1.0"
 ---

@@ -1,4 +1,5 @@
 ---
+name: code_review_parallel
 description: Parallel review of committed code since branch diverged
 version: "1.1"
 ---

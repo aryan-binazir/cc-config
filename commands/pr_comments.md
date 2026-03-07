@@ -1,4 +1,5 @@
 ---
+name: pr_comments
 description: Pull PR comments into a stable rolling checklist for discussion-first review
 version: "1.2"
 ---

@@ -1,4 +1,5 @@
 ---
+name: uncommitted_review_parallel
 description: Parallel review of uncommitted changes
 version: "1.1"
 ---

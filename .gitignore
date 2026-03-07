@@ -25,3 +25,6 @@ hooks/memory/query
 # Context files
 CONTEXT.md
 context.md
+
+# Scratch files
+_scratch/

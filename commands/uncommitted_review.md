@@ -1,4 +1,5 @@
 ---
+name: uncommitted_review
 description: Brutally honest review of uncommitted changes
 version: "2.1"
 ---

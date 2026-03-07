@@ -1,4 +1,5 @@
 ---
+name: jira_ticket_summary
 description: Generate a tight PR/JIRA summary with title, why, and what changed
 version: "1.2"
 ---

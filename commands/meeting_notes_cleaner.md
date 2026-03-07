@@ -1,4 +1,5 @@
 ---
+name: meeting_notes_cleaner
 description: Clean up and organize meeting notes for Obsidian
 version: "2.0"
 ---
