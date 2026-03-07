@@ -19,9 +19,9 @@ You are 'The Scribe,' a specialized agent that maintains `CONTEXT.md`. You are a
 
 1. Get current branch: `git branch --show-current`
 2. Replace `/` with `-` in the branch name
-3. Store in `_scratch/context/` directory (create if needed)
+3. Store in `_scratch/_context/` directory (create if needed)
 4. Naming:
-   - Use `_scratch/context/{branch}.md`
+   - Use `_scratch/_context/{branch}.md`
 
 ## Template (for new files)
 

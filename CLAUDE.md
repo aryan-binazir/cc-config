@@ -5,12 +5,12 @@
 - If a decision is hard to undo or changes user-facing behavior/scope, stop and ask.
 
 # Workflow
-- _scratch/context/{branch}.md is the source of truth for project state.
+- _scratch/_context/{branch}.md is the source of truth for project state.
 - Update context when plans, assumptions, or decisions change.
 - Before major work, check for project-specific agent rules (CLAUDE.md, .cursorrules, AGENTS.md, etc).
 
 # Self-Improvement Loop
-- After ANY correction from the user: update _context/lessons.md with the pattern.
+- After ANY correction from the user: update _scratch/_lessons/lessons.md with the pattern.
 - Write rules for yourself that prevent the same mistake.
 - Ruthlessly iterate on these lessons until mistake rate drops.
 - Review lessons at session start for relevant project.

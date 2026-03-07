@@ -47,8 +47,8 @@ Keep resolution fast — only search for detected abstractions, not full-repo sc
 
 ## Write Artifact
 
-- Store in `_scratch/` directory (create if needed).
-- Filename: `_scratch/{branch}-abstracts.md` where `{branch}` is the current git branch name.
+- Store in `_scratch/_context/` directory (create if needed).
+- Filename: `_scratch/_context/{branch}-abstracts.md` where `{branch}` is the current git branch name.
 
 ### Artifact Format
 
@@ -88,7 +88,7 @@ Limit notes to 3-6 bullets per abstraction. Be concrete, not speculative.
 After writing the artifact, print:
 
 ```
-Abstractions artifact: _scratch/{branch}-abstracts.md
+Abstractions artifact: _scratch/_context/{branch}-abstracts.md
 Abstractions found: N
 Top abstractions:
   - Name1
