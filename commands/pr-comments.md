@@ -18,7 +18,7 @@ Pull the currently checked-out PR's comments (all types), assign stable numbers,
 4. Exclude entire threads marked as resolved at the thread level (see Active-Only Filter).
 5. Keep only currently active comments from remaining threads.
 6. Build one combined list ordered by `createdAt` of the top-level item ascending.
-7. Assign stable hierarchical numbers and persist state in `_context/pr_reviews/pr-<number>.json`.
+7. Assign stable hierarchical numbers and persist state in `_scratch/pr_reviews/pr-<number>.json`.
 8. Render the full list every run with status markers:
    - open items: normal text
    - handled items: markdown strikethrough (`~~item~~`)
@@ -48,8 +48,8 @@ Pull the currently checked-out PR's comments (all types), assign stable numbers,
 
 ## State File
 
-- Path: `_context/pr_reviews/pr-<number>.json` where `<number>` is the PR number.
-- Create `_context/pr_reviews/` if missing.
+- Path: `_scratch/pr_reviews/pr-<number>.json` where `<number>` is the PR number.
+- Create `_scratch/pr_reviews/` if missing.
 - Persist structured state as JSON (not markdown).
 
 State payload:
@@ -76,7 +76,7 @@ State payload:
 
 - Top-level items (issue comments, review summaries, first comment in a review thread) get whole numbers: `1`, `2`, `3`…
 - Replies within a review thread get sub-numbers under their thread's top-level number: `1.1`, `1.2`, `1.3`…
-- Keep existing numbers from `_context/pr_reviews/pr-<number>.json` when ids match.
+- Keep existing numbers from `_scratch/pr_reviews/pr-<number>.json` when ids match.
 - Assign new top-level numbers using `nextNumber`. Assign new sub-numbers by incrementing the highest existing sub-number in that thread.
 - Never renumber existing items.
 - Keep handled status unless explicitly reopened.
@@ -129,9 +129,9 @@ Pick a number to discuss.
 
 ## Learning Repository
 
-When a PR comment teaches something worth remembering — a pattern, a gotcha, a domain rule, a better approach — capture it in `_context/agent_notes/` as a topic file (e.g., `_context/agent_notes/error-handling.md`, `_context/agent_notes/api-pagination.md`). These files are for agent consumption, not human readability.
+When a PR comment teaches something worth remembering — a pattern, a gotcha, a domain rule, a better approach — capture it in `_scratch/agent_notes/` as a topic file (e.g., `_scratch/agent_notes/error-handling.md`, `_scratch/agent_notes/api-pagination.md`). These files are for agent consumption, not human readability.
 
-- Before creating a new file, search `_context/agent_notes/` for an existing file on the same topic. Update it if one exists.
+- Before creating a new file, search `_scratch/agent_notes/` for an existing file on the same topic. Update it if one exists.
 - File naming: lowercase, hyphenated, descriptive of the topic (not the PR or branch).
 - Content and structure are at your discretion. Optimize for usefulness as future context when working on related tickets.
 - This is opt-in by judgment — only write when there's a genuine takeaway, not for every comment.
