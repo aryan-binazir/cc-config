@@ -1,6 +1,6 @@
 ---
 name: context_sync
-description: Sync current project state into CONTEXT.md
+description: Sync current project state into branch context file in _scratch/_context/
 argument-hint: "[optional notes to include]"
 ---
 
@@ -12,6 +12,7 @@ Update or create the branch-specific context file to reflect current project sta
 - Store all context files in `_scratch/_context/` directory (create if needed)
 - Use `_scratch/_context/{branch}.md` where `{branch}` is the current branch name with `/` replaced by `-`
 - Example: `_scratch/_context/feature-auth.md`
+- Current branch context file (for `work`): `_scratch/_context/work.md`
 
 ## Rules
 
