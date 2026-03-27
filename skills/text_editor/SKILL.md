@@ -1,5 +1,5 @@
 ---
-name: thoughtful_editor
+name: text_editor
 description: Use this skill when the user provides text to be reviewed, corrected, or lightly improved while preserving the original tone and intent.
 ---
 
