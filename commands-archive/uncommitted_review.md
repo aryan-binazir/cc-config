@@ -1,12 +1,12 @@
 ---
 name: uncommitted_review
 description: Brutally honest review of uncommitted changes
-version: "2.1"
+version: "3.0"
 ---
 
 # Uncommitted Review
 
-Review ONLY staged and unstaged changes. Nothing else.
+Be brutally honest. Review ONLY staged and unstaged changes. Nothing else.
 
 ## Scope
 
@@ -31,21 +31,33 @@ git diff
 git status --short
 ```
 
+## Understand Context
+
+Before flagging issues, **read the surrounding code** in each changed file. The diff alone is not enough — you need context to judge correctness, types, contracts, and intent. Open the full file around changed lines.
+
 ## Review Focus
 
-1. **Correctness**: Does this code actually work? Logic errors, broken algorithms, wrong assumptions.
+Only flag real issues. Do not stretch to fill categories — if a category has no issues, skip it.
 
-2. **Regressions**: Will committing this break existing functionality? Removed behavior, changed contracts, broken integrations.
+1. **Correctness**: Logic errors, broken algorithms, wrong assumptions, off-by-one errors, type mismatches, contract violations, error propagation (swallowed errors, wrong error types).
 
-3. **Security**: Injection risks, auth issues, data exposure, secrets in code.
+2. **Regressions**: Removed behavior, changed contracts, broken integrations, data integrity issues, non-idempotent operations that should be idempotent.
 
-4. **Performance**: N+1 queries, unnecessary loops, memory leaks, expensive operations.
+3. **Security**: Injection (SQL, command, XSS), auth/authz issues, data exposure, hardcoded secrets/API keys, path traversal, SSRF, missing input validation, overly permissive CORS/permissions, new dependencies with known vulnerabilities.
+
+4. **Performance**: N+1 queries, unnecessary loops, O(n²) when O(n) is possible, memory/resource leaks (connections, file handles), unnecessary allocations, missing indexes, blocking the event loop.
 
 5. **Maintainability**: Naming, complexity, duplication, missing error handling, test coverage gaps.
 
 6. **Edge Cases**: What inputs would break this? Null handling, empty arrays, boundary conditions, race conditions.
 
-**Important**: Only use information from the diff. If you're unsure whether something is an issue, say so rather than guessing.
+If you're unsure whether something is an issue, put it in **Uncertain** rather than guessing.
+
+## Severity Guide
+
+- **Critical**: Will cause data loss, security breach, crash in production, or silent corruption. Must fix before commit.
+- **High**: Bug or flaw that will bite someone, but won't cause immediate disaster. Should fix.
+- **Low**: Code smell, minor inefficiency, or style issue that doesn't affect correctness. Consider fixing.
 
 ## Output
 
@@ -69,3 +81,7 @@ List only issues that need fixing. No compliments. No padding.
 ```
 
 If no issues found, say so and move on.
+
+## Save Review
+
+After outputting the review, also write the full review output to `_scratch/REVIEW.md`. If `REVIEW.md` already exists, increment the suffix: `REVIEW_1.md`, `REVIEW_2.md`, etc.
