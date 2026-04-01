@@ -100,4 +100,4 @@ If no issues found, say so and move on.
 
 ## Save Review
 
-After outputting the review, also write the full review output to `_scratch/REVIEW.md`. If `REVIEW.md` already exists, increment the suffix: `REVIEW_1.md`, `REVIEW_2.md`, etc.
+**IMPORTANT**: You MUST save the review. Run `mkdir -p _scratch` then use the Write tool to write the full review output to `_scratch/REVIEW.md`. If `REVIEW.md` already exists, increment the suffix: `REVIEW_1.md`, `REVIEW_2.md`, etc. Do not skip this step.
