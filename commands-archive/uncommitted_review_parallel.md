@@ -31,6 +31,10 @@ git diff
 git status --short
 ```
 
+## PR Context
+
+If a PR exists for this branch, read the full PR (description, diff, and comments) first — it contains decisions and context that inform the review.
+
 ## Parallel Review
 
 Spawn 3 sub-agents in parallel. Each agent must **read the full changed files for context** — do not review the diff in isolation.
@@ -94,4 +98,4 @@ If no issues found, say so and move on.
 
 ## Save Review
 
-**IMPORTANT**: You MUST save the review. Run `mkdir -p _scratch` then use the Write tool to write the full review output to `_scratch/REVIEW.md`. If `REVIEW.md` already exists, increment the suffix: `REVIEW_1.md`, `REVIEW_2.md`, etc. Do not skip this step.
+**IMPORTANT**: You MUST save the review. Determine the current branch name with `git branch --show-current`, replacing any `/` characters with `-` to keep it a flat filename. Run `mkdir -p _scratch/_reviews` then use the Write tool to write the full review output to `_scratch/_reviews/{branchname}-review.md`. Do not skip this step.
