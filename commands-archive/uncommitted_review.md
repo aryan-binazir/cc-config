@@ -33,7 +33,7 @@ git status --short
 
 ## PR Context
 
-If a PR exists for this branch, read the PR description first — it contains decisions and context that inform the review.
+If a PR exists for this branch, read the full PR (description, diff, and comments) first — it contains decisions and context that inform the review.
 
 ## Understand Context
 
