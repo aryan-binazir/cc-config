@@ -104,4 +104,4 @@ If no issues found, say so and move on.
 
 ## Save Review
 
-**IMPORTANT**: You MUST save the review. Determine the current branch name with `git branch --show-current`. Run `mkdir -p _scratch/_reviews` then use the Write tool to write the full review output to `_scratch/_reviews/{branchname}-review.md` (replacing `{branchname}` with the actual branch name). Do not skip this step.
+**IMPORTANT**: You MUST save the review. Determine the current branch name with `git branch --show-current`, replacing any `/` characters with `-` to keep it a flat filename. Run `mkdir -p _scratch/_reviews` then use the Write tool to write the full review output to `_scratch/_reviews/{branchname}-review.md`. Do not skip this step.
