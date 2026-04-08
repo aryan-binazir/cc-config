@@ -31,6 +31,10 @@ git diff
 git status --short
 ```
 
+## PR Context
+
+If a PR exists for this branch, read the PR description first — it contains decisions and context that inform the review.
+
 ## Understand Context
 
 Before flagging issues, **read the surrounding code** in each changed file. The diff alone is not enough — you need context to judge correctness, types, contracts, and intent. Open the full file around changed lines.
@@ -84,4 +88,4 @@ If no issues found, say so and move on.
 
 ## Save Review
 
-**IMPORTANT**: You MUST save the review. Run `mkdir -p _scratch` then use the Write tool to write the full review output to `_scratch/REVIEW.md`. If `REVIEW.md` already exists, increment the suffix: `REVIEW_1.md`, `REVIEW_2.md`, etc. Do not skip this step.
+**IMPORTANT**: You MUST save the review. Determine the current branch name with `git branch --show-current`. Run `mkdir -p _scratch/_reviews` then use the Write tool to write the full review output to `_scratch/_reviews/{branchname}-review.md` (replacing `{branchname}` with the actual branch name). Do not skip this step.
