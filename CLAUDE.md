@@ -20,4 +20,4 @@
 - Never add Co-Authored-By lines to commits.
 - Commit message format: `type(TICKET): description` (e.g. `fix(BBA-9): Added logging package`). Types: `feat`, `fix`, `chore`, `refactor`.
   - The type is determined by the ticket's overall purpose and MUST stay consistent across ALL commits and the PR title for that ticket. Check existing commits on the branch before committing.
-- PR descriptions include a summary covering trade-offs, decisions, and known issues, followed by a collapsed `<details>` block titled "Agents Context" containing verbose context an agent would find helpful when reviewing the PR.
+- PR descriptions include a summary covering trade-offs, decisions, and known issues, followed by a collapsed `<details>` block titled "Agent Context" containing verbose context an agent would find helpful when reviewing the PR.
