@@ -43,23 +43,37 @@ Only use information from the diff. If you're unsure whether something is an iss
 
 ## Output
 
-List only issues that need fixing. No compliments. No padding.
+Keep the review concise. No compliments. No padding.
 
 ```
-## Critical (must fix before merge)
-- [file:line] - [what is wrong and why it matters]
-
-## High (should fix)
-- [file:line] - [what is wrong and why it matters]
-
-## Low (consider fixing)
-- [file:line] - [what is wrong and why it matters]
-
-## Uncertain
-- [file:line] - [potential issue and why it is uncertain]
-
 ## Verdict
-[APPROVE / NEEDS FIXES / REJECT] - [1 sentence summary]
+[APPROVE / NEEDS FIXES / REJECT]
+
+## Blocking
+[BLOCKING / NON-BLOCKING] - [1 short sentence]
+
+## Findings
+- [Critical | High | Low | Uncertain] [file:line] - [what is wrong and why it matters]
 ```
 
-If no issues are found, say so plainly.
+If no issues are found, say so plainly:
+
+```
+## Verdict
+APPROVE
+
+## Blocking
+NON-BLOCKING - No findings worth blocking over.
+
+## Findings
+- None.
+```
+
+## Save Review
+
+Save exactly the same concise review output shown in the terminal.
+
+1. Determine the current branch name with `git branch --show-current`.
+2. Replace any `/` characters with `-` so the filename stays flat.
+3. Run `mkdir -p _scratch/_reviews`.
+4. Write the review to `_scratch/_reviews/{branchname}-review.md`.

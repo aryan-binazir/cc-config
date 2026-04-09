@@ -26,23 +26,37 @@ Do not review already committed code or unrelated files.
 
 ## Output
 
-List only issues that need fixing. No compliments. No padding.
+Keep the review concise. No compliments. No padding.
 
 ```
-## Critical (must fix before commit)
-- [file:line] - [what is wrong and why it matters]
-
-## High (should fix)
-- [file:line] - [what is wrong and why it matters]
-
-## Low (consider fixing)
-- [file:line] - [what is wrong and why it matters]
-
-## Uncertain
-- [file:line] - [potential issue and why it is uncertain]
-
 ## Verdict
-[GOOD TO COMMIT / NEEDS FIXES] - [1 sentence summary]
+[GOOD TO COMMIT / NEEDS FIXES]
+
+## Blocking
+[BLOCKING / NON-BLOCKING] - [1 short sentence]
+
+## Findings
+- [Critical | High | Low | Uncertain] [file:line] - [what is wrong and why it matters]
 ```
 
-If no issues are found, say so plainly.
+If no issues are found, say so plainly:
+
+```
+## Verdict
+GOOD TO COMMIT
+
+## Blocking
+NON-BLOCKING - No findings worth blocking over.
+
+## Findings
+- None.
+```
+
+## Save Review
+
+Save exactly the same concise review output shown in the terminal.
+
+1. Determine the current branch name with `git branch --show-current`.
+2. Replace any `/` characters with `-` so the filename stays flat.
+3. Run `mkdir -p _scratch/_reviews`.
+4. Write the review to `_scratch/_reviews/{branchname}-review.md`.
