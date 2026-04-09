@@ -17,3 +17,4 @@
 
 # Git Rules
 - Do not force-push or rewrite history.
+- PR descriptions include a summary covering trade-offs, decisions, and known issues, followed by a collapsed `<details>` block titled "Agents Context" containing verbose context an agent would find helpful when reviewing the PR.
