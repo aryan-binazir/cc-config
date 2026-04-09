@@ -22,20 +22,43 @@ Same scope as `uncommitted_review`: only `git diff --cached` and `git diff`.
 
 ## Output
 
-Keep the review concise. No compliments. No padding.
+List only issues that need fixing. No compliments. No padding.
+
+```
+## Critical (must fix before commit)
+- [file:line] - [what is wrong and why it matters]
+
+## High (should fix)
+- [file:line] - [what is wrong and why it matters]
+
+## Low (consider fixing)
+- [file:line] - [what is wrong and why it matters]
+
+## Uncertain
+- [file:line] - [potential issue and why it is uncertain]
+
+## Verdict
+[GOOD TO COMMIT / NEEDS FIXES] - [1 sentence summary]
+```
+
+If no issues are found, say so plainly.
+
+## Save Review
+
+Also save a concise artifact to `_scratch/_reviews/{branchname}-review.md` using this format:
 
 ```
 ## Verdict
 [GOOD TO COMMIT / NEEDS FIXES]
 
 ## Blocking
-[BLOCKING / NON-BLOCKING] - [1 short sentence]
+[BLOCKING / NON-BLOCKING] - [1 short sentence on whether the findings are worth blocking over]
 
 ## Findings
 - [Critical | High | Low | Uncertain] [file:line] - [what is wrong and why it matters]
 ```
 
-If no issues are found, say so plainly:
+If there are no findings, write:
 
 ```
 ## Verdict
@@ -47,10 +70,6 @@ NON-BLOCKING - No findings worth blocking over.
 ## Findings
 - None.
 ```
-
-## Save Review
-
-Save exactly the same concise review output shown in the terminal.
 
 1. Determine the current branch name with `git branch --show-current`.
 2. Replace any `/` characters with `-` so the filename stays flat.
