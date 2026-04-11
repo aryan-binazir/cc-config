@@ -144,7 +144,7 @@ Do not begin implementation until the contract is settled.
 
 ### Plan mode after contract settlement
 
-**important** Immediately after the contract is settled and before implementation starts, enter plan mode with `/plan`, present the plan back to the user, and then stop. Do not edit files, update Linear, create or switch branches, persist the contract, or begin implementation until the user explicitly approves the plan.
+**important** Immediately after the contract is settled and before implementation starts, call `update_plan`, present the plan back to the user, and then stop. Do not edit files, update Linear, create or switch branches, persist the contract, or begin implementation until the user explicitly approves the plan.
 
 That plan must:
 - restate the finalized implementation contract
