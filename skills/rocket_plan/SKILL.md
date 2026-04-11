@@ -59,6 +59,8 @@ Do not proceed with a degraded workflow. Missing auth, missing `claude`, unreach
 - If the input is raw spec text, use it directly.
 - If both exist, prefer the fetched Linear content as the source of truth and treat raw spec text as supplemental context.
 
+If the source of truth is a Linear ticket, assume the user may not have read it recently or at all. Do not make the user infer the plan from a ticket they cannot see.
+
 ### Require a clear goal
 
 The contract is not settled until the overall goal is explicit.
@@ -100,9 +102,28 @@ Use `Assumptions` for inferred behavior or missing details you had to supply.
 Use `Out of scope` for deliberate exclusions so later review does not expand the work retroactively.
 Use `Validation approach` for concrete checks such as tests, lint, or manual verification.
 
+### Return the ticket plan to the user
+
+Skip this step if no Linear ticket exists.
+
+Before asking clarification questions, give the user a concise but concrete readout of what was loaded from Linear. The user should be able to understand the proposed work without opening the ticket.
+
+That readout must include:
+- a short summary of the ticket in plain language
+- the proposed implementation contract, using the same `Goal`, `Accepted scope`, `Assumptions`, `Out of scope`, and `Validation approach` headings
+- any ambiguities or gaps that need confirmation
+
+Do not ask the user to restate the ticket. Phrase the clarification round so the user can confirm or correct your read of the ticket and proposed plan.
+
 ### Clarification rules
 
 Before implementation, ask one consolidated clarification round like a strong peer engineer preparing to own the work. Be thorough enough that the user can answer once and walk away.
+
+If the source spec came from Linear, the clarification message must be self-contained:
+- start with the ticket summary and proposed contract
+- then ask for confirmation or corrections
+- then ask the consolidated clarification questions
+- make it clear what you plan to build if the user simply replies with approval
 
 Cover at least:
 - the overall goal or motivation if it is missing or weak
@@ -120,6 +141,18 @@ After that:
 - stop asking unless continuing would be irresponsible
 
 Do not begin implementation until the contract is settled.
+
+### Plan mode after contract settlement
+
+Immediately after the contract is settled and before implementation starts, enter an explicit plan mode and present the plan back to the user.
+
+That plan must:
+- restate the finalized implementation contract
+- give a concise execution plan for the work you are about to do
+- include validation and commit checkpoints when relevant
+- explicitly include `$rocket_review` as the final step
+
+Do not keep this as an internal-only artifact. The user should be able to see the plan you intend to execute before code changes begin.
 
 ### Sync the Linear ticket before implementation
 
@@ -195,16 +228,16 @@ reuse that contract instead of re-asking clarification questions.
 
 If the existing contract is incomplete or the spec materially changed, rebuild it and overwrite the file.
 
-### Internal execution plan
+### Execution plan
 
-Before writing code, build an internal plan from:
+Before writing code, build the execution plan from:
 - `Goal`
 - `Accepted scope`
 - `Assumptions`
 - `Validation approach`
 - logical commit checkpoints
 
-This plan is for execution quality, not a user-facing artifact.
+Present this plan to the user in the plan-mode step above, then execute against it.
 
 ### Implementation rules
 
