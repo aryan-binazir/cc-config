@@ -1,6 +1,6 @@
 ---
 name: rocket_plan
-description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants Codex to ask one strong clarification round, then carry the work through implementation, commits, push, and an in-session $rocket_review handoff without further babysitting.
+description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants Codex to ask one strong clarification round, settle a goal and implementation contract, update the Linear ticket when applicable, carry the work through implementation and push, and then hand off in-session to $rocket_review without further babysitting.
 ---
 
 # Rocket Plan
@@ -10,6 +10,7 @@ Use this skill when the user wants an end-to-end implementation flow, not just p
 This skill is strict on purpose:
 - It does not skip preflight checks.
 - It does not treat the original spec as the implementation contract.
+- It does not settle a contract without a clear goal.
 - It does not silently guess past unresolved ambiguity.
 - It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket_review`.
 
@@ -52,10 +53,23 @@ Do not proceed with a degraded workflow. Missing auth, missing `claude`, unreach
 
 ## Phase 1: Spec Intake and Clarification
 
-### Acquire the source spec
+### Acquire and prioritize the source spec
 
 - If the input is a Linear ticket ID or URL, fetch the full ticket content with the available Linear tooling.
 - If the input is raw spec text, use it directly.
+- If both exist, prefer the fetched Linear content as the source of truth and treat raw spec text as supplemental context.
+
+### Require a clear goal
+
+The contract is not settled until the overall goal is explicit.
+
+If the ticket or spec is only a task list and does not explain why the work matters, push back in the clarification round and ask for the goal or motivation behind the work.
+
+If a Linear ticket exists and its current description does not state the goal clearly:
+- capture the agreed goal during clarification
+- write that goal back into the ticket description before implementation starts
+
+If no Linear ticket exists, capture the goal in the contract and proceed.
 
 ### Normalize into an implementation contract
 
@@ -63,6 +77,9 @@ Do not treat the incoming spec as the implementation plan. Convert it into a con
 
 ```md
 # Implementation Contract
+
+## Goal
+- ...
 
 ## Accepted scope
 - ...
@@ -77,6 +94,7 @@ Do not treat the incoming spec as the implementation plan. Convert it into a con
 - ...
 ```
 
+Use `Goal` for the overall purpose of the work.
 Use `Accepted scope` for the work that will actually be built.
 Use `Assumptions` for inferred behavior or missing details you had to supply.
 Use `Out of scope` for deliberate exclusions so later review does not expand the work retroactively.
@@ -87,6 +105,7 @@ Use `Validation approach` for concrete checks such as tests, lint, or manual ver
 Before implementation, ask one consolidated clarification round like a strong peer engineer preparing to own the work. Be thorough enough that the user can answer once and walk away.
 
 Cover at least:
+- the overall goal or motivation if it is missing or weak
 - missing product or behavior details
 - integration boundaries
 - expected validation
@@ -102,20 +121,41 @@ After that:
 
 Do not begin implementation until the contract is settled.
 
-### Persist the contract
+### Sync the Linear ticket before implementation
 
-As soon as the working branch is known, write the settled contract to:
+Skip this step if no Linear ticket exists.
 
-```text
-_scratch/_contracts/<branch>.md
+After clarification settles the contract and before implementation starts, update the ticket description so it matches what will actually be built.
+
+Use a managed-tail strategy:
+- preserve all existing ticket content before the managed region
+- treat the first exact heading `## Rocket Plan Contract` as the start of the managed region
+- if that heading already exists, replace from that heading to the end of the description
+- if it does not exist, append one canonical managed tail to the end of the description
+
+The canonical managed tail begins with a divider and then the managed contract block:
+
+```md
+---
+## Rocket Plan Contract
+
+### Goal
+...
+
+### Accepted scope
+- ...
+
+### Assumptions
+- ...
+
+### Out of scope
+- ...
+
+### Validation approach
+- ...
 ```
 
-Rules:
-- Use the raw branch path, not a flattened filename.
-- Create parent directories as needed.
-- Example: branch `aryan-binazir/BBA-11` maps to `_scratch/_contracts/aryan-binazir/BBA-11.md`.
-- Write this file before code changes begin.
-- Treat this file as the durable handoff artifact for later review. It must survive session interruption between implementation and review. Do not rely on session memory.
+Do not append duplicate managed tails. Replace the existing managed region instead.
 
 ## Phase 2: Branch and Implementation
 
@@ -127,9 +167,33 @@ Resolve branch state before implementation:
 - If the user provided raw spec text instead of a ticket, ask for a branch name in the clarification round. If the user does not answer, derive `aryan-binazir/<short-descriptive-slug>` and proceed.
 - If local commit or PR conventions require a ticket identifier and raw spec work does not provide one, ask once during clarification. If it remains missing, stop instead of inventing a fake ticket.
 
+### Persist or reuse the contract
+
+As soon as the working branch is known and before code changes begin, write the settled contract to:
+
+```text
+_scratch/_contracts/<branch>.md
+```
+
+Rules:
+- Use the raw branch path, not a flattened filename.
+- Create parent directories as needed.
+- Example: branch `aryan-binazir/BBA-11` maps to `_scratch/_contracts/aryan-binazir/BBA-11.md`.
+- Treat this file as the durable handoff artifact for later review. It must survive session interruption between implementation and review. Do not rely on session memory.
+
+On rerun:
+- if the current branch already has `_scratch/_contracts/<branch>.md`
+- and that file contains a settled contract with `Goal`, `Accepted scope`, `Assumptions`, `Out of scope`, and `Validation approach`
+- and the new user input does not materially change the spec
+
+reuse that contract instead of re-asking clarification questions.
+
+If the existing contract is incomplete or the spec materially changed, rebuild it and overwrite the file.
+
 ### Internal execution plan
 
 Before writing code, build an internal plan from:
+- `Goal`
 - `Accepted scope`
 - `Assumptions`
 - `Validation approach`
@@ -162,7 +226,8 @@ Stop and report the exact blocker if:
 When implementation is complete:
 1. Ensure all intended changes are committed.
 2. Push the current branch.
-3. Invoke `$rocket_review` as a skill in the same Codex session.
+3. Verify that the upstream branch exists and matches local `HEAD`.
+4. Invoke `$rocket_review` as a skill in the same Codex session.
 
 The handoff rules are strict:
 - Do not reimplement `rocket_review` inline.
@@ -172,6 +237,8 @@ The handoff rules are strict:
 - Point `$rocket_review` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
 - You may include the Linear ticket reference or raw spec only as secondary context.
 
+If the final push fails, the upstream branch does not exist, or upstream does not match local `HEAD`, stop and report the blocker instead of invoking `$rocket_review`.
+
 If `$rocket_review` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
 
 ## What This Skill Does Not Do
@@ -180,5 +247,6 @@ If `$rocket_review` cannot run, stop and report the exact blocker. Do not silent
 - It does not merge the PR.
 - It does not replace repo-local rules.
 - It does not keep the contract only in session memory.
+- It does not settle the contract without a clear goal.
 - It does not silently guess past unresolved ambiguity.
 - It does not treat `$rocket_review` as an external session handoff. It is an in-session skill invocation.
