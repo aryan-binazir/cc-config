@@ -9,11 +9,10 @@ Use this only after implementation is complete enough for external review.
 
 This skill is narrow on purpose:
 - It does not define the implementation work.
-- It does not create the PR.
 - It does not assign or reinterpret severity.
 - It does not run more than 2 Claude review rounds.
 
-Your job is to take the current checked-out branch, confirm it already has an open PR, ask Claude for a harsh branch review against the supplied spec, patch what should be patched, and leave a strict audit trail.
+Your job is to take the current checked-out branch, ensure it has an open PR (creating one if needed), ask Claude for a harsh branch review against the supplied spec, patch what should be patched, and leave a strict audit trail.
 
 ## Preconditions
 
@@ -30,10 +29,11 @@ command -v claude
 Required conditions:
 - You are inside the repo/worktree that contains the branch being reviewed.
 - The intended review branch is the branch currently checked out.
-- `gh pr view` succeeds and the PR head branch matches the currently checked-out branch.
+- A PR exists for the current branch. If `gh pr view` fails (no PR), create one with `gh pr create` using the repo's normal PR conventions. If creation fails, stop and report the problem.
+- If a PR already exists, its head branch must match the currently checked-out branch.
 - `claude` is available on `PATH`.
 
-Stop and report the problem if any precondition fails.
+Stop and report the problem if any other precondition fails.
 
 ## Branch State
 
@@ -253,7 +253,7 @@ Rules:
 ## Practical Sequence
 
 Use this order:
-1. Verify repo, branch, PR, and `claude`.
+1. Verify repo, branch, and `claude`. Ensure a PR exists (create one if needed).
 2. Make sure the review target is the current pushed branch state.
 3. Build the Claude prompt with the supplied spec, branch, PR, repo path, and `code_review_parallel` instruction.
 4. Run round 1 with `claude --dangerously-skip-permissions -p`.
@@ -269,8 +269,8 @@ Use this order:
 Stop immediately and report back instead of guessing if:
 - you are not in a git repo/worktree
 - the current branch cannot be resolved
-- no PR exists for the current branch
-- the PR head branch does not match the checked-out branch
+- no PR exists and `gh pr create` also fails
+- an existing PR's head branch does not match the checked-out branch
 - `claude` is unavailable
 - the Claude CLI call exits non-zero, times out, or returns malformed output
 - the spec was not provided in a form you can hand to Claude
