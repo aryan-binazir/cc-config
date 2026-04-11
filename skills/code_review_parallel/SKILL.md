@@ -31,7 +31,7 @@ If a file appears in the diff that wasn't intentionally modified on this branch,
 
 ## Parallel Review
 
-Spawn sub-agents to check in parallel:
+If an implementation contract (Goal, Accepted scope, Assumptions, Out of scope, Validation approach) is provided in the caller's prompt, include it in each sub-agent's prompt so they review against the contract too. Respect Out of scope items — do not treat them as missing work.
 
 - **Agent 1: Correctness & Regressions** -- Does this code actually work? Logic errors, broken algorithms, wrong assumptions. Will merging break existing functionality? Removed behavior, changed contracts, broken integrations.
 - **Agent 2: Security & Performance** -- Injection risks, auth issues, data exposure, secrets in code. N+1 queries, unnecessary loops, memory leaks, expensive operations.
