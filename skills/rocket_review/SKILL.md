@@ -52,7 +52,8 @@ After round 1:
 
 You must supply the spec to Claude in the prompt you construct.
 
-Preferred spec source:
+Preferred spec source (in priority order):
+- an implementation contract from `rocket_plan` (persisted at `_scratch/_contracts/<branch>.md`) — this is the best review target because it contains accepted scope, assumptions, and out-of-scope items
 - a Linear ticket ID
 - a full Linear ticket URL
 
