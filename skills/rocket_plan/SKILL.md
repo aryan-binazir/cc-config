@@ -144,7 +144,7 @@ Do not begin implementation until the contract is settled.
 
 ### Plan mode after contract settlement
 
-Immediately after the contract is settled and before implementation starts, enter an explicit plan mode and present the plan back to the user.
+**important** Immediately after the contract is settled and before implementation starts, enter plan mode with `/plan` and present the plan back to the user.
 
 That plan must:
 - restate the finalized implementation contract
