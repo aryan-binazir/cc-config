@@ -212,6 +212,11 @@ EOF
 claude --dangerously-skip-permissions -p "$PROMPT"
 ```
 
+**important** Timeout rules:
+- Allow up to 15 minutes for each `claude --dangerously-skip-permissions -p` review run.
+- Do not stop early just because Claude has been quiet for a few minutes.
+- If a review run exceeds 15 minutes, treat it as a timeout failure.
+
 ## Review Loop
 
 Maximum review rounds: 2.
@@ -244,7 +249,7 @@ If round 1 comes back clean and you made no code changes, stop after round 1 and
 
 Treat the Claude invocation as failed if any of the following happens:
 - the `claude --dangerously-skip-permissions -p` command exits non-zero
-- the command times out
+- the command exceeds 15 minutes
 - the output does not contain the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections
 
 If the invocation fails:
