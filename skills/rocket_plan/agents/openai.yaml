@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rocket Plan"
+  short_description: "Turn specs into reviewed PRs"
+  default_prompt: "Use $rocket_plan to take a ticket or raw spec from intake to a reviewed PR."
