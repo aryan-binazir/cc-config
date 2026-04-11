@@ -348,16 +348,19 @@ Skip this step if no Linear ticket exists.
 
 After all review rounds are done and the final PR comment is posted, update the Linear ticket description. Do not post this as a separate ticket comment.
 
-Use the same managed-tail strategy as `rocket_plan`:
-- preserve all content before the first exact heading `## Rocket Plan Contract`
-- if that heading exists, replace from that heading to the end of the description
-- if it does not exist, append one canonical managed tail to the end of the description
+Use the same marker-bounded managed region as `rocket_plan`:
+- look for `<!-- managed:rocket-start -->` and `<!-- managed:rocket-end -->` in the description
+- if both markers exist, replace everything between them (inclusive of markers)
+- if markers are missing, append the managed region to the end of the description
+- never touch content outside the markers
+- if only one marker is found (orphaned state), treat it as missing and append a fresh managed region
 
-Managed tail rules:
+When rebuilding the managed region:
+- always emit both `<!-- managed:rocket-start -->` and `<!-- managed:rocket-end -->` markers
 - if the implementation contract exists, include the current `## Rocket Plan Contract` block first
-- if no implementation contract exists, preserve the existing description and append or replace only the `Rocket Review` section
+- if no implementation contract exists, preserve the existing `## Rocket Plan Contract` block from the current description inside the markers (do not wipe it)
 - then include exactly one `Rocket Review` section
-- do not create duplicate managed tails or duplicate review sections
+- do not create duplicate managed regions or duplicate review sections
 
 For the review section:
 - first verify the exact currently supported Linear collapsible-section syntax against official Linear editor documentation in the current session

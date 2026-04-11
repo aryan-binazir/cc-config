@@ -127,15 +127,16 @@ Skip this step if no Linear ticket exists.
 
 After clarification settles the contract and before implementation starts, update the ticket description so it matches what will actually be built.
 
-Use a managed-tail strategy:
-- preserve all existing ticket content before the managed region
-- treat the first exact heading `## Rocket Plan Contract` as the start of the managed region
-- if that heading already exists, replace from that heading to the end of the description
-- if it does not exist, append one canonical managed tail to the end of the description
+Use a marker-bounded managed region so replacements are safe and predictable:
+- look for `<!-- managed:rocket-start -->` and `<!-- managed:rocket-end -->` in the description
+- if both markers exist, replace everything between them (inclusive of markers)
+- if markers are missing, append the managed region to the end of the description
+- never touch content outside the markers
 
-The canonical managed tail begins with a divider and then the managed contract block:
+The managed region has this shape:
 
 ```md
+<!-- managed:rocket-start -->
 ---
 ## Rocket Plan Contract
 
@@ -153,9 +154,13 @@ The canonical managed tail begins with a divider and then the managed contract b
 
 ### Validation approach
 - ...
+<!-- managed:rocket-end -->
 ```
 
-Do not append duplicate managed tails. Replace the existing managed region instead.
+Rules:
+- Always emit both markers when writing the managed region.
+- Do not append duplicate managed regions. Replace between markers instead.
+- If only one marker is found (orphaned state), treat it as missing and append a fresh managed region. Do not try to repair partial markers.
 
 ## Phase 2: Branch and Implementation
 
