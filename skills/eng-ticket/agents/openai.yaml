@@ -1,0 +1,4 @@
+interface:
+  display_name: "Eng Ticket"
+  short_description: "Generate and review implementation-ready engineering tickets"
+  default_prompt: "Use $eng-ticket to generate or review an engineering ticket for the rocket_plan workflow."
