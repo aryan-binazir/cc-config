@@ -10,10 +10,10 @@ Use this only after implementation is complete enough for external review.
 This skill is narrow on purpose:
 - It does not define the implementation work.
 - It does not assign or reinterpret severity.
-- It does not run more than 2 external review rounds.
+- It does not run more than 2 Claude review rounds.
 - It does not rely on interactive PR creation.
 
-Your job is to take the current checked-out branch, ensure it has a PR, run one harsh Claude review and one harsh detached Codex review against the supplied spec, patch what should be patched, leave a strict audit trail, and post one final PR summary comment.
+Your job is to take the current checked-out branch, ensure it has a PR, ask Claude for a harsh branch review against the supplied spec, patch what should be patched, leave a strict audit trail, and post one final PR summary comment.
 
 ## Preconditions
 
@@ -26,7 +26,6 @@ command -v gh
 gh auth status
 git status -sb
 command -v claude
-command -v codex
 ```
 
 Required conditions:
@@ -34,7 +33,6 @@ Required conditions:
 - The intended review branch is the branch currently checked out.
 - `gh` is available and authenticated.
 - `claude` is available on `PATH`.
-- `codex` is available on `PATH`.
 
 Before generating a PR title or PR body, read local repo rules first:
 - `CLAUDE.md`
@@ -45,7 +43,7 @@ Stop and report the problem if any precondition fails.
 
 ## Branch State
 
-Each reviewer must review the actual pushed branch state, not a local-only draft.
+Claude must review the actual pushed branch state, not a local-only draft.
 
 Before round 1:
 - If there are review-ready local changes that belong on this branch, commit them using the repo's normal commit conventions and push them before asking Claude to review.
@@ -64,7 +62,7 @@ After round 1:
 
 ## Spec Contract
 
-You must supply the spec to each reviewer in the prompt you construct.
+You must supply the spec to Claude in the prompt you construct.
 
 Preferred spec source (in priority order):
 - an implementation contract from `rocket_plan` persisted at `_scratch/_contracts/<branch>.md`
@@ -85,7 +83,7 @@ The `rocket_plan` contract is the best review target because it contains:
 Fallback:
 - paste the full spec text verbatim into the prompt
 
-Do not make either reviewer discover the spec on its own. If you cannot supply a reliable spec, stop and ask the user.
+Do not make Claude discover the spec on its own. If you cannot supply a reliable spec, stop and ask the user.
 
 ## PR Resolution
 
@@ -144,30 +142,25 @@ review already complete
 
 Do not add diary resume logic. Treat this as the only completion shortcut.
 
-## Review Prompt Contract
+## Claude Prompt Contract
 
-Construct the reviewer prompt yourself. The prompt must include:
+Construct the `claude --dangerously-skip-permissions -p` prompt yourself. The prompt must include:
 - the implementation contract or fallback spec
 - the current branch name
 - the PR number and PR URL
-- the repo/worktree path to review
+- the repo/worktree path Claude should review
+- an explicit instruction to use `code_review_parallel`
 - an explicit request to review the current branch against `Goal`, `Accepted scope`, `Assumptions`, and `Validation approach`
 - an explicit instruction to respect `Out of scope` items and not treat them as missing work
 
-Require this exact output shape:
+Tell Claude to preserve the `code_review_parallel` output shape:
 - `Critical`
 - `High`
 - `Low`
 - `Uncertain`
 - `Verdict`
 
-Do not ask for compliments, extra summary sections, or style feedback outside that structure.
-
-## Claude Prompt Contract
-
-Round 1 uses Claude.
-
-Construct the `claude --dangerously-skip-permissions -p` prompt yourself. Add an explicit instruction to use `code_review_parallel`.
+Do not ask Claude for compliments, extra summary sections, or style feedback outside that structure.
 
 ## Prompt Template
 
@@ -224,17 +217,6 @@ claude --dangerously-skip-permissions -p "$PROMPT"
 - Do not stop early just because Claude has been quiet for a few minutes.
 - If a review run exceeds 15 minutes, treat it as a timeout failure.
 
-## Codex Prompt Contract
-
-Round 2 must use detached Codex against the current pushed branch state.
-
-Use `codex exec review` non-interactively. Reuse the same review contract and output shape as round 1, adapted for Codex instead of Claude.
-
-**important** Timeout rules:
-- Allow up to 15 minutes for each `codex exec review` run.
-- Do not stop early just because Codex has been quiet for a few minutes.
-- If a review run exceeds 15 minutes, treat it as a timeout failure.
-
 ## Review Loop
 
 Maximum review rounds: 2.
@@ -251,7 +233,7 @@ Round 1:
 6. Re-verify that upstream matches local `HEAD` before round 2.
 
 Round 2:
-1. Run detached Codex review against the current pushed branch state, even if round 1 produced no code changes.
+1. Run Claude review again against the updated pushed branch state if and only if round 1 produced code changes.
 2. Apply the same severity-preserving review handling.
 3. If you patch anything in round 2, make one commit for round 2 and push it.
 4. Re-verify that upstream matches local `HEAD`.
@@ -260,6 +242,8 @@ Round 2:
 After round 2:
 - Any unresolved finding that still matters and is not intentionally dismissed with a reason must be marked `[open]`.
 - Do not start a third round.
+
+If round 1 comes back clean and you made no code changes, stop after round 1 and post the final PR comment from the diary.
 
 ## Claude CLI Failure Handling
 
@@ -272,19 +256,6 @@ If the invocation fails:
 - stop the review loop immediately
 - do not guess at missing structure
 - report the raw Claude output and failure mode to the user
-- do not write a synthesized diary entry pretending the review succeeded
-
-## Codex CLI Failure Handling
-
-Treat the Codex invocation as failed if any of the following happens:
-- the `codex exec review` command exits non-zero
-- the command exceeds 15 minutes
-- the output does not contain the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections
-
-If the invocation fails:
-- stop the review loop immediately
-- do not guess at missing structure
-- report the raw Codex output and failure mode to the user
 - do not write a synthesized diary entry pretending the review succeeded
 
 ## Severity Ownership
@@ -409,7 +380,7 @@ Content requirements:
 ## Practical Sequence
 
 Use this order:
-1. Verify repo, branch, `gh`, `claude`, `codex`, and local repo rules.
+1. Verify repo, branch, `gh`, `claude`, and local repo rules.
 2. Make sure the review target is the current pushed branch state.
 3. Resolve the PR for the current branch, creating it non-interactively if needed.
 4. Check PR comments for an existing `## Rocket Review Summary`; if found, stop and report `review already complete`.
@@ -417,7 +388,7 @@ Use this order:
 6. Run round 1 with `claude --dangerously-skip-permissions -p`.
 7. Update the diary for round 1 after patch/skip decisions are made.
 8. If needed, commit and push round 1 fixes, then re-verify upstream freshness.
-9. Run round 2 with detached `codex exec review` against the current pushed branch state.
+9. Run round 2 if and only if round 1 changed code.
 10. Update the diary for round 2.
 11. If round 2 produced final fixes, commit and push them, then re-verify upstream freshness.
 12. Derive one final PR comment from the diary and post it.
@@ -434,8 +405,6 @@ Stop immediately and report back instead of guessing if:
 - an existing PR's head branch does not match the checked-out branch
 - repo-local PR title rules cannot be satisfied from the branch commit history
 - `claude` is unavailable
-- `codex` is unavailable
 - the Claude CLI call exits non-zero, times out, or returns malformed output
-- the Codex CLI call exits non-zero or returns malformed output
-- the spec was not provided in a form you can hand to the reviewer
+- the spec was not provided in a form you can hand to Claude
 - the working tree contains unclear changes you cannot safely include in the review
