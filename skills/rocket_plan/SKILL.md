@@ -241,7 +241,7 @@ Present this plan to the user in the plan-mode step above, then execute against 
 
 ### Implementation rules
 
-- Write the code.
+- Write the code. If the plan identifies independent workstreams, use sub-agents to parallelize them.
 - Follow repo-local conventions from `CLAUDE.md`, `AGENTS.md`, and nearby rules.
 - If a repo-local `CLAUDE.md` exists, read it before coding.
 - Keep changes scoped to the contract.
