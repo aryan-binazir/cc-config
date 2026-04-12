@@ -220,9 +220,9 @@ claude --dangerously-skip-permissions -p "$PROMPT"
 ```
 
 **important** Timeout rules:
-- Allow up to 15 minutes for each `claude --dangerously-skip-permissions -p` review run.
+- Allow up to the full 15-minute budget for each `claude --dangerously-skip-permissions -p` review run: `900000` ms.
 - Do not stop early just because Claude has been quiet for a few minutes.
-- If a review run exceeds 15 minutes, treat it as a timeout failure.
+- If a review run exceeds the full `900000` ms budget, treat it as a timeout failure.
 
 ## Codex Prompt Contract
 
@@ -289,9 +289,24 @@ If detached Codex returns priority-style findings instead of the requested secti
 If Codex returns a freeform review plus one or more `P0`/`P1`/`P2`/`P3` findings, extract those findings, map them into the standard severity buckets above, and continue the review loop.
 
 **important** Timeout rules:
-- Allow up to 15 minutes for each `codex exec` run.
+- Allow up to the full 15-minute budget for each `codex exec` run: `900000` ms.
 - Do not stop early just because Codex has been quiet for a few minutes.
-- If a review run exceeds 15 minutes, treat it as a timeout failure.
+- If a review run exceeds the full `900000` ms budget, treat it as a timeout failure.
+
+## Detached Codex Execution Contract
+
+Round 2 timeout handling must be explicit and budget-based, not vibe-based.
+
+- Treat detached round 2 as a single job with a total wall-clock budget of `900000` ms.
+- Record the launch timestamp when `codex exec` starts. Every later wait, poll, or classification decision must measure elapsed time against that original launch timestamp.
+- If your tooling supports one blocking wait for `900000` ms, prefer that.
+- If your tooling requires polling, recalculate `remaining_budget_ms = 900000 - elapsed_ms` after each poll and keep waiting until either:
+  - the process exits, or
+  - `remaining_budget_ms <= 0`
+- Never use a short fixed poll schedule whose total explicit waits add up to less than `900000` ms. A sequence like `30s + 60s + 60s` is a premature abort, not a timeout policy.
+- Quiet periods are normal. Progress chatter, plugin warnings, `collab: SpawnAgent`, `collab: Wait`, retry noise, or other intermediate logs are not by themselves timeout evidence and are not malformed-output evidence while the process is still running.
+- Do not classify the output as malformed while `codex exec` is still running and has remaining budget. Only validate the final output shape after the process exits, or after the full `900000` ms budget is actually exhausted.
+- If the workflow, operator, or wrapper stops waiting before `900000` ms elapse and before `codex exec` reaches a terminal result, classify that as a premature abort. Do not describe it as "Codex timed out after 15 minutes."
 
 ## Review Loop
 
@@ -323,7 +338,7 @@ After round 2:
 
 Treat the Claude invocation as failed if any of the following happens:
 - the `claude --dangerously-skip-permissions -p` command exits non-zero
-- the command exceeds 15 minutes
+- the command exceeds the full `900000` ms budget
 - the output does not contain the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections
 
 If the invocation fails:
@@ -334,16 +349,28 @@ If the invocation fails:
 
 ## Codex CLI Failure Handling
 
-Treat the Codex invocation as failed if any of the following happens:
-- the `codex exec` command exits non-zero
-- the command exceeds 15 minutes
-- the output contains neither the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections nor any parsable `P0`/`P1`/`P2`/`P3` findings that can be normalized into those sections
+Distinguish these failure modes precisely:
+- `premature abort`: the workflow, operator, or wrapper stopped waiting before the full `900000` ms budget elapsed and before `codex exec` produced a terminal result
+- `timeout`: `codex exec` was still running after the full `900000` ms budget elapsed
+- `process failure`: `codex exec` exited non-zero
+- `malformed output`: `codex exec` exited within budget, but the final collected output contains neither the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections nor any parsable `P0`/`P1`/`P2`/`P3` findings that can be normalized into those sections
+
+Output handling rules:
+- Capture the complete detached Codex output for the whole run, including progress chatter and the eventual final answer.
+- If progress logs appear before the final answer, ignore that leading noise and extract the final structured review block from the completed output.
+- If Codex exits successfully with a freeform review plus parseable `P0`/`P1`/`P2`/`P3` findings, normalize those findings instead of failing on formatting.
+- Do not call a run malformed just because early/intermediate output lacks the required headings.
 
 If the invocation fails:
 - stop the review loop immediately
 - do not guess at missing structure
-- report the raw Codex output and failure mode to the user
+- report the raw Codex output, exact failure mode, and actual elapsed time to the user
 - do not write a synthesized diary entry pretending the review succeeded
+
+Failure wording rules:
+- Only use timeout language if the run really consumed the full `900000` ms budget.
+- If the run stopped earlier than that, say it was stopped early or prematurely aborted, and include the actual elapsed time.
+- If the process exited on its own before the budget without valid final sections, call it malformed output or process failure as appropriate, not a timeout.
 
 If the output is missing the requested section headings but does contain parseable priority findings:
 - normalize those findings into `Critical`, `High`, `Low`, and `Uncertain`
@@ -483,7 +510,7 @@ Use this order:
 6. Run round 1 with `claude --dangerously-skip-permissions -p`.
 7. Update the diary for round 1 after patch/skip decisions are made.
 8. If needed, commit and push round 1 fixes, then re-verify upstream freshness.
-9. Run round 2 with detached `codex exec` against the current pushed branch state.
+9. Run round 2 with detached `codex exec` against the current pushed branch state, record the launch time, and wait up to the full `900000` ms budget before declaring timeout.
 10. Update the diary for round 2.
 11. If round 2 produced final fixes, commit and push them, then re-verify upstream freshness.
 12. Derive one final PR comment from the diary and post it.
@@ -502,6 +529,6 @@ Stop immediately and report back instead of guessing if:
 - `claude` is unavailable
 - `codex` is unavailable
 - the Claude CLI call exits non-zero, times out, or returns malformed output
-- the Codex CLI call exits non-zero or returns malformed output
+- the Codex CLI call exits non-zero, is prematurely aborted, truly times out after the full `900000` ms budget, or returns malformed output
 - the spec was not provided in a form you can hand to the reviewer
 - the working tree contains unclear changes you cannot safely include in the review
