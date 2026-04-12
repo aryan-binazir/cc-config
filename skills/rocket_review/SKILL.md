@@ -228,7 +228,57 @@ claude --dangerously-skip-permissions -p "$PROMPT"
 
 Round 2 must use detached Codex against the current pushed branch state.
 
-Use `codex exec review` non-interactively. Reuse the same review contract and output shape as round 1, adapted for Codex instead of Claude.
+Construct the `codex exec` prompt yourself. Add an explicit instruction to use `code_review_parallel`.
+
+## Codex Prompt Template
+
+Use a prompt equivalent to this:
+
+```text
+You are Codex reviewing work completed on this branch.
+
+Use your `code_review_parallel` skill for this review.
+
+Review target:
+- Repo/worktree: <absolute path>
+- Branch: <branch>
+- PR: #<number> <url>
+
+Implementation contract:
+<contents of _scratch/_contracts/<branch>.md, or fallback spec text>
+
+Review against:
+- Goal
+- Accepted scope
+- Assumptions
+- Validation approach
+
+Respect Out of scope items. Do not treat them as missing work.
+
+Review only the changes introduced on this branch. The `code_review_parallel` skill handles scoping.
+
+Give a brutally honest review of whether the current branch satisfies the contract.
+
+Return findings grouped exactly as:
+## Critical
+## High
+## Low
+## Uncertain
+## Verdict
+
+Within each finding, include concrete file and line references when possible.
+No padding. No compliments.
+```
+
+`codex exec` may be easier to drive with a heredoc:
+
+```bash
+PROMPT=$(cat <<'EOF'
+...
+EOF
+)
+codex exec "$PROMPT"
+```
 
 If detached Codex returns priority-style findings instead of the requested section headings, normalize them rather than failing immediately. Treat these labels as equivalent severities:
 - `P0` -> `Critical`
@@ -239,7 +289,7 @@ If detached Codex returns priority-style findings instead of the requested secti
 If Codex returns a freeform review plus one or more `P0`/`P1`/`P2`/`P3` findings, extract those findings, map them into the standard severity buckets above, and continue the review loop.
 
 **important** Timeout rules:
-- Allow up to 15 minutes for each `codex exec review` run.
+- Allow up to 15 minutes for each `codex exec` run.
 - Do not stop early just because Codex has been quiet for a few minutes.
 - If a review run exceeds 15 minutes, treat it as a timeout failure.
 
@@ -285,9 +335,9 @@ If the invocation fails:
 ## Codex CLI Failure Handling
 
 Treat the Codex invocation as failed if any of the following happens:
-- the `codex exec review` command exits non-zero
+- the `codex exec` command exits non-zero
 - the command exceeds 15 minutes
-- the output contains neither the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections nor any parseable `P0`/`P1`/`P2`/`P3` findings that can be normalized into those sections
+- the output contains neither the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections nor any parsable `P0`/`P1`/`P2`/`P3` findings that can be normalized into those sections
 
 If the invocation fails:
 - stop the review loop immediately
@@ -354,7 +404,7 @@ Required structure:
 ```
 
 Rules:
-- Preserve severity grouping exactly as Claude returned it.
+- Preserve severity grouping exactly as the reviewer returned it.
 - Keep each round self-contained.
 - If a severity group has no items, write `- (none)`.
 - Include the round commit hash when an item was patched in that round.
@@ -419,7 +469,7 @@ For the review section:
 - if verification is unclear, fall back to a plain `## Rocket Review` section instead of emitting broken markdown
 
 Content requirements:
-- include what Claude found, what was patched, what was skipped, and why skipped items were left as-is
+- include what each reviewer found, what was patched, what was skipped, and why skipped items were left as-is
 - keep the ticket description as the source of truth for the final reviewed state
 
 ## Practical Sequence
@@ -433,7 +483,7 @@ Use this order:
 6. Run round 1 with `claude --dangerously-skip-permissions -p`.
 7. Update the diary for round 1 after patch/skip decisions are made.
 8. If needed, commit and push round 1 fixes, then re-verify upstream freshness.
-9. Run round 2 with detached `codex exec review` against the current pushed branch state.
+9. Run round 2 with detached `codex exec` against the current pushed branch state.
 10. Update the diary for round 2.
 11. If round 2 produced final fixes, commit and push them, then re-verify upstream freshness.
 12. Derive one final PR comment from the diary and post it.
