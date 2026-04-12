@@ -230,6 +230,14 @@ Round 2 must use detached Codex against the current pushed branch state.
 
 Use `codex exec review` non-interactively. Reuse the same review contract and output shape as round 1, adapted for Codex instead of Claude.
 
+If detached Codex returns priority-style findings instead of the requested section headings, normalize them rather than failing immediately. Treat these labels as equivalent severities:
+- `P0` -> `Critical`
+- `P1` -> `High`
+- `P2` or `P3` -> `Low`
+- findings without a usable priority, or hedged/design-observation findings without a clear severity -> `Uncertain`
+
+If Codex returns a freeform review plus one or more `P0`/`P1`/`P2`/`P3` findings, extract those findings, map them into the standard severity buckets above, and continue the review loop.
+
 **important** Timeout rules:
 - Allow up to 15 minutes for each `codex exec review` run.
 - Do not stop early just because Codex has been quiet for a few minutes.
@@ -279,7 +287,7 @@ If the invocation fails:
 Treat the Codex invocation as failed if any of the following happens:
 - the `codex exec review` command exits non-zero
 - the command exceeds 15 minutes
-- the output does not contain the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections
+- the output contains neither the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections nor any parseable `P0`/`P1`/`P2`/`P3` findings that can be normalized into those sections
 
 If the invocation fails:
 - stop the review loop immediately
@@ -287,12 +295,20 @@ If the invocation fails:
 - report the raw Codex output and failure mode to the user
 - do not write a synthesized diary entry pretending the review succeeded
 
+If the output is missing the requested section headings but does contain parseable priority findings:
+- normalize those findings into `Critical`, `High`, `Low`, and `Uncertain`
+- derive the round verdict conservatively from the normalized findings
+- record in the diary that round 2 used normalized Codex output
+- continue exactly as if Codex had emitted the requested headings
+
 ## Severity Ownership
 
 Severity comes from `code_review_parallel`, not from you.
 
 Your responsibilities are:
 - preserve Claude's severity buckets exactly
+- preserve detached Codex severity when it already uses the requested buckets
+- when detached Codex emits `P0`/`P1`/`P2`/`P3`, normalize them using the mapping defined above without reinterpretation
 - decide what to patch
 - decide what to skip with a reason
 - mark anything still unresolved after the final allowed round as `[open]`
