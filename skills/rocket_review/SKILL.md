@@ -74,6 +74,7 @@ Preferred spec source (in priority order):
 Contract path rules:
 - Use the raw branch path, not a flattened filename.
 - Example: branch `aryan-binazir/BBA-11` maps to `_scratch/_contracts/aryan-binazir/BBA-11.md`.
+- Treat `_scratch/_contracts/<branch>.md` as local review state by default. Do not require it to be committed, and do not commit `_scratch` artifacts unless the user explicitly asks.
 
 The `rocket_plan` contract is the best review target because it contains:
 - `Goal`
@@ -84,6 +85,8 @@ The `rocket_plan` contract is the best review target because it contains:
 
 Fallback:
 - paste the full spec text verbatim into the prompt
+
+When the local contract file exists, pass the reviewing agent its absolute file path in the prompt so it can open the contract directly if useful. You may also inline the contract contents; the key requirement is that the reviewer receives the contract explicitly rather than having to discover it.
 
 Do not make either reviewer discover the spec on its own. If you cannot supply a reliable spec, stop and ask the user.
 

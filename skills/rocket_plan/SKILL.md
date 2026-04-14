@@ -218,6 +218,7 @@ Rules:
 - Create parent directories as needed.
 - Example: branch `aryan-binazir/BBA-11` maps to `_scratch/_contracts/aryan-binazir/BBA-11.md`.
 - Treat this file as the durable handoff artifact for later review. It must survive session interruption between implementation and review. Do not rely on session memory.
+- This contract file is local review state by default. Do not commit `_scratch` artifacts unless the user explicitly asks.
 
 On rerun:
 - if the current branch already has `_scratch/_contracts/<branch>.md`
