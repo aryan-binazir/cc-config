@@ -26,4 +26,4 @@
   ### Decisions
   ### Testing
   How it was tested, or how to test it.
-  Followed by a collapsed `<details>` block titled "Agent Context" containing verbose context an agent would find helpful when reviewing the PR.
+  Followed by a collapsed `<details>` block titled "Agent Context" containing generous, verbose context a future agent reviewing this PR would want — original ask, why this approach, constraints, gotchas, anything non-obvious. Err on the side of too much rather than too little.
