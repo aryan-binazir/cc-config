@@ -1,6 +1,6 @@
 ---
 name: rocket-review
-description: Run the final Claude review loop for a completed branch, whether or not a PR already exists. Use this whenever the user explicitly says `rocket_review`, asks for the final Claude review loop, or wants Codex to ensure the current branch has a PR, have Claude review it with `code_review_parallel`, patch what should be patched, and post one final PR summary comment.
+description: Run the final Claude review loop for a completed branch, whether or not a PR already exists. Use this whenever the user explicitly says `rocket_review`, asks for the final Claude review loop, or wants Codex to ensure the current branch has a PR, have Claude review it with `/code-review`, patch what should be patched, and post one final PR summary comment.
 ---
 
 # Rocket Review
@@ -170,7 +170,7 @@ Do not ask for compliments, extra summary sections, or style feedback outside th
 
 Round 1 uses Claude.
 
-Construct the `claude --dangerously-skip-permissions -p` prompt yourself. Add an explicit instruction to use `code_review_parallel`.
+Construct the `claude --dangerously-skip-permissions -p` prompt yourself. Add an explicit instruction to use `/code-review`.
 
 ## Prompt Template
 
@@ -179,7 +179,7 @@ Use a prompt equivalent to this:
 ```text
 You are Claude reviewing work completed by Codex.
 
-Use your `code_review_parallel` skill for this review.
+Run the `/code-review` slash command for this review.
 
 Review target:
 - Repo/worktree: <absolute path>
@@ -197,7 +197,7 @@ Review against:
 
 Respect Out of scope items. Do not treat them as missing work.
 
-Review only the changes introduced on this branch. The `code_review_parallel` skill handles scoping.
+Review only the changes introduced on this branch. The `/code-review` command handles scoping.
 
 Give a brutally honest review of whether the current branch satisfies the contract.
 
@@ -231,7 +231,7 @@ claude --dangerously-skip-permissions -p "$PROMPT"
 
 Round 2 must use detached Codex against the current pushed branch state.
 
-Construct the `codex exec` prompt yourself. Add an explicit instruction to use `code_review_parallel`.
+Construct the `codex exec` prompt yourself. Add an explicit instruction to use `/code-review`.
 
 ## Codex Prompt Template
 
@@ -240,7 +240,7 @@ Use a prompt equivalent to this:
 ```text
 You are Codex reviewing work completed on this branch.
 
-Use your `code_review_parallel` skill for this review.
+Run the `/code-review` slash command for this review.
 
 Review target:
 - Repo/worktree: <absolute path>
@@ -258,7 +258,7 @@ Review against:
 
 Respect Out of scope items. Do not treat them as missing work.
 
-Review only the changes introduced on this branch. The `code_review_parallel` skill handles scoping.
+Review only the changes introduced on this branch. The `/code-review` command handles scoping.
 
 Give a brutally honest review of whether the current branch satisfies the contract.
 
@@ -383,7 +383,7 @@ If the output is missing the requested section headings but does contain parseab
 
 ## Severity Ownership
 
-Severity comes from `code_review_parallel`, not from you.
+Severity comes from `/code-review`, not from you.
 
 Your responsibilities are:
 - preserve Claude's severity buckets exactly
@@ -509,7 +509,7 @@ Use this order:
 2. Make sure the review target is the current pushed branch state.
 3. Resolve the PR for the current branch, creating it non-interactively if needed.
 4. Check PR comments for an existing `## Rocket Review Summary`; if found, stop and report `review already complete`.
-5. Build the Claude prompt with the implementation contract or fallback spec, branch, PR, repo path, and `code_review_parallel` instruction.
+5. Build the Claude prompt with the implementation contract or fallback spec, branch, PR, repo path, and `/code-review` instruction.
 6. Run round 1 with `claude --dangerously-skip-permissions -p`.
 7. Update the diary for round 1 after patch/skip decisions are made.
 8. If needed, commit and push round 1 fixes, then re-verify upstream freshness.

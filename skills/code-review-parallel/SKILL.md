@@ -9,7 +9,7 @@ Review only the changes introduced on the current branch since merge-base. Use p
 
 ## Scope
 
-Same review scope as `code_review`: only branch-introduced changes between merge-base and `HEAD`.
+Same review scope as `code-review`: only branch-introduced changes between merge-base and `HEAD`.
 
 ## Get Changes
 

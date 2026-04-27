@@ -1,6 +1,6 @@
 ---
 name: rocket-review-claude-only
-description: Run the final Claude review loop for a completed branch, whether or not a PR already exists. Use this whenever the user explicitly says `rocket_review`, asks for the final Claude review loop, or wants Codex to ensure the current branch has a PR, have Claude review it with `code_review_parallel`, patch what should be patched, and post one final PR summary comment.
+description: Run the final Claude review loop for a completed branch, whether or not a PR already exists. Use this whenever the user explicitly says `rocket_review`, asks for the final Claude review loop, or wants Codex to ensure the current branch has a PR, have Claude review it with `/code-review`, patch what should be patched, and post one final PR summary comment.
 ---
 
 # Rocket Review
@@ -149,11 +149,11 @@ Construct the `claude --dangerously-skip-permissions -p` prompt yourself. The pr
 - the current branch name
 - the PR number and PR URL
 - the repo/worktree path Claude should review
-- an explicit instruction to use `code_review_parallel`
+- an explicit instruction to use `/code-review`
 - an explicit request to review the current branch against `Goal`, `Accepted scope`, `Assumptions`, and `Validation approach`
 - an explicit instruction to respect `Out of scope` items and not treat them as missing work
 
-Tell Claude to preserve the `code_review_parallel` output shape:
+Tell Claude to preserve the `/code-review` output shape:
 - `Critical`
 - `High`
 - `Low`
@@ -169,7 +169,7 @@ Use a prompt equivalent to this:
 ```text
 You are Claude reviewing work completed by Codex.
 
-Use your `code_review_parallel` skill for this review.
+Run the `/code-review` slash command for this review.
 
 Review target:
 - Repo/worktree: <absolute path>
@@ -187,7 +187,7 @@ Review against:
 
 Respect Out of scope items. Do not treat them as missing work.
 
-Review only the changes introduced on this branch. The `code_review_parallel` skill handles scoping.
+Review only the changes introduced on this branch. The `/code-review` command handles scoping.
 
 Give a brutally honest review of whether the current branch satisfies the contract.
 
@@ -260,7 +260,7 @@ If the invocation fails:
 
 ## Severity Ownership
 
-Severity comes from `code_review_parallel`, not from you.
+Severity comes from `/code-review`, not from you.
 
 Your responsibilities are:
 - preserve Claude's severity buckets exactly
@@ -384,7 +384,7 @@ Use this order:
 2. Make sure the review target is the current pushed branch state.
 3. Resolve the PR for the current branch, creating it non-interactively if needed.
 4. Check PR comments for an existing `## Rocket Review Summary`; if found, stop and report `review already complete`.
-5. Build the Claude prompt with the implementation contract or fallback spec, branch, PR, repo path, and `code_review_parallel` instruction.
+5. Build the Claude prompt with the implementation contract or fallback spec, branch, PR, repo path, and `/code-review` instruction.
 6. Run round 1 with `claude --dangerously-skip-permissions -p`.
 7. Update the diary for round 1 after patch/skip decisions are made.
 8. If needed, commit and push round 1 fixes, then re-verify upstream freshness.
