@@ -102,6 +102,12 @@ Use `Assumptions` for inferred behavior or missing details you had to supply.
 Use `Out of scope` for deliberate exclusions so later review does not expand the work retroactively.
 Use `Validation approach` for concrete checks such as tests, lint, or manual verification.
 
+`Validation approach` must be specific enough to drive implementation, not just verify it afterward:
+- identify the tests the agent expects to add or update before and during coding
+- state the behavior, regression, or quality standard each test is meant to protect
+- name the targeted and full validation commands the agent expects to run
+- if automated tests are not appropriate, explain why and state the manual or static checks that replace them
+
 ### Return the ticket plan to the user
 
 Skip this step if no Linear ticket exists.
@@ -129,7 +135,7 @@ Cover at least:
 - the overall goal or motivation if it is missing or weak
 - missing product or behavior details
 - integration boundaries
-- expected validation
+- expected validation, including what tests should be created or updated and what standard those tests should enforce
 - rollout or migration expectations when relevant
 - branch naming or ticket identifier needs for raw spec work when repo conventions require them
 
@@ -149,6 +155,7 @@ Do not begin implementation until the contract is settled.
 That plan must:
 - restate the finalized implementation contract
 - give a concise execution plan for the work you are about to do
+- include a test-first validation plan that names the tests to create or update, the behavior or standards they enforce, and when they will be run
 - include validation and commit checkpoints when relevant
 - explicitly include `$rocket_review` as the final step
 
@@ -238,6 +245,11 @@ Before writing code, build the execution plan from:
 - `Validation approach`
 - logical commit checkpoints
 
+The execution plan must turn the `Validation approach` into concrete test work:
+- write or update the tests that describe the intended behavior before implementing the corresponding code when the repo's test setup makes that practical
+- use those tests to constrain the implementation and catch regressions, not as an afterthought
+- tie tests back to the standards in the contract, such as error handling, compatibility, accessibility, performance, security, or repo-local conventions
+
 Present this plan to the user in the plan-mode step above, then execute against it.
 
 ### Implementation rules
@@ -246,9 +258,11 @@ Present this plan to the user in the plan-mode step above, then execute against 
 - Follow repo-local conventions from `CLAUDE.md`, `AGENTS.md`, and nearby rules.
 - If a repo-local `CLAUDE.md` exists, read it before coding.
 - Keep changes scoped to the contract.
+- Start each implementation checkpoint by adding or updating the tests identified in the plan. Prefer observing the targeted test fail before implementing the production change when doing so is practical and not wasteful.
+- Implement only enough production behavior to satisfy the settled contract, repo-local standards, and the tests created for that checkpoint.
 - Commit incrementally at logical checkpoints.
 - Run `make lint` before each commit unless local repo rules define a different required validation command.
-- Run the tests implied by the contract and repo conventions.
+- Run the targeted tests created or updated for the checkpoint, then the broader tests implied by the contract and repo conventions.
 - If lint or tests fail because of ordinary code bugs, fix them silently and continue.
 - If a failure exposes genuine spec ambiguity rather than a code bug, stop and ask the user. This is the only acceptable mid-implementation interruption.
 
