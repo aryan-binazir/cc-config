@@ -1,6 +1,6 @@
 ---
 name: rocket-review
-description: Run the final Claude review loop for a completed branch, whether or not a PR already exists. Use this whenever the user explicitly says `rocket_review`, asks for the final Claude review loop, or wants Codex to ensure the current branch has a PR, have Claude review it with `/code-review`, patch what should be patched, and post one final PR summary comment.
+description: Run the final Claude review loop for a completed branch, whether or not a PR already exists. Use this whenever the user explicitly says `rocket_review`, asks for the final Claude review loop, or wants Codex to ensure the current branch has a PR, have Claude review it with `/code-review-parallel`, patch what should be patched, and post one final PR summary comment.
 ---
 
 # Rocket Review
@@ -171,7 +171,7 @@ Do not ask for compliments, extra summary sections, or style feedback outside th
 
 Round 1 uses Claude.
 
-Construct the `claude --dangerously-skip-permissions -p` prompt yourself. Add an explicit instruction to use `/code-review`.
+Construct the `claude --dangerously-skip-permissions -p` prompt yourself. Add an explicit instruction to use `/code-review-parallel`.
 
 ## Prompt Template
 
@@ -180,7 +180,7 @@ Use a prompt equivalent to this:
 ```text
 You are Claude reviewing work completed by Codex.
 
-Run the `/code-review` slash command for this review.
+Run the `/code-review-parallel` slash command for this review.
 
 Review target:
 - Repo/worktree: <absolute path>
@@ -200,7 +200,7 @@ Respect Out of scope items. Do not treat them as missing work.
 
 Also review implementation quality. Flag any case where the branch solved the problem in a sloppy, overcomplicated, non-idiomatic, or brittle way. Call out simpler existing repo patterns, helpers, abstractions, or integration points that should have been used instead.
 
-Review only the changes introduced on this branch. The `/code-review` command handles scoping.
+Review only the changes introduced on this branch. The `/code-review-parallel` command handles scoping.
 
 Give a brutally honest review of whether the current branch satisfies the contract and whether it used the simplest repo-idiomatic implementation path.
 
@@ -234,7 +234,7 @@ claude --dangerously-skip-permissions -p "$PROMPT"
 
 Round 2 must use detached Codex against the current pushed branch state.
 
-Construct the `codex exec` prompt yourself. Add an explicit instruction to use `/code-review`.
+Construct the `codex exec --dangerously-bypass-approvals-and-sandbox` prompt yourself. Add an explicit instruction to use `/code-review-parallel`.
 
 ## Codex Prompt Template
 
@@ -243,7 +243,7 @@ Use a prompt equivalent to this:
 ```text
 You are Codex reviewing work completed on this branch.
 
-Run the `/code-review` slash command for this review.
+Run the `/code-review-parallel` slash command for this review.
 
 Review target:
 - Repo/worktree: <absolute path>
@@ -263,7 +263,7 @@ Respect Out of scope items. Do not treat them as missing work.
 
 Also review implementation quality. Flag any case where the branch solved the problem in a sloppy, overcomplicated, non-idiomatic, or brittle way. Call out simpler existing repo patterns, helpers, abstractions, or integration points that should have been used instead.
 
-Review only the changes introduced on this branch. The `/code-review` command handles scoping.
+Review only the changes introduced on this branch. The `/code-review-parallel` command handles scoping.
 
 Give a brutally honest review of whether the current branch satisfies the contract and whether it used the simplest repo-idiomatic implementation path.
 
@@ -278,14 +278,14 @@ Within each finding, include concrete file and line references when possible.
 No padding. No compliments.
 ```
 
-`codex exec` may be easier to drive with a heredoc:
+`codex exec --dangerously-bypass-approvals-and-sandbox` may be easier to drive with a heredoc:
 
 ```bash
 PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-codex exec "$PROMPT"
+codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"
 ```
 
 If detached Codex returns priority-style findings instead of the requested section headings, normalize them rather than failing immediately. Treat these labels as equivalent severities:
@@ -297,7 +297,7 @@ If detached Codex returns priority-style findings instead of the requested secti
 If Codex returns a freeform review plus one or more `P0`/`P1`/`P2`/`P3` findings, extract those findings, map them into the standard severity buckets above, and continue the review loop.
 
 **important** Timeout rules:
-- Allow up to the full 15-minute budget for each `codex exec` run: `900000` ms.
+- Allow up to the full 15-minute budget for each `codex exec --dangerously-bypass-approvals-and-sandbox` run: `900000` ms.
 - Do not stop early just because Codex has been quiet for a few minutes.
 - If a review run exceeds the full `900000` ms budget, treat it as a timeout failure.
 
@@ -306,15 +306,15 @@ If Codex returns a freeform review plus one or more `P0`/`P1`/`P2`/`P3` findings
 Round 2 timeout handling must be explicit and budget-based, not vibe-based.
 
 - Treat detached round 2 as a single job with a total wall-clock budget of `900000` ms.
-- Record the launch timestamp when `codex exec` starts. Every later wait, poll, or classification decision must measure elapsed time against that original launch timestamp.
+- Record the launch timestamp when `codex exec --dangerously-bypass-approvals-and-sandbox` starts. Every later wait, poll, or classification decision must measure elapsed time against that original launch timestamp.
 - If your tooling supports one blocking wait for `900000` ms, prefer that.
 - If your tooling requires polling, recalculate `remaining_budget_ms = 900000 - elapsed_ms` after each poll and keep waiting until either:
   - the process exits, or
   - `remaining_budget_ms <= 0`
 - Never use a short fixed poll schedule whose total explicit waits add up to less than `900000` ms. A sequence like `30s + 60s + 60s` is a premature abort, not a timeout policy.
 - Quiet periods are normal. Progress chatter, plugin warnings, `collab: SpawnAgent`, `collab: Wait`, retry noise, or other intermediate logs are not by themselves timeout evidence and are not malformed-output evidence while the process is still running.
-- Do not classify the output as malformed while `codex exec` is still running and has remaining budget. Only validate the final output shape after the process exits, or after the full `900000` ms budget is actually exhausted.
-- If the workflow, operator, or wrapper stops waiting before `900000` ms elapse and before `codex exec` reaches a terminal result, classify that as a premature abort. Do not describe it as "Codex timed out after 15 minutes."
+- Do not classify the output as malformed while `codex exec --dangerously-bypass-approvals-and-sandbox` is still running and has remaining budget. Only validate the final output shape after the process exits, or after the full `900000` ms budget is actually exhausted.
+- If the workflow, operator, or wrapper stops waiting before `900000` ms elapse and before `codex exec --dangerously-bypass-approvals-and-sandbox` reaches a terminal result, classify that as a premature abort. Do not describe it as "Codex timed out after 15 minutes."
 
 ## Review Loop
 
@@ -358,10 +358,10 @@ If the invocation fails:
 ## Codex CLI Failure Handling
 
 Distinguish these failure modes precisely:
-- `premature abort`: the workflow, operator, or wrapper stopped waiting before the full `900000` ms budget elapsed and before `codex exec` produced a terminal result
-- `timeout`: `codex exec` was still running after the full `900000` ms budget elapsed
-- `process failure`: `codex exec` exited non-zero
-- `malformed output`: `codex exec` exited within budget, but the final collected output contains neither the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections nor any parsable `P0`/`P1`/`P2`/`P3` findings that can be normalized into those sections
+- `premature abort`: the workflow, operator, or wrapper stopped waiting before the full `900000` ms budget elapsed and before `codex exec --dangerously-bypass-approvals-and-sandbox` produced a terminal result
+- `timeout`: `codex exec --dangerously-bypass-approvals-and-sandbox` was still running after the full `900000` ms budget elapsed
+- `process failure`: `codex exec --dangerously-bypass-approvals-and-sandbox` exited non-zero
+- `malformed output`: `codex exec --dangerously-bypass-approvals-and-sandbox` exited within budget, but the final collected output contains neither the expected `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections nor any parsable `P0`/`P1`/`P2`/`P3` findings that can be normalized into those sections
 
 Output handling rules:
 - Capture the complete detached Codex output for the whole run, including progress chatter and the eventual final answer.
@@ -388,7 +388,7 @@ If the output is missing the requested section headings but does contain parseab
 
 ## Severity Ownership
 
-Severity comes from `/code-review`, not from you.
+Severity comes from `/code-review-parallel`, not from you.
 
 Your responsibilities are:
 - preserve Claude's severity buckets exactly
@@ -514,11 +514,11 @@ Use this order:
 2. Make sure the review target is the current pushed branch state.
 3. Resolve the PR for the current branch, creating it non-interactively if needed.
 4. Check PR comments for an existing `## Rocket Review Summary`; if found, stop and report `review already complete`.
-5. Build the Claude prompt with the implementation contract or fallback spec, branch, PR, repo path, and `/code-review` instruction.
+5. Build the Claude prompt with the implementation contract or fallback spec, branch, PR, repo path, and `/code-review-parallel` instruction.
 6. Run round 1 with `claude --dangerously-skip-permissions -p`.
 7. Update the diary for round 1 after patch/skip decisions are made.
 8. If needed, commit and push round 1 fixes, then re-verify upstream freshness.
-9. Run round 2 with detached `codex exec` against the current pushed branch state, record the launch time, and wait up to the full `900000` ms budget before declaring timeout.
+9. Run round 2 with detached `codex exec --dangerously-bypass-approvals-and-sandbox` against the current pushed branch state, record the launch time, and wait up to the full `900000` ms budget before declaring timeout.
 10. Update the diary for round 2.
 11. If round 2 produced final fixes, commit and push them, then re-verify upstream freshness.
 12. Derive one final PR comment from the diary and post it.
