@@ -102,6 +102,12 @@ Use `Assumptions` for inferred behavior or missing details you had to supply.
 Use `Out of scope` for deliberate exclusions so later review does not expand the work retroactively.
 Use `Validation approach` for concrete checks such as tests, lint, or manual verification.
 
+The contract must set an implementation quality bar, not just a feature checklist:
+- prefer the simplest repo-idiomatic change that satisfies the goal
+- reuse existing local patterns, helpers, abstractions, and integration points before introducing new ones
+- avoid broad rewrites, duplicate systems, speculative abstraction, and brittle one-off workarounds unless the contract explicitly justifies them
+- include any known codebase conventions or architectural constraints that should shape the implementation
+
 `Validation approach` must be specific enough to drive implementation, not just verify it afterward:
 - identify the tests the agent expects to add or update before and during coding
 - state the behavior, regression, or quality standard each test is meant to protect
@@ -148,16 +154,95 @@ After that:
 
 Do not begin implementation until the contract is settled.
 
-### Plan mode after contract settlement
+### Pre-Plan Claude critique
 
-**important** Immediately after the contract is settled and before implementation starts, go to Plan mode, call `update_plan`, and present the plan back to the user for feedback. Stop there until the user explicitly approves the plan. Do not edit files, update Linear, create or switch branches, persist the contract, or begin implementation until the user explicitly approves the plan.
+After the contract is settled and before entering Plan mode:
+1. Draft the execution plan.
+2. Run the Claude plan critique below.
+3. Revise the plan as needed.
+4. Stop if unresolved material concerns remain that require user input.
 
-That plan must:
+Do not call `update_plan`, present the plan for approval, update Linear, create or switch branches, persist the contract, or begin implementation until the Claude critique loop is complete.
+
+The drafted plan must:
 - restate the finalized implementation contract
 - give a concise execution plan for the work you are about to do
+- explain why the approach is the simplest repo-idiomatic path and which existing patterns or integration points it will use
 - include a test-first validation plan that names the tests to create or update, the behavior or standards they enforce, and when they will be run
 - include validation and commit checkpoints when relevant
 - explicitly include `$rocket_review` as the final step
+
+Ask Claude for a plan critique before presenting the plan for user approval.
+
+Rules:
+- Run Claude after the user clarification round has settled the contract and after you have drafted the execution plan.
+- Run the first Claude plan critique before user approval, then revise the plan to address material concerns.
+- Run follow-up Claude critique rounds only while there are unresolved material concerns about overengineering, codebase fit, validation, scope, or risky assumptions. Do not loop on style preferences, wording, or non-blocking taste comments.
+- Cap plan critique at 3 total Claude rounds unless the user explicitly asks for more. If material concerns remain after the cap, present the unresolved concerns to the user instead of continuing the loop.
+- Do not ask Claude to implement anything.
+- Ask Claude to review the contract and proposed plan for overengineering, avoidable complexity, missing simpler codebase-native approaches, violations of repo-local conventions, weak test strategy, hidden scope expansion, and risky assumptions.
+- Include the repo/worktree path, branch, relevant ticket/spec, contract, proposed execution plan, and validation plan.
+- If Claude identifies a clearly better simpler approach, revise the plan before showing it to the user.
+- If Claude raises a real ambiguity that changes scope or user-facing behavior, ask the user before proceeding.
+- If Claude raises feedback that seems potentially correct but depends on product intent, user preference, risk tolerance, rollout expectations, or another judgment the user can reasonably decide, ask the user before accepting or rejecting it.
+- For every follow-up critique after round 1, include a prior-feedback ledger in the prompt:
+  - accepted Claude recommendations and how the plan changed
+  - rejected Claude recommendations and why you are not willing to accept them
+  - unresolved concerns that still need Claude to re-check
+- If you intentionally reject Claude's advice, state the reason in the user-visible plan.
+- Allow up to the full 15-minute budget for the Claude plan critique: `900000` ms. Do not stop early just because Claude has been quiet for a few minutes. If the critique exceeds the full budget, treat it as a timeout failure and report the blocker instead of silently skipping it.
+
+Use a prompt equivalent to:
+
+```text
+You are Claude advising Codex before implementation starts.
+
+Review target:
+- Repo/worktree: <absolute path>
+- Branch: <branch>
+- Ticket/spec: <ticket or raw spec summary>
+
+Implementation contract:
+<contract>
+
+Proposed execution plan:
+<plan>
+
+Validation plan:
+<tests and commands>
+
+Prior Claude feedback ledger, for follow-up rounds only:
+- Accepted:
+  - <recommendation and plan change>
+- Rejected:
+  - <recommendation and reason it was not accepted>
+- Still unresolved:
+  - <concern Claude should re-check>
+
+Give brutally honest planning feedback before code is written.
+
+Focus on:
+- Is this more complicated than necessary?
+- Is there a simpler existing codebase pattern, helper, abstraction, or integration point to use?
+- Does the plan violate repo-local conventions or introduce a parallel system?
+- Is the test strategy strong enough to drive development?
+- Are any assumptions risky, underspecified, or likely to create rework?
+
+Return:
+## Blocking
+## Simplifications
+## Test Strategy
+## Risks
+## Verdict
+
+No implementation. No compliments. No padding.
+```
+
+### Plan mode after Claude critique
+
+**important** After the Claude critique loop is complete and before implementation starts, go to Plan mode, call `update_plan`, and present the revised plan back to the user for feedback. Stop there until the user explicitly approves the plan. Do not run another Claude plan critique after presenting the plan unless the user explicitly asks for one.
+
+Do not edit files, update Linear, create or switch branches, persist the contract, or begin implementation until the user explicitly approves the revised plan.
 
 Do not keep this as an internal-only artifact. The user should be able to see the plan you intend to execute before code changes begin.
 
@@ -165,7 +250,7 @@ Do not keep this as an internal-only artifact. The user should be able to see th
 
 Skip this step if no Linear ticket exists.
 
-After clarification settles the contract and before implementation starts, update the ticket description so it matches what will actually be built.
+After the user explicitly approves the revised plan and before implementation starts, update the ticket description so it matches what will actually be built.
 
 Use a marker-bounded managed region so replacements are safe and predictable:
 - look for `<!-- managed:rocket-start -->` and `<!-- managed:rocket-end -->` in the description

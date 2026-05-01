@@ -153,6 +153,7 @@ Construct the reviewer prompt yourself. The prompt must include:
 - the repo/worktree path to review
 - an explicit request to review the current branch against `Goal`, `Accepted scope`, `Assumptions`, and `Validation approach`
 - an explicit instruction to respect `Out of scope` items and not treat them as missing work
+- an explicit request to flag unnecessary complexity, non-idiomatic code, duplicate abstractions, brittle shortcuts, and simpler existing repo patterns that should have been used
 
 Require this exact output shape:
 - `Critical`
@@ -194,9 +195,11 @@ Review against:
 
 Respect Out of scope items. Do not treat them as missing work.
 
+Also review implementation quality. Flag any case where the branch solved the problem in a sloppy, overcomplicated, non-idiomatic, or brittle way. Call out simpler existing repo patterns, helpers, abstractions, or integration points that should have been used instead.
+
 Review only the changes introduced on this branch. The `/code-review` command handles scoping.
 
-Give a brutally honest review of whether the current branch satisfies the contract.
+Give a brutally honest review of whether the current branch satisfies the contract and whether it used the simplest repo-idiomatic implementation path.
 
 Return findings grouped exactly as:
 ## Critical
@@ -255,9 +258,11 @@ Review against:
 
 Respect Out of scope items. Do not treat them as missing work.
 
+Also review implementation quality. Flag any case where the branch solved the problem in a sloppy, overcomplicated, non-idiomatic, or brittle way. Call out simpler existing repo patterns, helpers, abstractions, or integration points that should have been used instead.
+
 Review only the changes introduced on this branch. The `/code-review` command handles scoping.
 
-Give a brutally honest review of whether the current branch satisfies the contract.
+Give a brutally honest review of whether the current branch satisfies the contract and whether it used the simplest repo-idiomatic implementation path.
 
 Return findings grouped exactly as:
 ## Critical
