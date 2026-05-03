@@ -1,6 +1,6 @@
 ---
 name: rocket-review
-description: Run the final Claude review loop for a completed branch, whether or not a PR already exists. Use this whenever the user explicitly says `rocket_review`, asks for the final Claude review loop, or wants Codex to ensure the current branch has a PR, have Claude review it with `/code-review-parallel`, patch what should be patched, and post one final PR summary comment.
+description: Run the final Claude review loop for a completed branch, whether or not a PR already exists. Use this whenever the user explicitly says `rocket-review`, asks for the final Claude review loop, or wants Codex to ensure the current branch has a PR, have Claude review it with `/code-review-parallel`, patch what should be patched, and post one final PR summary comment.
 ---
 
 # Rocket Review

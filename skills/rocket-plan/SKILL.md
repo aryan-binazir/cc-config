@@ -1,6 +1,6 @@
 ---
 name: rocket-plan
-description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants Codex to ask one strong clarification round, settle a goal and implementation contract, update the Linear ticket when applicable, carry the work through implementation and push, and then hand off in-session to $rocket_review without further babysitting.
+description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants Codex to ask one strong clarification round, settle a goal and implementation contract, update the Linear ticket when applicable, carry the work through implementation and push, and then hand off in-session to $rocket-review without further babysitting.
 ---
 
 # Rocket Plan
@@ -12,7 +12,7 @@ This skill is strict on purpose:
 - It does not treat the original spec as the implementation contract.
 - It does not settle a contract without a clear goal.
 - It does not silently guess past unresolved ambiguity.
-- It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket_review`.
+- It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket-review`.
 
 ## Accepted Inputs
 
@@ -170,7 +170,7 @@ The drafted plan must:
 - explain why the approach is the simplest repo-idiomatic path and which existing patterns or integration points it will use
 - include a test-first validation plan that names the tests to create or update, the behavior or standards they enforce, and when they will be run
 - include validation and commit checkpoints when relevant
-- explicitly include `$rocket_review` as the final step
+- explicitly include `$rocket-review` as the final step
 
 Ask Claude for a plan critique before presenting the plan for user approval.
 
@@ -365,19 +365,19 @@ When implementation is complete:
 1. Ensure all intended changes are committed.
 2. Push the current branch.
 3. Verify that the upstream branch exists and matches local `HEAD`.
-4. Invoke `$rocket_review` as a skill in the same Codex session.
+4. Invoke `$rocket-review` as a skill in the same Codex session.
 
 The handoff rules are strict:
-- Do not reimplement `rocket_review` inline.
-- Do not shell out to a separate `rocket_review` process.
+- Do not reimplement `rocket-review` inline.
+- Do not shell out to a separate `rocket-review` process.
 - Do not describe this as starting a new session.
 - Do not reconstruct the contract from memory if the file already exists.
-- Point `$rocket_review` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
+- Point `$rocket-review` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
 - You may include the Linear ticket reference or raw spec only as secondary context.
 
-If the final push fails, the upstream branch does not exist, or upstream does not match local `HEAD`, stop and report the blocker instead of invoking `$rocket_review`.
+If the final push fails, the upstream branch does not exist, or upstream does not match local `HEAD`, stop and report the blocker instead of invoking `$rocket-review`.
 
-If `$rocket_review` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
+If `$rocket-review` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
 
 ## What This Skill Does Not Do
 
@@ -387,4 +387,4 @@ If `$rocket_review` cannot run, stop and report the exact blocker. Do not silent
 - It does not keep the contract only in session memory.
 - It does not settle the contract without a clear goal.
 - It does not silently guess past unresolved ambiguity.
-- It does not treat `$rocket_review` as an external session handoff. It is an in-session skill invocation.
+- It does not treat `$rocket-review` as an external session handoff. It is an in-session skill invocation.
