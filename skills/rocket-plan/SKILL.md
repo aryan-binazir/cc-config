@@ -1,6 +1,6 @@
 ---
 name: rocket-plan
-description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants Codex to ask one strong clarification round, settle a goal and implementation contract, update the Linear ticket when applicable, carry the work through implementation and push, and then hand off in-session to $rocket-review without further babysitting.
+description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants Codex to grill them with hard clarification questions until the contract is unambiguous, settle a goal and implementation contract, update the Linear ticket when applicable, drive implementation strictly test-first, push, and then hand off in-session to $rocket-review without further babysitting.
 ---
 
 # Rocket Plan
@@ -12,6 +12,8 @@ This skill is strict on purpose:
 - It does not treat the original spec as the implementation contract.
 - It does not settle a contract without a clear goal.
 - It does not silently guess past unresolved ambiguity.
+- It does not soften the clarification phase. It grills the user on every branch where the spec is ambiguous, until the contract is unambiguous.
+- It does not write production code without a failing test driving it. Test-first is mandatory.
 - It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket-review`.
 
 ## Accepted Inputs
@@ -108,11 +110,11 @@ The contract must set an implementation quality bar, not just a feature checklis
 - avoid broad rewrites, duplicate systems, speculative abstraction, and brittle one-off workarounds unless the contract explicitly justifies them
 - include any known codebase conventions or architectural constraints that should shape the implementation
 
-`Validation approach` must be specific enough to drive implementation, not just verify it afterward:
-- identify the tests the agent expects to add or update before and during coding
-- state the behavior, regression, or quality standard each test is meant to protect
-- name the targeted and full validation commands the agent expects to run
-- if automated tests are not appropriate, explain why and state the manual or static checks that replace them
+`Validation approach` must be specific enough to drive implementation through strict test-first development, not just verify it afterward:
+- list the tests that will drive each piece of production behavior, in the order they will be written
+- for each test, state the behavior, regression, or quality standard it is meant to protect and the production code it will force into existence
+- name the targeted and full validation commands the agent expects to run, including the command used to watch a single test fail before making it pass
+- if automated tests are genuinely not appropriate for a slice of work, explain why explicitly and state the manual or static checks that replace them; this is an exception, not a default
 
 ### Return the ticket plan to the user
 
@@ -129,25 +131,39 @@ Do not ask the user to restate the ticket. Phrase the clarification round so the
 
 ### Clarification rules
 
-Before implementation, ask one consolidated clarification round like a strong peer engineer preparing to own the work. Be thorough enough that the user can answer once and walk away.
+If the `grill-with-docs` skill is available, use it to run this phase and skip the inline rules below. Otherwise, follow the rules below.
+
+Before implementation, grill the user. Go down every branch where the spec is ambiguous, every decision that has a real cost to get wrong, and every assumption that would change the implementation if flipped. Treat planning as the cheap phase and act like a senior engineer who refuses to start work until they understand it end to end.
+
+Be aggressive about surfacing hard questions, not polite about avoiding them. If a question feels uncomfortable to ask, that is usually the signal that it must be asked. The user has explicitly asked for this — do not pre-soften, batch into a single shallow round, or skip questions to "be efficient."
 
 If the source spec came from Linear, the clarification message must be self-contained:
 - start with the ticket summary and proposed contract
 - then ask for confirmation or corrections
-- then ask the consolidated clarification questions
+- then ask the hard questions in focused rounds
 - make it clear what you plan to build if the user simply replies with approval
 
-Cover at least:
-- the overall goal or motivation if it is missing or weak
-- missing product or behavior details
-- integration boundaries
-- expected validation, including what tests should be created or updated and what standard those tests should enforce
-- rollout or migration expectations when relevant
+Cover at least, and explicitly probe each branch you can think of inside these:
+- the overall goal or motivation if it is missing or weak, including the user or business outcome the work must produce
+- missing product or behavior details, including unhappy paths, error states, empty states, and edge cases
+- integration boundaries, upstream and downstream consumers, and what breaks if this change ships
+- data model, migration, and backfill implications
+- failure modes, retries, idempotency, and concurrency expectations
+- security, permissions, and auth implications
+- performance and scale expectations
+- observability: what logs, metrics, or traces this work should emit or rely on
+- expected validation, including the specific tests that will be written to drive the work and the standard each test must enforce
+- rollout, feature flagging, reversibility, and migration expectations when relevant
 - branch naming or ticket identifier needs for raw spec work when repo conventions require them
+- explicit out-of-scope confirmation so later review does not retroactively expand the work
 
-One follow-up round is allowed only if the first answers create new ambiguity.
+Run as many clarification rounds as it takes for the contract to be unambiguous. Do not artificially cap rounds. Each follow-up round must be tighter than the last and must only ask about concerns that survived the previous answers — do not re-litigate settled questions.
 
-After that:
+Stop the grilling only when:
+- every remaining ambiguity is small enough that a stated assumption in `Assumptions` is honest and low risk, and
+- the user has confirmed or corrected the proposed contract.
+
+Then:
 - settle the contract
 - state reasonable assumptions in `Assumptions`
 - stop asking unless continuing would be irresponsible
@@ -168,8 +184,8 @@ The drafted plan must:
 - restate the finalized implementation contract
 - give a concise execution plan for the work you are about to do
 - explain why the approach is the simplest repo-idiomatic path and which existing patterns or integration points it will use
-- include a test-first validation plan that names the tests to create or update, the behavior or standards they enforce, and when they will be run
-- include validation and commit checkpoints when relevant
+- include a strict test-first validation plan that lists each failing test in the order it will be written, the production change it will force into existence, and the command used to run it; tests-after, all-upfront, or alongside-the-code patterns are not acceptable
+- include validation and commit checkpoints aligned to red-green-refactor cycles when practical
 - explicitly include `$rocket-review` as the final step
 
 Ask Claude for a plan critique before presenting the plan for user approval.
@@ -225,7 +241,7 @@ Focus on:
 - Is this more complicated than necessary?
 - Is there a simpler existing codebase pattern, helper, abstraction, or integration point to use?
 - Does the plan violate repo-local conventions or introduce a parallel system?
-- Is the test strategy strong enough to drive development?
+- Is the plan strictly test-first? Does each production change have a failing test scheduled to be written first, in order, with a defined behavior to protect?
 - Are any assumptions risky, underspecified, or likely to create rework?
 
 Return:
@@ -328,26 +344,31 @@ Before writing code, build the execution plan from:
 - `Accepted scope`
 - `Assumptions`
 - `Validation approach`
-- logical commit checkpoints
+- logical commit checkpoints, each scoped to a single red-green-refactor cycle when practical
 
-The execution plan must turn the `Validation approach` into concrete test work:
-- write or update the tests that describe the intended behavior before implementing the corresponding code when the repo's test setup makes that practical
-- use those tests to constrain the implementation and catch regressions, not as an afterthought
+The execution plan must turn the `Validation approach` into a concrete, ordered sequence of test-first cycles:
+- list each failing test that will be written, in the order it will be written
+- state the production change each test will force into existence
+- explicitly assert that tests are written first and watched fail before any matching production code is written; do not allow tests-after, full-upfront test specs, or tests written in the same step as the production change
 - tie tests back to the standards in the contract, such as error handling, compatibility, accessibility, performance, security, or repo-local conventions
 
 Present this plan to the user in the plan-mode step above, then execute against it.
 
 ### Implementation rules
 
-- Write the code. If the plan identifies independent workstreams, use sub-agents to parallelize them.
+If the `tdd` skill is available, use it to drive the test-first red-green-refactor loop and skip the inline rules below. Otherwise, follow the rules below.
+
+- Write the code test-first. Tests must drive development: write the next failing test, watch it fail, then write the minimum production code to make it pass, then refactor. Move on to the next test.
+- Tests are not written after the code. Tests are not all written upfront before any code. Tests are not written alongside the code in the same step. Each unit of production code exists because a failing test demanded it.
+- The only acceptable exception is when the repo's test setup makes a strict red-green-refactor loop genuinely impractical or wasteful for that specific change. In that case, state the exception explicitly in the execution plan or in a checkpoint commit message and use the closest approximation: write the test first within the smallest practical slice, even if it covers slightly more than one line of production code.
+- If the plan identifies independent workstreams, use sub-agents to parallelize them. Each sub-agent must follow the same test-first loop within its workstream.
 - Follow repo-local conventions from `CLAUDE.md`, `AGENTS.md`, and nearby rules.
 - If a repo-local `CLAUDE.md` exists, read it before coding.
 - Keep changes scoped to the contract.
-- Start each implementation checkpoint by adding or updating the tests identified in the plan. Prefer observing the targeted test fail before implementing the production change when doing so is practical and not wasteful.
-- Implement only enough production behavior to satisfy the settled contract, repo-local standards, and the tests created for that checkpoint.
-- Commit incrementally at logical checkpoints.
+- Implement only enough production behavior to satisfy the settled contract, repo-local standards, and the failing test you just wrote.
+- Commit incrementally at logical checkpoints. A checkpoint is at minimum one red-green-refactor cycle, not a batched set of untested changes.
 - Run `make lint` before each commit unless local repo rules define a different required validation command.
-- Run the targeted tests created or updated for the checkpoint, then the broader tests implied by the contract and repo conventions.
+- Run the targeted tests for the current checkpoint, then the broader tests implied by the contract and repo conventions.
 - If lint or tests fail because of ordinary code bugs, fix them silently and continue.
 - If a failure exposes genuine spec ambiguity rather than a code bug, stop and ask the user. This is the only acceptable mid-implementation interruption.
 
@@ -387,4 +408,6 @@ If `$rocket-review` cannot run, stop and report the exact blocker. Do not silent
 - It does not keep the contract only in session memory.
 - It does not settle the contract without a clear goal.
 - It does not silently guess past unresolved ambiguity.
+- It does not skip or soften the grilling round to be polite or efficient.
+- It does not allow tests-after, all-upfront, or alongside-the-code patterns. Tests drive each production change.
 - It does not treat `$rocket-review` as an external session handoff. It is an in-session skill invocation.
