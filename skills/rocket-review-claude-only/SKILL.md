@@ -134,7 +134,7 @@ After creating the PR:
 
 Once the PR exists, inspect its existing comments before review rounds begin.
 
-If a comment already contains the exact heading `## Rocket Review Summary`, stop and report:
+If a comment already contains the exact summary line `<summary>Rocket Review Summary</summary>`, stop and report:
 
 ```text
 review already complete
@@ -328,7 +328,8 @@ Use `gh pr comment` against the current branch's PR.
 Required shape:
 
 ```md
-## Rocket Review Summary
+<details>
+<summary>Rocket Review Summary</summary>
 
 **Rounds:** 2
 **Final Verdict:** APPROVE
@@ -341,9 +342,13 @@ Required shape:
 
 ### Low
 - [file:line] - description [open]
+
+</details>
 ```
 
 Rules:
+- Wrap the whole PR comment body in a closed GitHub disclosure block using `<details>` and `<summary>Rocket Review Summary</summary>`.
+- Do not add the `open` attribute; the disclosure must render collapsed by default.
 - No claim in the PR comment may be absent from the diary.
 - Preserve severity headings.
 - Use `[patched]`, `[skipped: reason]`, and `[open]` exactly.
@@ -386,7 +391,7 @@ Use this order:
 1. Verify repo, branch, `gh`, `claude`, and local repo rules.
 2. Make sure the review target is the current pushed branch state.
 3. Resolve the PR for the current branch, creating it non-interactively if needed.
-4. Check PR comments for an existing `## Rocket Review Summary`; if found, stop and report `review already complete`.
+4. Check PR comments for an existing exact summary line `<summary>Rocket Review Summary</summary>`; if found, stop and report `review already complete`.
 5. Build the Claude prompt with the implementation contract or fallback spec, branch, PR, repo path, and `/code-review` instruction.
 6. Run round 1 with `claude --dangerously-skip-permissions -p`.
 7. Update the diary for round 1 after patch/skip decisions are made.
