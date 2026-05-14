@@ -37,7 +37,7 @@ Required conditions:
 - `codex` is available on `PATH`.
 - The CodeRabbit CLI (`cr` or `coderabbit`) is available on `PATH` and already authenticated.
 
-If the CodeRabbit CLI is missing, stop and tell the user to install it (`curl -fsSL https://cli.coderabbit.ai/install.sh | sh` or `brew install coderabbit`) and authenticate with `cr auth login` before retrying. Do not attempt to install or authenticate it yourself.
+If the CodeRabbit CLI is missing, stop and tell the user to install it (`curl -fsSL https://cli.coderabbit.ai/install.sh | sh` or `brew install coderabbit`) and authenticate with `cr auth login` (or `cr auth login --agent` for OAuth in non-interactive contexts) before retrying. Do not attempt to install or authenticate it yourself.
 
 Before generating a PR title or PR body, read local repo rules first:
 - `CLAUDE.md`
@@ -159,11 +159,13 @@ The CodeRabbit invocation is detached, non-interactive, and produces structured 
 Required invocation shape:
 
 ```bash
-cr --agent --base <base-branch>
+cr review --agent --type committed --base <base-branch>
 ```
 
 Rules:
-- Use `--agent` to force structured JSON output to stdout. Never run `cr` bare (it drops into an interactive TUI and hangs non-TTY shells).
+- The verb is `review`. `--agent`, `--base`, and `--type` are flags on the `review` subcommand, not the top-level binary. Do not invoke `cr` bare and do not omit `review`.
+- Use `--agent` to emit structured findings for agent workflows on stdout. Never use `--interactive` (full-screen TUI) and do not run `cr review` bare (it falls back to `--plain`, which is fine for humans but not what this skill consumes).
+- Use `--type committed` so the review targets only the committed branch state. This skill requires the branch to be pushed first, so uncommitted changes are not in scope here. (`--type all` would also cover uncommitted work; do not use it — it muddies the diff.)
 - Use `--base` set to the merge-base/target branch of the PR. Resolve it from `gh pr view --json baseRefName`, not from assumption. Fall back to `main` only if `gh` cannot supply it.
 - Capture the full stdout into a file under `_scratch/_reviews/coderabbit_<branch-safe>.json`. Create `_scratch/_reviews` if needed.
 - Do not pipe stdout through any transform that could drop or reformat findings.
@@ -175,7 +177,7 @@ Timeout rules:
 - If the run exceeds the full `1800000` ms budget, treat it as a timeout failure.
 
 Failure handling:
-- If `cr --agent` exits non-zero, the run is a process failure.
+- If `cr review --agent` exits non-zero, the run is a process failure.
 - If the JSON output is not parseable, the run is malformed output.
 - If the run was aborted before its budget was exhausted and did not exit on its own, that is a premature abort, not a timeout.
 - On any failure mode: stop the review loop immediately, report the raw output and exact failure mode to the user, and do not synthesize a fake review.
@@ -258,7 +260,7 @@ Review target:
 Implementation contract:
 <contents of _scratch/_contracts/<branch>.md, or fallback spec text>
 
-CodeRabbit findings (already produced by a prior detached `cr --agent` run):
+CodeRabbit findings (already produced by a prior detached `cr review --agent --type committed --base <base>` run):
 <absolute path to _scratch/_reviews/coderabbit_<branch-safe>.json>
 
 CodeRabbit severities map: critical -> Critical, major/high -> High, minor/low/nitpick -> Low, anything ambiguous -> Uncertain.
@@ -521,7 +523,7 @@ Use this order:
 3. Resolve the PR for the current branch, creating it non-interactively if needed.
 4. Check PR comments for an existing exact summary line `<summary>Rocket Review Rabbit Summary</summary>`; if found, stop and report `review already complete`.
 5. Resolve the PR base branch via `gh pr view --json baseRefName`.
-6. Run **exactly one** detached `cr --agent --base <base>` pass. Capture JSON to `_scratch/_reviews/coderabbit_<branch-safe>.json`. Normalize severities. Record in the diary under `## CodeRabbit (single pass)`. Never run CodeRabbit again in this skill invocation.
+6. Run **exactly one** detached `cr review --agent --type committed --base <base>` pass. Capture JSON to `_scratch/_reviews/coderabbit_<branch-safe>.json`. Normalize severities. Record in the diary under `## CodeRabbit (single pass)`. Never run CodeRabbit again in this skill invocation.
 7. Build the round 1 Codex prompt with the implementation contract or fallback spec, branch, PR, repo path, CodeRabbit findings file path, and `/code-review-parallel` instruction.
 8. Run Codex round 1 with `codex exec --dangerously-bypass-approvals-and-sandbox`.
 9. Update the diary for Codex round 1 after patch/skip decisions are made.
