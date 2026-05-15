@@ -1,6 +1,6 @@
 ---
 name: rocket-review-rabbit
-description: Run the final review loop for a completed branch using one detached CodeRabbit CLI review round followed by one or more Codex review rounds. Use this whenever the user explicitly says `rocket-review-rabbit`, asks for the CodeRabbit + Codex review loop, or wants Codex to ensure the current branch has a PR, run CodeRabbit CLI exactly once, patch or skip CodeRabbit findings with an audit trail, then run Codex against the updated branch until verdict is APPROVE, and post one final PR summary comment.
+description: Run the final review loop for a completed branch using one or more Codex review rounds followed by a single terminal CodeRabbit App review round read from the PR. Use this whenever the user explicitly says `rocket-review-rabbit`, asks for the Codex + CodeRabbit review loop, or wants Codex to ensure the current branch has a PR, run Codex against the branch until verdict is APPROVE, then fetch the CodeRabbit App's PR review and patch or skip those findings with an audit trail, and post one final PR summary comment.
 ---
 
 # Rocket Review Rabbit
@@ -10,15 +10,16 @@ Use this only after implementation is complete enough for external review.
 This skill is narrow on purpose:
 - It does not define the implementation work.
 - It does not assign or reinterpret severity.
-- It runs CodeRabbit CLI **exactly once** for the whole job.
 - It runs Codex up to 3 rounds, stopping early when Codex explicitly approves.
+- It iterates with the CodeRabbit GitHub App until CodeRabbit's latest review on the current `HEAD` has no actionable findings. The CodeRabbit App auto-reviews every push, so this loop is driven by waiting for the App's review on the latest pushed commit, patching what it raises, pushing again, and re-fetching.
+- It does not invoke the CodeRabbit CLI. CodeRabbit reviews are produced asynchronously on the PR by the GitHub App, not by a local binary.
 - It does not rely on interactive PR creation.
 
-Your job is to take the current checked-out branch, ensure it has a PR, run **one** detached CodeRabbit CLI review, normalize and handle those findings as the first review round, patch what should be patched, record every patch/skip/open decision, then run Codex against the updated pushed branch and the CodeRabbit ledger until Codex approves or the round cap is reached. Leave a strict audit trail and post one final PR summary comment.
+Your job is to take the current checked-out branch, ensure it has a PR, run Codex against the pushed branch until Codex approves or the round cap is reached, then drive the CodeRabbit iteration loop: wait for the App's review on the latest commit (up to 15 minutes per round), fetch findings via `gh`, patch what should be patched, commit and push, and repeat until CodeRabbit's latest review on `HEAD` is clean or the CodeRabbit round cap is reached. Record every patch/skip/open decision for every round, and post one final PR summary comment.
 
 ## Preconditions
 
-Run these checks before PR resolution and the CodeRabbit run:
+Run these checks before PR resolution and the Codex rounds:
 
 ```bash
 git rev-parse --is-inside-work-tree
@@ -27,7 +28,6 @@ command -v gh
 gh auth status
 git status -sb
 command -v codex
-command -v cr || command -v coderabbit
 ```
 
 Required conditions:
@@ -35,9 +35,7 @@ Required conditions:
 - The intended review branch is the branch currently checked out.
 - `gh` is available and authenticated.
 - `codex` is available on `PATH`.
-- The CodeRabbit CLI (`cr` or `coderabbit`) is available on `PATH` and already authenticated.
-
-If the CodeRabbit CLI is missing, stop and tell the user to install it (`curl -fsSL https://cli.coderabbit.ai/install.sh | sh` or `brew install coderabbit`) and authenticate with `cr auth login` (or `cr auth login --agent` for OAuth in non-interactive contexts) before retrying. Do not attempt to install or authenticate it yourself.
+- The CodeRabbit GitHub App is expected to be installed on the repo. The terminal CodeRabbit round will fetch the App's PR review via `gh api`. This skill does not install, authenticate, or invoke any local CodeRabbit CLI.
 
 Before generating a PR title or PR body, read local repo rules first:
 - `CLAUDE.md`
@@ -50,8 +48,8 @@ Stop and report the problem if any precondition fails.
 
 Each reviewer must review the actual pushed branch state, not a local-only draft.
 
-Before the CodeRabbit run:
-- If there are review-ready local changes that belong on this branch, commit them using the repo's normal commit conventions and push them before invoking CodeRabbit.
+Before the Codex rounds:
+- If there are review-ready local changes that belong on this branch, commit them using the repo's normal commit conventions and push them before invoking Codex.
 - If the working tree contains unrelated, ambiguous, or not-yet-ready changes, stop and ask the user instead of guessing.
 - If the current branch has no upstream branch yet, push it before attempting PR creation.
 
@@ -61,8 +59,8 @@ After every push:
 - stop if upstream is stale or missing
 
 Between review rounds:
-- If you patched anything in the CodeRabbit round, make one follow-up commit for that round and push it before the first Codex round.
 - If you patched anything in a Codex round, make one follow-up commit for that round and push it before the next Codex round.
+- If you patched anything in a CodeRabbit round, make one follow-up commit for that round and push it before waiting for CodeRabbit's next App review. Pushing is what triggers the App to re-review.
 - Do not amend unless the user explicitly asks.
 - Do not create extra bookkeeping commits.
 
@@ -151,81 +149,12 @@ review already complete
 
 Do not add diary resume logic. Treat this as the only completion shortcut.
 
-## CodeRabbit Run (Exactly Once)
+## Codex Review (Single Round)
 
-**This is the most important rule of this skill: CodeRabbit CLI runs exactly once per invocation of `rocket-review-rabbit`. Never re-run CodeRabbit between Codex rounds. Never re-run CodeRabbit "to double-check" after Codex patches. Once. Total.**
+Codex runs exactly once, before the CodeRabbit iteration loop. It reviews the current pushed branch state against the implementation contract.
 
-The CodeRabbit invocation is detached, non-interactive, and produces structured JSON that Codex will consume.
-
-Required invocation shape:
-
-```bash
-cr review --agent --type committed --base <base-branch>
-```
-
-Rules:
-- The verb is `review`. `--agent`, `--base`, and `--type` are flags on the `review` subcommand, not the top-level binary. Do not invoke `cr` bare and do not omit `review`.
-- Use `--agent` to emit structured findings for agent workflows on stdout. Never use `--interactive` (full-screen TUI) and do not run `cr review` bare (it falls back to `--plain`, which is fine for humans but not what this skill consumes).
-- Use `--type committed` so the review targets only the committed branch state. This skill requires the branch to be pushed first, so uncommitted changes are not in scope here. (`--type all` would also cover uncommitted work; do not use it — it muddies the diff.)
-- Use `--base` set to the merge-base/target branch of the PR. Resolve it from `gh pr view --json baseRefName`, not from assumption. Fall back to `main` only if `gh` cannot supply it.
-- Capture the full stdout into a file under `_scratch/_reviews/coderabbit_<branch-safe>.json`. Create `_scratch/_reviews` if needed.
-- Do not pipe stdout through any transform that could drop or reformat findings.
-- The CLI binary may be named `cr` or `coderabbit`. They are the same binary; prefer whichever resolved in the precondition check.
-
-Timeout rules:
-- Allow up to a 30-minute budget (`1800000` ms) for the CodeRabbit run. CodeRabbit reviews are long-running.
-- Do not stop early just because CodeRabbit has been quiet for a few minutes. Progress logs are normal.
-- If the run exceeds the full `1800000` ms budget, treat it as a timeout failure.
-
-Failure handling:
-- If `cr review --agent` exits non-zero, the run is a process failure.
-- If the JSON output is not parseable, the run is malformed output.
-- If the run was aborted before its budget was exhausted and did not exit on its own, that is a premature abort, not a timeout.
-- On any failure mode: stop the review loop immediately, report the raw output and exact failure mode to the user, and do not synthesize a fake review.
-- Free-tier rate limit is 3 reviews/hour. If CodeRabbit reports a rate-limit error, stop and report it to the user; do not retry on a loop.
-
-After a successful run:
-- Parse the JSON into a normalized findings list. Each finding should carry severity, file, line, and description.
-- Map CodeRabbit severities into the standard buckets:
-  - `critical` -> `Critical`
-  - `major` / `high` -> `High`
-  - `minor` / `low` / `nitpick` -> `Low`
-  - anything without a clear severity or hedged design observations -> `Uncertain`
-- Persist the normalized findings into the diary under the CodeRabbit round before patching or skipping anything.
-
-## CodeRabbit Finding Handling Round
-
-CodeRabbit findings are handled before Codex runs. Do not defer CodeRabbit decisions to Codex.
-
-After the single CodeRabbit run:
-1. Normalize CodeRabbit findings into `Critical`, `High`, `Low`, and `Uncertain` using the mapping above.
-2. Read each finding conservatively. Err toward patching clearly valid findings rather than dismissing them.
-3. Patch what should be fixed.
-4. For every CodeRabbit finding, decide exactly one status:
-   - `[patched]`
-   - `[skipped: not actionable]`
-   - `[skipped: reason]`
-   - `[open]`
-5. Record the CodeRabbit round in the diary with the original severity grouping and each finding's status.
-6. If any CodeRabbit finding was patched, create one follow-up commit for the CodeRabbit round and push it.
-7. Re-verify that upstream exists and local `HEAD` matches upstream before running Codex.
-
-Rules:
-- Do not run Codex before the CodeRabbit round has been recorded.
-- Do not ask Codex to decide whether CodeRabbit findings should be patched before you have made your own patch/skip decision.
-- If a CodeRabbit finding is skipped, the diary must state the concrete reason. Vague reasons like `[skipped: not needed]` are not acceptable.
-- If a CodeRabbit finding is impossible to patch because the finding is underspecified, malformed, or depends on information CodeRabbit did not provide, mark it `[skipped: reason]` and explain the missing information.
-- If a CodeRabbit finding looks valid but patching it reveals product or scope ambiguity, stop and ask the user instead of guessing.
-- CodeRabbit round verdict is `NEEDS FIXES` when any finding was patched or left `[open]`; it is `APPROVE` only when there are no findings or every finding was skipped with a concrete non-actionable reason.
-
-## Codex Iterate-Until-Approve Loop
-
-Maximum Codex rounds: **3**. Stop earlier if Codex explicitly approves.
-
-Codex runs after the CodeRabbit round has been patched/skipped and pushed. It reviews the current pushed branch state against the implementation contract, the CodeRabbit findings file, and the CodeRabbit round ledger. It should verify the CodeRabbit handling and perform its own review. It may re-open a skipped CodeRabbit finding only if the skip reason is demonstrably wrong or incomplete.
-
-Each round:
-1. Run detached Codex review against the current pushed branch state. Pass it the implementation contract, the CodeRabbit findings file, and the CodeRabbit round status ledger.
+The round:
+1. Run detached Codex review against the current pushed branch state. Pass it the implementation contract only.
 2. Read the findings conservatively. Err toward patching rather than dismissing.
 3. Patch what should be fixed.
 4. For each finding, decide one of:
@@ -234,17 +163,99 @@ Each round:
    - `[skipped: reason]`
    - `[open]`
 5. If you patched anything, create one commit for that round and push it.
-6. Re-verify that upstream matches local `HEAD` before the next round.
+6. Re-verify that upstream matches local `HEAD` before proceeding.
 7. Update the diary for the round.
 
-Stopping conditions:
-- Codex emits `## Verdict` with `APPROVE` AND the round's `## Critical` and `## High` sections are empty -> loop ends, treat the run as approved.
-- 3 rounds have run -> loop ends regardless of verdict. Unresolved findings become `[open]`.
-- Any Codex failure mode (see Failure Handling below) -> stop immediately.
+Stop conditions:
+- Codex round completes (regardless of verdict). Proceed to the CodeRabbit iteration loop. Anything Codex flagged as Critical or High that you did not patch must be recorded `[open]` so the final PR summary surfaces it.
+- Any Codex failure mode (see Failure Handling below) -> stop immediately and do not proceed to the CodeRabbit iteration loop.
 
-Do not start a 4th round.
+Do not run a second Codex round. The CodeRabbit loop that follows is the iteration phase of this skill.
 
-If Codex emits `APPROVE` but Critical or High findings still exist, do not stop. Treat the approval as inconsistent, override it, and continue. Codex's verdict alone is not enough; the severity buckets must also be clean.
+## CodeRabbit Iteration Loop
+
+The CodeRabbit GitHub App auto-reviews every push to the PR. CodeRabbit does not return structured severity buckets or APPROVE/NEEDS FIXES verdicts — it just posts comments on the PR. The skill drives a loop: wait for the App's comments on the current `HEAD`, handle each comment, commit and push patches (which triggers the App to re-review the new `HEAD`), then wait again. The loop continues until CodeRabbit posts no new actionable comments on the latest `HEAD`.
+
+There is no preset round cap. The loop runs until CodeRabbit stops adding new comments on the latest pushed commit. The natural termination signal is the App's review pipeline finishing with no new inline comments tied to `HEAD`. Each round has a 15-minute per-round wait budget to bound runaway waits.
+
+CodeRabbit reviews PRs asynchronously. The skill reads those comments from the PR via `gh api`. There is no local CLI invocation.
+
+### Per-round flow
+
+Each CodeRabbit round:
+1. Record the current `HEAD` SHA. This is the commit the next App review must cover.
+2. Poll for the App's review of this commit (see "Wait for the CodeRabbit App review" below).
+3. Fetch the App's comments tied to this commit (see "Fetch the comments" below).
+4. If the fetched review has no actionable inline comments on this commit, the loop ends. Record the round in the diary with `(no new comments)`.
+5. Otherwise handle each comment (see "Handle the comments" below). Patch what should be patched.
+6. If any comment was addressed by a patch in this round, create one follow-up commit and push it. Re-verify upstream freshness. The new `HEAD` becomes the target for the next round.
+7. Update the diary for this round with each comment's status.
+8. Loop back to step 1 with the new `HEAD`.
+
+### Wait for the CodeRabbit App review
+
+Before fetching for a given round, the App must have actually reviewed the current `HEAD`. Poll the PR's review list until a `coderabbitai[bot]` review appears whose `commit_id` matches the recorded `HEAD`, or 15 minutes elapse.
+
+Polling rules:
+- Per-round wait budget: 15 minutes (`900000` ms).
+- Poll interval: 30 seconds.
+- Each poll must call `gh api repos/<owner>/<repo>/pulls/<number>/reviews` and inspect `[].user.login`, `[].commit_id`, and `[].submitted_at`.
+- Stop polling as soon as a `coderabbitai[bot]` review on the recorded `HEAD` is observed.
+- If the budget elapses with no eligible review for this `HEAD`, treat it as a missing review failure mode (see Failure handling below). Do not silently proceed and do not treat absence as approval.
+
+### Fetch the comments
+
+Once the App review is present, capture both surfaces of the App's review in a single non-interactive read:
+
+```bash
+gh api repos/<owner>/<repo>/pulls/<number>/reviews \
+  --jq '[.[] | select(.user.login == "coderabbitai[bot]")]' \
+  > _scratch/_reviews/coderabbit_<branch-safe>.round<N>.reviews.json
+
+gh api repos/<owner>/<repo>/pulls/<number>/comments \
+  --jq '[.[] | select(.user.login == "coderabbitai[bot]")]' \
+  > _scratch/_reviews/coderabbit_<branch-safe>.round<N>.comments.json
+```
+
+Rules:
+- The summary review body lives in `pulls/<n>/reviews`; the inline per-line comments live in `pulls/<n>/comments`. The inline list is what drives the iteration loop because that is where actionable findings live.
+- Filter strictly to `user.login == "coderabbitai[bot]"`. Do not include human reviewers or other bots.
+- For a given round, only the App comments tied to the current `HEAD` count. Older comments (already addressed or against earlier commits) are not re-raised by the App on a new commit; if they appear in your fetched JSON, scope them by their `commit_id` field to the current `HEAD`.
+- Capture raw JSON per round to `_scratch/_reviews/` for the diary's audit trail.
+- Do not pipe through any transform that could drop or reformat comments.
+
+### Handle the comments
+
+After a successful fetch:
+- Build one list of inline comments tied to the current `HEAD`. Each entry should carry file, line, and the comment body.
+- Read each comment conservatively. Err toward patching clearly valid comments rather than dismissing them.
+- For every CodeRabbit comment, decide exactly one status:
+  - `[patched]`
+  - `[skipped: not actionable]`
+  - `[skipped: reason]`
+  - `[open]`
+- Do not invent severity buckets for CodeRabbit comments. CodeRabbit does not emit reliable severity headers, and the skill does not assign them on its behalf.
+- Record the round in the diary under `## CodeRabbit Round N` as a flat list of comments with their status.
+
+### Loop exit
+
+The loop ends and you proceed to the final PR comment when:
+- The current round's fetch returned zero actionable inline comments tied to `HEAD`. The App's review pipeline has finished with nothing more to say on this commit. Record the round with `(no new comments)` and proceed.
+
+### Failure handling
+
+Stop the loop immediately and report the failure to the user on any of:
+- `gh api` exits non-zero (process failure).
+- No `coderabbitai[bot]` review for the current `HEAD` appears within the 15-minute per-round budget (missing review). Tell the user to confirm the CodeRabbit App is installed and active on the repo before retrying.
+- The fetched JSON cannot be parsed (malformed output).
+
+Do not synthesize a fake review. Do not fall back to a CLI. Do not silently treat "no findings yet" as "no findings."
+
+Rules:
+- If a CodeRabbit comment is skipped, the diary must state the concrete reason. Vague reasons like `[skipped: not needed]` are not acceptable.
+- If a CodeRabbit comment is impossible to act on because it is underspecified, malformed, or depends on information CodeRabbit did not provide, mark it `[skipped: reason]` and explain the missing information.
+- If a CodeRabbit comment looks valid but acting on it reveals product or scope ambiguity, stop and ask the user instead of guessing.
+- If a CodeRabbit comment was already addressed by the Codex round or by a prior CodeRabbit round, mark it `[skipped: already patched in <round>]` and reference the commit. The App usually will not re-raise once the commit it was tied to is no longer `HEAD`, but if it does, this skip handles it cleanly.
 
 ## Codex Prompt Contract
 
@@ -255,12 +266,12 @@ The prompt must include:
 - the current branch name
 - the PR number and PR URL
 - the repo/worktree path to review
-- the path to the CodeRabbit findings file (`_scratch/_reviews/coderabbit_<branch-safe>.json`) and a brief description of the severity mapping you applied
-- the CodeRabbit round status ledger from the diary, including every `[patched]`, `[skipped: ...]`, and `[open]` decision
 - an explicit request to review the current branch against `Goal`, `Accepted scope`, `Assumptions`, and `Validation approach`
 - an explicit instruction to respect `Out of scope` items and not treat them as missing work
 - an explicit request to flag unnecessary complexity, non-idiomatic code, duplicate abstractions, brittle shortcuts, and simpler existing repo patterns that should have been used
 - on Codex rounds 2 and 3, a short status summary of which Codex findings have already been resolved or skipped, so Codex does not re-litigate them
+
+Do not mention CodeRabbit or any CodeRabbit findings in the Codex prompt. CodeRabbit runs after Codex and is handled separately.
 
 Require this exact output shape:
 - `Critical`
@@ -288,18 +299,6 @@ Review target:
 Implementation contract:
 <contents of _scratch/_contracts/<branch>.md, or fallback spec text>
 
-CodeRabbit findings (already produced by a prior detached `cr review --agent --type committed --base <base>` run):
-<absolute path to _scratch/_reviews/coderabbit_<branch-safe>.json>
-
-CodeRabbit severities map: critical -> Critical, major/high -> High, minor/low/nitpick -> Low, anything ambiguous -> Uncertain.
-
-CodeRabbit round status:
-- [file:line] - description [patched in CodeRabbit round, commit abc123]
-- [file:line] - description [skipped in CodeRabbit round: reason]
-- [file:line] - description [open]
-
-Verify the CodeRabbit handling. Do not re-raise CodeRabbit findings already marked [patched] unless the patch is demonstrably wrong. Do not re-raise findings marked [skipped] unless the skip reason is wrong, incomplete, or contradicted by the code.
-
 Review against:
 - Goal
 - Accepted scope
@@ -310,7 +309,7 @@ Respect Out of scope items. Do not treat them as missing work.
 
 Also review implementation quality. Flag any case where the branch solved the problem in a sloppy, overcomplicated, non-idiomatic, or brittle way. Call out simpler existing repo patterns, helpers, abstractions, or integration points that should have been used instead.
 
-Return your own findings and any CodeRabbit handling issues that need more work as one unified review. Do not repeat CodeRabbit findings that were already patched or skipped with a valid reason. Review only the changes introduced on this branch. The `/code-review-parallel` command handles scoping.
+Review only the changes introduced on this branch. The `/code-review-parallel` command handles scoping.
 
 Give a brutally honest review of whether the current branch satisfies the contract and whether it used the simplest repo-idiomatic implementation path.
 
@@ -409,20 +408,20 @@ If the output is missing the requested section headings but does contain parseab
 
 ## Severity Ownership
 
-Severity comes from CodeRabbit and from `/code-review-parallel`, not from you.
+Severity comes from `/code-review-parallel` (Codex), not from you. CodeRabbit comments do not carry reliable severity headers and the skill does not assign them — CodeRabbit comments are tracked as a flat list with status.
 
 Your responsibilities are:
-- preserve CodeRabbit severity using the documented mapping into `Critical`, `High`, `Low`, `Uncertain`
-- preserve Codex severity when it already uses the requested buckets
-- when Codex emits `P0`/`P1`/`P2`/`P3`, normalize them using the mapping defined above without reinterpretation
+- preserve Codex severity when it already uses the `Critical`, `High`, `Low`, `Uncertain` buckets
+- when Codex emits `P0`/`P1`/`P2`/`P3`, normalize them using the mapping defined elsewhere in this skill without reinterpretation
 - decide what to patch
 - decide what to skip with a reason
-- mark anything still unresolved after the final allowed round as `[open]`
+- mark anything still unresolved as `[open]`
 
 Do not:
-- rename severity levels
+- rename Codex severity levels
 - collapse severity levels into custom buckets
 - re-rank findings just because you disagree with the emphasis
+- invent severity buckets for CodeRabbit comments
 
 ## Diary
 
@@ -438,27 +437,12 @@ Create `_scratch/_reviews` if needed.
 
 Use round-level sections, not per-finding lifecycle logs.
 
-Required structure:
+Required structure (one Codex round, then one section per CodeRabbit iteration round):
 
 ```md
 # Rocket Review Rabbit: <branch>
 
-## CodeRabbit Round
-### Verdict: NEEDS FIXES
-
-### Critical
-- [file:line] - description [patched] (commit abc123)
-
-### High
-- [file:line] - description [skipped: reason]
-
-### Low
-- [file:line] - description [open]
-
-### Uncertain
-- (none)
-
-## Rocket Review Rabbit Round 1
+## Codex Round
 ### Verdict: NEEDS FIXES
 
 ### Critical
@@ -472,17 +456,31 @@ Required structure:
 
 ### Uncertain
 - (none)
+
+## CodeRabbit Round 1
+### HEAD: abc123
+
+- [file:line] - description [patched] (commit def456)
+- [file:line] - description [skipped: reason]
+- [file:line] - description [open]
+
+## CodeRabbit Round 2
+### HEAD: def456
+
+(no new comments)
 ```
 
 Rules:
-- The `## CodeRabbit Round` section is written once after CodeRabbit findings are normalized and handled. It must include status decisions for every CodeRabbit finding.
-- Each `## Rocket Review Rabbit Round N` section is a Codex round, not the CodeRabbit round.
-- Preserve severity grouping exactly as each reviewer returned it, after the documented severity mapping for CodeRabbit.
+- The `## Codex Round` section is the single Codex review round, with Codex's severity grouping preserved.
+- Each `## CodeRabbit Round N` section is one CodeRabbit App review round, written in order as the CodeRabbit iteration loop runs. Include the `### HEAD: <sha>` line so it is clear which commit the App reviewed.
+- CodeRabbit rounds are a flat list of comments, not severity-grouped. Do not invent severity buckets for them.
+- For Codex, preserve severity grouping exactly as Codex returned it, after the documented severity mapping. If a severity group has no items, write `- (none)`.
+- For CodeRabbit, if the round produced no actionable inline comments tied to `HEAD`, write `(no new comments)` and proceed.
 - Keep each round self-contained.
-- If a severity group has no items, write `- (none)`.
 - Include the round commit hash when an item was patched in that round.
 - If a later round surfaces a new finding caused by an earlier round's patch, note that explicitly in the finding text instead of inventing a new status.
 - Do not claim a patch, skip, or open item unless it happened in that round.
+- The terminal CodeRabbit round must be the round that ended the loop with `(no new comments)`.
 
 ## Final PR Comment
 
@@ -496,17 +494,22 @@ Required shape:
 <details>
 <summary>Rocket Review Rabbit Summary</summary>
 
-**CodeRabbit runs:** 1
-**Codex rounds:** 2
-**Final Verdict:** APPROVE
+**Codex rounds:** 1
+**CodeRabbit rounds:** 2
 
-### Critical
+### Codex
+#### Critical
 - [file:line] - description [patched]
 
-### High
+#### High
 - [file:line] - description [skipped: reason]
 
-### Low
+#### Low
+- [file:line] - description [open]
+
+### CodeRabbit
+- [file:line] - description [patched]
+- [file:line] - description [skipped: reason]
 - [file:line] - description [open]
 
 </details>
@@ -516,11 +519,12 @@ Rules:
 - Wrap the whole PR comment body in a closed GitHub disclosure block using `<details>` and `<summary>Rocket Review Rabbit Summary</summary>`.
 - Do not add the `open` attribute; the disclosure must render collapsed by default.
 - No claim in the PR comment may be absent from the diary.
-- Preserve severity headings.
+- Preserve Codex's severity headings.
+- CodeRabbit comments render as a flat list, no severity headings.
 - Use `[patched]`, `[skipped: reason]`, and `[open]` exactly.
 - No padding. No compliments.
-- `**CodeRabbit runs:** 1` is always literal `1`. If it is anything else, you violated the single-pass rule.
-- `**Codex rounds:**` reflects the actual number of Codex rounds executed, between `1` and `3`.
+- `**Codex rounds:** 1` is always literal `1`. If it is anything else, you violated the single-round Codex rule.
+- `**CodeRabbit rounds:**` reflects the actual number of CodeRabbit iteration rounds executed, including the terminal round that produced `(no new comments)`.
 
 ## Linear Ticket Sync
 
@@ -555,23 +559,22 @@ Content requirements:
 ## Practical Sequence
 
 Use this order:
-1. Verify repo, branch, `gh`, `codex`, CodeRabbit CLI, and local repo rules.
+1. Verify repo, branch, `gh`, `codex`, and local repo rules.
 2. Make sure the review target is the current pushed branch state.
 3. Resolve the PR for the current branch, creating it non-interactively if needed.
 4. Check PR comments for an existing exact summary line `<summary>Rocket Review Rabbit Summary</summary>`; if found, stop and report `review already complete`.
-5. Resolve the PR base branch via `gh pr view --json baseRefName`.
-6. Run **exactly one** detached `cr review --agent --type committed --base <base>` pass. Capture JSON to `_scratch/_reviews/coderabbit_<branch-safe>.json`. Never run CodeRabbit again in this skill invocation.
-7. Normalize CodeRabbit severities, handle every CodeRabbit finding with `[patched]`, `[skipped: ...]`, or `[open]`, and record the result in the diary under `## CodeRabbit Round`.
-8. If the CodeRabbit round produced patches, create one CodeRabbit follow-up commit, push it, and re-verify upstream freshness.
-9. Build the Codex round 1 prompt with the implementation contract or fallback spec, branch, PR, repo path, CodeRabbit findings file path, CodeRabbit round status ledger, and `/code-review-parallel` instruction.
-10. Run Codex round 1 with `codex exec --dangerously-bypass-approvals-and-sandbox`.
-11. Update the diary for Codex round 1 after patch/skip decisions are made.
-12. If Codex round 1 verdict is `APPROVE` and Critical and High are empty, jump to step 16.
-13. If needed, commit and push Codex round 1 fixes, then re-verify upstream freshness.
-14. Run Codex round 2 with the CodeRabbit status ledger and prior Codex round status ledger included. Update the diary. If round 2 satisfies the approve condition, jump to step 16.
-15. Run Codex round 3 with the CodeRabbit status ledger and prior Codex round status ledger included. Update the diary. Anything still unresolved becomes `[open]`.
-16. Derive one final PR comment from the diary and post it.
-17. If a Linear ticket exists, update the ticket description with the managed contract/review tail.
+5. Build the Codex prompt with the implementation contract or fallback spec, branch, PR, repo path, and `/code-review-parallel` instruction. Do not mention CodeRabbit.
+6. Run the single Codex round with `codex exec --dangerously-bypass-approvals-and-sandbox`.
+7. Update the diary for the Codex round after patch/skip decisions are made. If anything was patched, commit and push, then re-verify upstream freshness.
+8. Enter the CodeRabbit iteration loop. For each round:
+   a. Record the current `HEAD` SHA.
+   b. Poll `gh api repos/<owner>/<repo>/pulls/<number>/reviews` for a `coderabbitai[bot]` review whose `commit_id` matches the recorded `HEAD`. Wait up to 15 minutes (`900000` ms) at 30-second intervals.
+   c. Fetch the App's review and inline comments via `gh api`, filtered to `user.login == "coderabbitai[bot]"`. Capture JSON to `_scratch/_reviews/coderabbit_<branch-safe>.round<N>.reviews.json` and `.round<N>.comments.json`.
+   d. Scope inline comments to the recorded `HEAD` via their `commit_id` field.
+   e. If no actionable inline comments are tied to this `HEAD`, record the round in the diary with `(no new comments)` and exit the loop.
+   f. Otherwise handle each comment with `[patched]`, `[skipped: ...]`, or `[open]`, record the round in the diary, commit and push any patches, re-verify upstream freshness, and continue the loop with the new `HEAD`.
+9. Derive one final PR comment from the diary and post it.
+10. If a Linear ticket exists, update the ticket description with the managed contract/review tail.
 
 ## Stop Conditions
 
@@ -583,9 +586,10 @@ Stop immediately and report back instead of guessing if:
 - no PR exists and deterministic `gh pr create --head ... --title ... --body-file ...` also fails
 - an existing PR's head branch does not match the checked-out branch
 - repo-local PR title rules cannot be satisfied from the branch commit history
-- the CodeRabbit CLI is unavailable or unauthenticated
-- the CodeRabbit run exits non-zero, is rate-limited, times out after the full `1800000` ms budget, is prematurely aborted, or returns unparseable JSON
 - `codex` is unavailable
 - a Codex round exits non-zero, is prematurely aborted, truly times out after the full `900000` ms budget, or returns malformed output
 - the spec was not provided in a form you can hand to Codex
 - the working tree contains unclear changes you cannot safely include in the review
+- any CodeRabbit iteration round's `gh api` call exits non-zero
+- no `coderabbitai[bot]` review for the current `HEAD` appears on the PR within a single round's 15-minute wait budget; ask the user to confirm the CodeRabbit App is installed and active on the repo before retrying
+- any fetched CodeRabbit JSON is not parseable
