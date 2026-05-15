@@ -30,6 +30,10 @@
       "Bash(mvn:*)",
       "Bash(gh:*)",
       "Bash(git:*)",
+      "Bash(git add:*)",
+      "Bash(git add)",
+      "Bash(git commit:*)",
+      "Bash(git commit)",
       "Bash(jest:*)",
       "Bash(pytest:*)",
       "Bash(eslint:*)",
@@ -52,10 +56,6 @@
       "Bash(rm)",
       "Bash(rm -rf:*)",
       "Bash(rm -rf /)",
-      "Bash(git add:*)",
-      "Bash(git add)",
-      "Bash(git commit:*)",
-      "Bash(git commit)",
       "Bash(git push:*)",
       "Bash(git push)",
       "Bash(dd if=:*)",
@@ -63,7 +63,8 @@
       "Bash(wget:*)",
       "Bash(mkfs:*)",
       "Bash(docker rm -f:*)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
   "model": "opus",
   "hooks": {
@@ -110,5 +111,7 @@
     "mode": "hold"
   },
   "skipDangerousModePermissionPrompt": true,
-  "voiceEnabled": true
+  "agentPushNotifEnabled": true,
+  "voiceEnabled": true,
+  "skipAutoPermissionPrompt": true
 }
