@@ -185,12 +185,13 @@ CodeRabbit reviews PRs asynchronously. The skill reads those comments from the P
 Each CodeRabbit round:
 1. Record the current `HEAD` SHA. This is the commit the next App review must cover.
 2. Poll for the App's review of this commit (see "Wait for the CodeRabbit App review" below).
-3. Fetch the App's comments tied to this commit (see "Fetch the comments" below).
+3. Fetch the App's comments tied to this commit (see "Fetch the comments" below). Also fetch the matching `reviewThreads` via GraphQL so you have a `databaseId -> threadId` mapping for replies and resolves.
 4. If the fetched review has no actionable inline comments on this commit, the loop ends. Record the round in the diary with `(no new comments)`.
 5. Otherwise handle each comment (see "Handle the comments" below). Patch what should be patched.
 6. If any comment was addressed by a patch in this round, create one follow-up commit and push it. Re-verify upstream freshness. The new `HEAD` becomes the target for the next round.
-7. Update the diary for this round with each comment's status.
-8. Loop back to step 1 with the new `HEAD`.
+7. Reply to every handled comment thread and resolve the patched/skipped threads (see "Reply to each comment thread" below). The reply for a patched comment must reference the follow-up commit's short SHA.
+8. Update the diary for this round with each comment's status and reply outcome.
+9. Loop back to step 1 with the new `HEAD`.
 
 ### Wait for the CodeRabbit App review
 
@@ -227,7 +228,7 @@ Rules:
 ### Handle the comments
 
 After a successful fetch:
-- Build one list of inline comments tied to the current `HEAD`. Each entry should carry file, line, and the comment body.
+- Build one list of inline comments tied to the current `HEAD`. Each entry should carry the comment id, thread id, file, line, and the comment body.
 - Read each comment conservatively. Err toward patching clearly valid comments rather than dismissing them.
 - For every CodeRabbit comment, decide exactly one status:
   - `[patched]`
@@ -236,6 +237,28 @@ After a successful fetch:
   - `[open]`
 - Do not invent severity buckets for CodeRabbit comments. CodeRabbit does not emit reliable severity headers, and the skill does not assign them on its behalf.
 - Record the round in the diary under `## CodeRabbit Round N` as a flat list of comments with their status.
+
+### Reply to each comment thread
+
+Every comment you address — whether patched, skipped, or explicitly left open — must get a reply on its thread, and patched/skipped threads must be resolved. Do not leave a comment thread silent. CodeRabbit re-reviews on push but the App will not know whether a human/agent has decided on a thread unless the thread is resolved.
+
+For each handled comment, in order:
+1. Post a reply to the thread via `gh api repos/<owner>/<repo>/pulls/<number>/comments/<comment_id>/replies -X POST -f body=...`. Use one of these reply shapes verbatim so the audit trail is consistent:
+   - `[patched]`: `Patched in <short-sha>. <one-sentence summary of the change>.`
+   - `[skipped: ...]`: `Skipped: <concrete reason>.`
+   - `[open]`: `Left open: <why we haven't acted yet>.`
+2. For `[patched]` and `[skipped: ...]`, resolve the thread via GraphQL:
+   ```bash
+   gh api graphql -f query='mutation($id: ID!) { resolveReviewThread(input: { threadId: $id }) { thread { isResolved } } }' -F id=<thread_id>
+   ```
+   Get the thread id by querying the PR's `reviewThreads` once at the start of the round and joining each `comments.nodes[].databaseId` back to the inline comment id you handled. For `[open]`, do not resolve the thread; the open status is itself a signal that the discussion is unfinished.
+3. Record the reply outcome in the diary entry for that comment (append `(replied, resolved)` or `(replied, open)`).
+
+Reply rules:
+- Replies are facts, not justifications. Do not argue with CodeRabbit; if you disagree, state the concrete reason once and resolve.
+- Replies must reference the commit by short SHA when the status is `[patched]`. The SHA must match the commit that contains the patch.
+- Never delete a CodeRabbit comment thread. Resolving is the only acceptable action besides leaving it open.
+- If `gh api` reply or `gh api graphql` resolve fails, stop the loop, report the failure, and do not synthesize that the reply or resolution happened.
 
 ### Loop exit
 
