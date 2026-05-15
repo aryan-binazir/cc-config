@@ -10,7 +10,7 @@
 - Before major work, check for project-specific agent rules (CLAUDE.md, .cursorrules, AGENTS.md, etc).
 
 # Self-Improvement Loop
-- After ANY correction from the user: update _scratch/_lessons/lessons.md with the pattern.
+- After ANY correction from the user: if the current workspace is inside a git repo, update _scratch/_lessons/lessons.md with the pattern. If it is not inside a git repo, do not create _scratch.
 - Write rules for yourself that prevent the same mistake.
 - Ruthlessly iterate on these lessons until mistake rate drops.
 - Review lessons at session start for relevant project.
