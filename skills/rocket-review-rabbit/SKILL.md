@@ -149,11 +149,11 @@ review already complete
 
 Do not add diary resume logic. Treat this as the only completion shortcut.
 
-## Codex Review (Single Round)
+## Codex Review
 
-Codex runs exactly once, before the CodeRabbit iteration loop. It reviews the current pushed branch state against the implementation contract.
+Codex runs up to 3 rounds before the CodeRabbit iteration loop. It reviews the current pushed branch state against the implementation contract, stopping early when Codex explicitly approves.
 
-The round:
+Each round:
 1. Run detached Codex review against the current pushed branch state. Pass it the implementation contract only.
 2. Read the findings conservatively. Err toward patching rather than dismissing.
 3. Patch what should be fixed.
@@ -167,10 +167,9 @@ The round:
 7. Update the diary for the round.
 
 Stop conditions:
-- Codex round completes (regardless of verdict). Proceed to the CodeRabbit iteration loop. Anything Codex flagged as Critical or High that you did not patch must be recorded `[open]` so the final PR summary surfaces it.
+- Codex explicitly approves -> stop Codex rounds early and proceed to the CodeRabbit iteration loop.
+- Codex reaches 3 completed rounds -> proceed to the CodeRabbit iteration loop. Anything Codex flagged as Critical or High that you did not patch must be recorded `[open]` so the final PR summary surfaces it.
 - Any Codex failure mode (see Failure Handling below) -> stop immediately and do not proceed to the CodeRabbit iteration loop.
-
-Do not run a second Codex round. The CodeRabbit loop that follows is the iteration phase of this skill.
 
 ## CodeRabbit Iteration Loop
 
