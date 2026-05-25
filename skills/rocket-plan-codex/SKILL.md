@@ -1,13 +1,13 @@
 ---
 name: rocket-plan-codex
-description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR, using Cursor's Composer 2.5 (via `cursor-agent`) as the external pre-approval critic. Use this when the user wants the agent to grill them with hard clarification questions until the contract is unambiguous, settle a goal and implementation contract, run a Composer 2.5 plan critique before approval, update the Linear ticket when applicable, drive implementation strictly test-first, push, and then hand off in-session to $rocket-review-bugbot without further babysitting.
+description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR, using Cursor's Composer 2.5 (via `cursor-agent`) as the external pre-approval critic. Use this when the user wants the agent to grill them with hard clarification questions until the contract is unambiguous, settle a goal and implementation contract, run a Composer 2.5 plan critique before approval, update the Linear ticket when applicable, drive implementation strictly test-first, push, and then hand off in-session to $rocket-review-composer without further babysitting.
 ---
 
 # Rocket Plan (Composer 2.5 critic)
 
 Use this skill when the user wants an end-to-end implementation flow with **Composer 2.5** (via `cursor-agent`) as the external pre-approval critic.
 
-The pre-approval plan critique is run against `cursor-agent` (Composer 2.5). It hands off to `$rocket-review-bugbot` for the final review loop.
+The pre-approval plan critique is run against `cursor-agent` (Composer 2.5). It hands off to `$rocket-review-composer` for the final review loop.
 
 This skill is strict on purpose:
 - It does not skip preflight checks.
@@ -16,7 +16,7 @@ This skill is strict on purpose:
 - It does not silently guess past unresolved ambiguity.
 - It does not soften the clarification phase. It grills the user on every branch where the spec is ambiguous, until the contract is unambiguous.
 - It does not write production code without a failing test driving it. Test-first is mandatory.
-- It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket-review-bugbot`.
+- It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket-review-composer`.
 
 ## Accepted Inputs
 
@@ -189,7 +189,7 @@ The drafted plan must:
 - explain why the approach is the simplest repo-idiomatic path and which existing patterns or integration points it will use
 - include a strict test-first validation plan that lists each failing test in the order it will be written, the production change it will force into existence, and the command used to run it; tests-after, all-upfront, or alongside-the-code patterns are not acceptable
 - include validation and commit checkpoints aligned to red-green-refactor cycles when practical
-- explicitly include `$rocket-review-bugbot` as the final step
+- explicitly include `$rocket-review-composer` as the final step
 
 Ask Composer 2.5 for a plan critique before presenting the plan for user approval.
 
@@ -401,19 +401,19 @@ When implementation is complete:
 1. Ensure all intended changes are committed.
 2. Push the current branch.
 3. Verify that the upstream branch exists and matches local `HEAD`.
-4. Invoke `$rocket-review-bugbot` as a skill in the same session.
+4. Invoke `$rocket-review-composer` as a skill in the same session.
 
 The handoff rules are strict:
-- Do not reimplement `rocket-review-bugbot` inline.
-- Do not shell out to a separate `rocket-review-bugbot` process.
+- Do not reimplement `rocket-review-composer` inline.
+- Do not shell out to a separate `rocket-review-composer` process.
 - Do not describe this as starting a new session.
 - Do not reconstruct the contract from memory if the file already exists.
-- Point `$rocket-review-bugbot` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
+- Point `$rocket-review-composer` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
 - You may include the Linear ticket reference or raw spec only as secondary context.
 
-If the final push fails, the upstream branch does not exist, or upstream does not match local `HEAD`, stop and report the blocker instead of invoking `$rocket-review-bugbot`.
+If the final push fails, the upstream branch does not exist, or upstream does not match local `HEAD`, stop and report the blocker instead of invoking `$rocket-review-composer`.
 
-If `$rocket-review-bugbot` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
+If `$rocket-review-composer` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
 
 ## What This Skill Does Not Do
 
@@ -425,4 +425,4 @@ If `$rocket-review-bugbot` cannot run, stop and report the exact blocker. Do not
 - It does not silently guess past unresolved ambiguity.
 - It does not skip or soften the grilling round to be polite or efficient.
 - It does not allow tests-after, all-upfront, or alongside-the-code patterns. Tests drive each production change.
-- It does not treat `$rocket-review-bugbot` as an external session handoff. It is an in-session skill invocation.
+- It does not treat `$rocket-review-composer` as an external session handoff. It is an in-session skill invocation.
