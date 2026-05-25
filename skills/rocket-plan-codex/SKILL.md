@@ -1,13 +1,13 @@
 ---
 name: rocket-plan-codex
-description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR, using Codex as the external pre-approval critic instead of Claude. Use this when the user wants the agent to grill them with hard clarification questions until the contract is unambiguous, settle a goal and implementation contract, run a Codex plan critique before approval, update the Linear ticket when applicable, drive implementation strictly test-first, push, and then hand off in-session to $rocket-review-codex without further babysitting.
+description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR, using Cursor's Composer 2.5 (via `cursor-agent`) as the external pre-approval critic. Use this when the user wants the agent to grill them with hard clarification questions until the contract is unambiguous, settle a goal and implementation contract, run a Composer 2.5 plan critique before approval, update the Linear ticket when applicable, drive implementation strictly test-first, push, and then hand off in-session to $rocket-review-bugbot without further babysitting.
 ---
 
-# Rocket Plan (Codex critic)
+# Rocket Plan (Composer 2.5 critic)
 
-Use this skill when the user wants an end-to-end implementation flow with **Codex** as the external pre-approval critic, not Claude.
+Use this skill when the user wants an end-to-end implementation flow with **Composer 2.5** (via `cursor-agent`) as the external pre-approval critic.
 
-This is the Codex-critic variant of `$rocket-plan`. The flow is identical except that the pre-approval plan critique is run against `codex` instead of `claude`. If the user wants Claude as the pre-approval critic, use `$rocket-plan` instead.
+The pre-approval plan critique is run against `cursor-agent` (Composer 2.5). It hands off to `$rocket-review-bugbot` for the final review loop.
 
 This skill is strict on purpose:
 - It does not skip preflight checks.
@@ -16,7 +16,7 @@ This skill is strict on purpose:
 - It does not silently guess past unresolved ambiguity.
 - It does not soften the clarification phase. It grills the user on every branch where the spec is ambiguous, until the contract is unambiguous.
 - It does not write production code without a failing test driving it. Test-first is mandatory.
-- It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket-review-codex`.
+- It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket-review-bugbot`.
 
 ## Accepted Inputs
 
@@ -44,7 +44,7 @@ Required checks:
 git rev-parse --is-inside-work-tree
 command -v gh
 gh auth status
-command -v codex
+command -v cursor-agent
 git ls-remote --exit-code
 ```
 
@@ -52,8 +52,9 @@ Additional required checks:
 - Confirm the current working directory is the intended repo/worktree.
 - If the input is a Linear ticket ID or URL, fetch the full ticket and stop if it is inaccessible.
 - Inspect `git status -sb` before implementation. If unrelated dirty changes are present and cannot be safely separated, stop and report that instead of guessing.
+- `cursor-agent` must be authenticated. The critic call assumes Composer 2.5 is the active model in the user's Cursor account. If your account defaults to a different model, set the model via `cursor-agent` configuration or `--model` flag before running this skill.
 
-Do not proceed with a degraded workflow. Missing auth, missing `codex`, unreachable remotes, or inaccessible Linear tickets are hard stops.
+Do not proceed with a degraded workflow. Missing auth, missing `cursor-agent`, unreachable remotes, or inaccessible Linear tickets are hard stops.
 
 ## Phase 1: Spec Intake and Clarification
 
@@ -172,15 +173,15 @@ Then:
 
 Do not begin implementation until the contract is settled.
 
-### Pre-Approval Codex critique
+### Pre-Approval Composer 2.5 critique
 
 After the contract is settled and before presenting the plan for user approval:
 1. Draft the execution plan.
-2. Run the Codex plan critique below.
+2. Run the Composer 2.5 plan critique below.
 3. Revise the plan as needed.
 4. Stop if unresolved material concerns remain that require user input.
 
-Do not call `update_plan`, present the plan for approval, update Linear, create or switch branches, persist the contract, or begin implementation until the Codex critique loop is complete.
+Do not call `update_plan`, present the plan for approval, update Linear, create or switch branches, persist the contract, or begin implementation until the Composer 2.5 critique loop is complete.
 
 The drafted plan must:
 - restate the finalized implementation contract
@@ -188,32 +189,32 @@ The drafted plan must:
 - explain why the approach is the simplest repo-idiomatic path and which existing patterns or integration points it will use
 - include a strict test-first validation plan that lists each failing test in the order it will be written, the production change it will force into existence, and the command used to run it; tests-after, all-upfront, or alongside-the-code patterns are not acceptable
 - include validation and commit checkpoints aligned to red-green-refactor cycles when practical
-- explicitly include `$rocket-review-codex` as the final step
+- explicitly include `$rocket-review-bugbot` as the final step
 
-Ask Codex for a plan critique before presenting the plan for user approval.
+Ask Composer 2.5 for a plan critique before presenting the plan for user approval.
 
 Rules:
-- Run Codex after the user clarification round has settled the contract and after you have drafted the execution plan.
-- Run the first Codex plan critique before user approval, then revise the plan to address material concerns.
-- Run follow-up Codex critique rounds only while there are unresolved material concerns about overengineering, codebase fit, validation, scope, or risky assumptions. Do not loop on style preferences, wording, or non-blocking taste comments.
-- Cap plan critique at 3 total Codex rounds unless the user explicitly asks for more. If material concerns remain after the cap, present the unresolved concerns to the user instead of continuing the loop.
-- Do not ask Codex to implement anything.
-- Ask Codex to review the contract and proposed plan for overengineering, avoidable complexity, missing simpler codebase-native approaches, violations of repo-local conventions, weak test strategy, hidden scope expansion, and risky assumptions.
+- Run Composer 2.5 after the user clarification round has settled the contract and after you have drafted the execution plan.
+- Run the first Composer 2.5 plan critique before user approval, then revise the plan to address material concerns.
+- Run follow-up Composer 2.5 critique rounds only while there are unresolved material concerns about overengineering, codebase fit, validation, scope, or risky assumptions. Do not loop on style preferences, wording, or non-blocking taste comments.
+- Cap plan critique at 3 total Composer 2.5 rounds unless the user explicitly asks for more. If material concerns remain after the cap, present the unresolved concerns to the user instead of continuing the loop.
+- Do not ask Composer 2.5 to implement anything.
+- Ask Composer 2.5 to review the contract and proposed plan for overengineering, avoidable complexity, missing simpler codebase-native approaches, violations of repo-local conventions, weak test strategy, hidden scope expansion, and risky assumptions.
 - Include the repo/worktree path, branch, relevant ticket/spec, contract, proposed execution plan, and validation plan.
-- If Codex identifies a clearly better simpler approach, revise the plan before showing it to the user.
-- If Codex raises a real ambiguity that changes scope or user-facing behavior, ask the user before proceeding.
-- If Codex raises feedback that seems potentially correct but depends on product intent, user preference, risk tolerance, rollout expectations, or another judgment the user can reasonably decide, ask the user before accepting or rejecting it.
+- If Composer 2.5 identifies a clearly better simpler approach, revise the plan before showing it to the user.
+- If Composer 2.5 raises a real ambiguity that changes scope or user-facing behavior, ask the user before proceeding.
+- If Composer 2.5 raises feedback that seems potentially correct but depends on product intent, user preference, risk tolerance, rollout expectations, or another judgment the user can reasonably decide, ask the user before accepting or rejecting it.
 - For every follow-up critique after round 1, include a prior-feedback ledger in the prompt:
-  - accepted Codex recommendations and how the plan changed
-  - rejected Codex recommendations and why you are not willing to accept them
-  - unresolved concerns that still need Codex to re-check
-- If you intentionally reject Codex's advice, state the reason in the user-visible plan.
-- Allow up to the full 15-minute budget for the Codex plan critique: `900000` ms. Do not stop early just because Codex has been quiet for a few minutes. If the critique exceeds the full budget, treat it as a timeout failure and report the blocker instead of silently skipping it.
+  - accepted Composer 2.5 recommendations and how the plan changed
+  - rejected Composer 2.5 recommendations and why you are not willing to accept them
+  - unresolved concerns that still need Composer 2.5 to re-check
+- If you intentionally reject Composer 2.5's advice, state the reason in the user-visible plan.
+- Allow up to the full 15-minute budget for the Composer 2.5 plan critique: `900000` ms. Do not stop early just because Composer 2.5 has been quiet for a few minutes. If the critique exceeds the full budget, treat it as a timeout failure and report the blocker instead of silently skipping it.
 
 Use a prompt equivalent to:
 
 ```text
-You are Codex advising the implementing agent before implementation starts.
+You are Composer 2.5 advising the implementing agent before implementation starts.
 
 Review target:
 - Repo/worktree: <absolute path>
@@ -229,13 +230,13 @@ Proposed execution plan:
 Validation plan:
 <tests and commands>
 
-Prior Codex feedback ledger, for follow-up rounds only:
+Prior Composer 2.5 feedback ledger, for follow-up rounds only:
 - Accepted:
   - <recommendation and plan change>
 - Rejected:
   - <recommendation and reason it was not accepted>
 - Still unresolved:
-  - <concern Codex should re-check>
+  - <concern Composer 2.5 should re-check>
 
 Give brutally honest planning feedback before code is written.
 
@@ -256,9 +257,21 @@ Return:
 No implementation. No compliments. No padding.
 ```
 
-### Planning approval gate after Codex critique
+Invoke the critique via `cursor-agent` in non-interactive print mode. Do not pass `--force`/`--yolo`; the critique must be read-only and must not edit files. A heredoc keeps quoting safe:
 
-**important** After the Codex critique loop is complete and before implementation starts, call `update_plan` and present the revised plan back to the user for feedback. Stop there until the user explicitly approves the plan. Do not claim that the skill can switch collaboration modes by itself; the requirement is the visible planning approval gate. Do not run another Codex plan critique after presenting the plan unless the user explicitly asks for one.
+```bash
+PROMPT=$(cat <<'EOF'
+...
+EOF
+)
+cursor-agent -p "$PROMPT"
+```
+
+The model selection comes from the user's Cursor account. This skill assumes Composer 2.5 is the active default; if your account routes to a different model, set `--model` explicitly (use the Cursor-published identifier for Composer 2.5) or fix the account default before continuing.
+
+### Planning approval gate after Composer 2.5 critique
+
+**important** After the Composer 2.5 critique loop is complete and before implementation starts, call `update_plan` and present the revised plan back to the user for feedback. Stop there until the user explicitly approves the plan. Do not claim that the skill can switch collaboration modes by itself; the requirement is the visible planning approval gate. Do not run another Composer 2.5 plan critique after presenting the plan unless the user explicitly asks for one.
 
 Do not edit files, update Linear, create or switch branches, persist the contract, or begin implementation until the user explicitly approves the revised plan.
 
@@ -388,19 +401,19 @@ When implementation is complete:
 1. Ensure all intended changes are committed.
 2. Push the current branch.
 3. Verify that the upstream branch exists and matches local `HEAD`.
-4. Invoke `$rocket-review-codex` as a skill in the same session.
+4. Invoke `$rocket-review-bugbot` as a skill in the same session.
 
 The handoff rules are strict:
-- Do not reimplement `rocket-review-codex` inline.
-- Do not shell out to a separate `rocket-review-codex` process.
+- Do not reimplement `rocket-review-bugbot` inline.
+- Do not shell out to a separate `rocket-review-bugbot` process.
 - Do not describe this as starting a new session.
 - Do not reconstruct the contract from memory if the file already exists.
-- Point `$rocket-review-codex` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
+- Point `$rocket-review-bugbot` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
 - You may include the Linear ticket reference or raw spec only as secondary context.
 
-If the final push fails, the upstream branch does not exist, or upstream does not match local `HEAD`, stop and report the blocker instead of invoking `$rocket-review-codex`.
+If the final push fails, the upstream branch does not exist, or upstream does not match local `HEAD`, stop and report the blocker instead of invoking `$rocket-review-bugbot`.
 
-If `$rocket-review-codex` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
+If `$rocket-review-bugbot` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
 
 ## What This Skill Does Not Do
 
@@ -412,5 +425,4 @@ If `$rocket-review-codex` cannot run, stop and report the exact blocker. Do not 
 - It does not silently guess past unresolved ambiguity.
 - It does not skip or soften the grilling round to be polite or efficient.
 - It does not allow tests-after, all-upfront, or alongside-the-code patterns. Tests drive each production change.
-- It does not treat `$rocket-review-codex` as an external session handoff. It is an in-session skill invocation.
-- It does not run a Claude pre-approval plan critique. Use `$rocket-plan` for the Claude-critic flow.
+- It does not treat `$rocket-review-bugbot` as an external session handoff. It is an in-session skill invocation.
