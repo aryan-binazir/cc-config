@@ -93,7 +93,8 @@
     "typescript-lsp@claude-plugins-official": true,
     "github@claude-plugins-official": true,
     "basecamp@37signals": true,
-    "notion@claude-plugins-official": true
+    "notion@claude-plugins-official": true,
+    "lua-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "37signals": {
