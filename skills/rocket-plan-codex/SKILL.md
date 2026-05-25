@@ -1,13 +1,13 @@
 ---
 name: rocket-plan-codex
-description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR, using Cursor's Composer 2.5 (via `cursor-agent`) as the external pre-approval critic. Use this when the user wants the agent to grill them with hard clarification questions until the contract is unambiguous, settle a goal and implementation contract, run a Composer 2.5 plan critique before approval, update the Linear ticket when applicable, drive implementation strictly test-first, push, and then hand off in-session to $rocket-review-composer without further babysitting.
+description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR, using Composer (via `cursor-agent`) as the external pre-approval critic. Use this when the user wants the agent to grill them with hard clarification questions until the contract is unambiguous, settle a goal and implementation contract, run a Composer's plan critique before approval, update the Linear ticket when applicable, drive implementation strictly test-first, push, and then hand off in-session to $rocket-review-composer without further babysitting.
 ---
 
-# Rocket Plan (Composer 2.5 critic)
+# Rocket Plan (Composer critic)
 
-Use this skill when the user wants an end-to-end implementation flow with **Composer 2.5** (via `cursor-agent`) as the external pre-approval critic.
+Use this skill when the user wants an end-to-end implementation flow with **Composer** (via `cursor-agent`) as the external pre-approval critic.
 
-The pre-approval plan critique is run against `cursor-agent` (Composer 2.5). It hands off to `$rocket-review-composer` for the final review loop.
+The pre-approval plan critique is run against `cursor-agent` (Composer). It hands off to `$rocket-review-composer` for the final review loop.
 
 This skill is strict on purpose:
 - It does not skip preflight checks.
@@ -52,7 +52,7 @@ Additional required checks:
 - Confirm the current working directory is the intended repo/worktree.
 - If the input is a Linear ticket ID or URL, fetch the full ticket and stop if it is inaccessible.
 - Inspect `git status -sb` before implementation. If unrelated dirty changes are present and cannot be safely separated, stop and report that instead of guessing.
-- `cursor-agent` must be authenticated. The critic call assumes Composer 2.5 is the active model in the user's Cursor account. If your account defaults to a different model, set the model via `cursor-agent` configuration or `--model` flag before running this skill.
+- `cursor-agent` must be authenticated. The critic call assumes Composer is the active model in the user's Cursor account. If your account defaults to a different model, set the model via `cursor-agent` configuration or `--model` flag before running this skill.
 
 Do not proceed with a degraded workflow. Missing auth, missing `cursor-agent`, unreachable remotes, or inaccessible Linear tickets are hard stops.
 
@@ -173,15 +173,15 @@ Then:
 
 Do not begin implementation until the contract is settled.
 
-### Pre-Approval Composer 2.5 critique
+### Pre-Approval Composer critique
 
 After the contract is settled and before presenting the plan for user approval:
 1. Draft the execution plan.
-2. Run the Composer 2.5 plan critique below.
+2. Run the Composer plan critique below.
 3. Revise the plan as needed.
 4. Stop if unresolved material concerns remain that require user input.
 
-Do not call `update_plan`, present the plan for approval, update Linear, create or switch branches, persist the contract, or begin implementation until the Composer 2.5 critique loop is complete.
+Do not call `update_plan`, present the plan for approval, update Linear, create or switch branches, persist the contract, or begin implementation until the Composer critique loop is complete.
 
 The drafted plan must:
 - restate the finalized implementation contract
@@ -191,30 +191,30 @@ The drafted plan must:
 - include validation and commit checkpoints aligned to red-green-refactor cycles when practical
 - explicitly include `$rocket-review-composer` as the final step
 
-Ask Composer 2.5 for a plan critique before presenting the plan for user approval.
+Ask Composer for a plan critique before presenting the plan for user approval.
 
 Rules:
-- Run Composer 2.5 after the user clarification round has settled the contract and after you have drafted the execution plan.
-- Run the first Composer 2.5 plan critique before user approval, then revise the plan to address material concerns.
-- Run follow-up Composer 2.5 critique rounds only while there are unresolved material concerns about overengineering, codebase fit, validation, scope, or risky assumptions. Do not loop on style preferences, wording, or non-blocking taste comments.
-- Cap plan critique at 3 total Composer 2.5 rounds unless the user explicitly asks for more. If material concerns remain after the cap, present the unresolved concerns to the user instead of continuing the loop.
-- Do not ask Composer 2.5 to implement anything.
-- Ask Composer 2.5 to review the contract and proposed plan for overengineering, avoidable complexity, missing simpler codebase-native approaches, violations of repo-local conventions, weak test strategy, hidden scope expansion, and risky assumptions.
+- Run Composer after the user clarification round has settled the contract and after you have drafted the execution plan.
+- Run the first Composer plan critique before user approval, then revise the plan to address material concerns.
+- Run follow-up Composer critique rounds only while there are unresolved material concerns about overengineering, codebase fit, validation, scope, or risky assumptions. Do not loop on style preferences, wording, or non-blocking taste comments.
+- Cap plan critique at 3 total Composer rounds unless the user explicitly asks for more. If material concerns remain after the cap, present the unresolved concerns to the user instead of continuing the loop.
+- Do not ask Composer to implement anything.
+- Ask Composer to review the contract and proposed plan for overengineering, avoidable complexity, missing simpler codebase-native approaches, violations of repo-local conventions, weak test strategy, hidden scope expansion, and risky assumptions.
 - Include the repo/worktree path, branch, relevant ticket/spec, contract, proposed execution plan, and validation plan.
-- If Composer 2.5 identifies a clearly better simpler approach, revise the plan before showing it to the user.
-- If Composer 2.5 raises a real ambiguity that changes scope or user-facing behavior, ask the user before proceeding.
-- If Composer 2.5 raises feedback that seems potentially correct but depends on product intent, user preference, risk tolerance, rollout expectations, or another judgment the user can reasonably decide, ask the user before accepting or rejecting it.
+- If Composer identifies a clearly better simpler approach, revise the plan before showing it to the user.
+- If Composer raises a real ambiguity that changes scope or user-facing behavior, ask the user before proceeding.
+- If Composer raises feedback that seems potentially correct but depends on product intent, user preference, risk tolerance, rollout expectations, or another judgment the user can reasonably decide, ask the user before accepting or rejecting it.
 - For every follow-up critique after round 1, include a prior-feedback ledger in the prompt:
-  - accepted Composer 2.5 recommendations and how the plan changed
-  - rejected Composer 2.5 recommendations and why you are not willing to accept them
-  - unresolved concerns that still need Composer 2.5 to re-check
-- If you intentionally reject Composer 2.5's advice, state the reason in the user-visible plan.
-- Allow up to the full 15-minute budget for the Composer 2.5 plan critique: `900000` ms. Do not stop early just because Composer 2.5 has been quiet for a few minutes. If the critique exceeds the full budget, treat it as a timeout failure and report the blocker instead of silently skipping it.
+  - accepted Composer recommendations and how the plan changed
+  - rejected Composer recommendations and why you are not willing to accept them
+  - unresolved concerns that still need Composer to re-check
+- If you intentionally reject Composer's advice, state the reason in the user-visible plan.
+- Allow up to the full 15-minute budget for the Composer plan critique: `900000` ms. Do not stop early just because Composer has been quiet for a few minutes. If the critique exceeds the full budget, treat it as a timeout failure and report the blocker instead of silently skipping it.
 
 Use a prompt equivalent to:
 
 ```text
-You are Composer 2.5 advising the implementing agent before implementation starts.
+You are Composer advising the implementing agent before implementation starts.
 
 Review target:
 - Repo/worktree: <absolute path>
@@ -230,13 +230,13 @@ Proposed execution plan:
 Validation plan:
 <tests and commands>
 
-Prior Composer 2.5 feedback ledger, for follow-up rounds only:
+Prior Composer feedback ledger, for follow-up rounds only:
 - Accepted:
   - <recommendation and plan change>
 - Rejected:
   - <recommendation and reason it was not accepted>
 - Still unresolved:
-  - <concern Composer 2.5 should re-check>
+  - <concern Composer should re-check>
 
 Give brutally honest planning feedback before code is written.
 
@@ -267,11 +267,11 @@ EOF
 cursor-agent -p "$PROMPT"
 ```
 
-The model selection comes from the user's Cursor account. This skill assumes Composer 2.5 is the active default; if your account routes to a different model, set `--model` explicitly (use the Cursor-published identifier for Composer 2.5) or fix the account default before continuing.
+The model selection comes from the user's Cursor account. This skill assumes Composer is the active default; if your account routes to a different model, set `--model` explicitly or fix the account default before continuing.
 
-### Planning approval gate after Composer 2.5 critique
+### Planning approval gate after Composer critique
 
-**important** After the Composer 2.5 critique loop is complete and before implementation starts, call `update_plan` and present the revised plan back to the user for feedback. Stop there until the user explicitly approves the plan. Do not claim that the skill can switch collaboration modes by itself; the requirement is the visible planning approval gate. Do not run another Composer 2.5 plan critique after presenting the plan unless the user explicitly asks for one.
+**important** After the Composer critique loop is complete and before implementation starts, call `update_plan` and present the revised plan back to the user for feedback. Stop there until the user explicitly approves the plan. Do not claim that the skill can switch collaboration modes by itself; the requirement is the visible planning approval gate. Do not run another Composer plan critique after presenting the plan unless the user explicitly asks for one.
 
 Do not edit files, update Linear, create or switch branches, persist the contract, or begin implementation until the user explicitly approves the revised plan.
 
@@ -378,7 +378,7 @@ If the `tdd` skill is available, use it to drive the test-first red-green-refact
 - The only acceptable exception is when the repo's test setup makes a strict red-green-refactor loop genuinely impractical or wasteful for that specific change. In that case, state the exception explicitly in the execution plan or in a checkpoint commit message and use the closest approximation: write the test first within the smallest practical slice, even if it covers slightly more than one line of production code.
 - If the plan identifies independent workstreams, use sub-agents to parallelize them. Each sub-agent must follow the same test-first loop within its workstream.
 - Follow repo-local conventions from `CLAUDE.md`, `AGENTS.md`, and nearby rules.
-- If a repo-local `CLAUDE.md` exists, read it before coding.
+- If a repo-local `AGENTS.md` exists, read it before coding.
 - Keep changes scoped to the contract.
 - Implement only enough production behavior to satisfy the settled contract, repo-local standards, and the failing test you just wrote.
 - Commit incrementally at logical checkpoints. A checkpoint is at minimum one red-green-refactor cycle, not a batched set of untested changes.

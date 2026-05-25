@@ -1,6 +1,6 @@
 ---
 name: rocket-review-composer
-description: Run the final review loop for a completed branch using up to two Composer 2.5 review rounds (via `cursor-agent -p -f`) followed by up to two Codex review rounds (via `codex exec`), each running the `/code-review` slash command and gated by an `APPROVE` verdict. Use this whenever the user explicitly says `rocket-review-composer`, asks for the Composer+Codex review loop, or wants the agent to ensure the current branch has a PR, run Composer first then Codex (max 2 rounds each, early-exit on APPROVE), patch and push between rounds, and post one final PR summary comment that reports whether each agent approved.
+description: Run the final review loop for a completed branch using up to two Composer review rounds (via `cursor-agent -p -f`) followed by up to two Codex review rounds (via `codex exec`), each running the `/code-review` slash command and gated by an `APPROVE` verdict. Use this whenever the user explicitly says `rocket-review-composer`, asks for the Composer+Codex review loop, or wants the agent to ensure the current branch has a PR, run Composer first then Codex (max 2 rounds each, early-exit on APPROVE), patch and push between rounds, and post one final PR summary comment that reports whether each agent approved.
 ---
 
 # Rocket Review Composer
@@ -10,11 +10,11 @@ Use this only after implementation is complete enough for external review.
 This skill is narrow on purpose:
 - It does not define the implementation work.
 - It does not assign or reinterpret severity.
-- It does not run more than 2 rounds per agent. Composer 2.5 (via `cursor-agent`) runs up to 2 rounds, then Codex (via `codex exec`) runs up to 2 rounds.
+- It does not run more than 2 rounds per agent. Composer (via `cursor-agent`) runs up to 2 rounds, then Codex (via `codex exec`) runs up to 2 rounds.
 - It does not rely on interactive PR creation.
 - It exits an agent's rounds early on an approving verdict.
 
-Your job is to take the current checked-out branch, ensure it has a PR, run Composer 2.5 reviews first (up to 2 rounds), then Codex reviews (up to 2 rounds), each invoking the `/code-review` slash command and parsing the returned verdict, patch what should be patched between rounds, commit and push after every non-approving round, leave a strict audit trail, and post one final PR summary comment that surfaces whether each agent approved.
+Your job is to take the current checked-out branch, ensure it has a PR, run Composer reviews first (up to 2 rounds), then Codex reviews (up to 2 rounds), each invoking the `/code-review` slash command and parsing the returned verdict, patch what should be patched between rounds, commit and push after every non-approving round, leave a strict audit trail, and post one final PR summary comment that surfaces whether each agent approved.
 
 A `## Verdict` containing `APPROVE` ends that agent's loop, including conditional forms such as `APPROVE WITH FIXES`. Any other verdict (for example `NEEDS FIXES`) does not.
 
@@ -36,7 +36,7 @@ Required conditions:
 - You are inside the repo/worktree that contains the branch being reviewed.
 - The intended review branch is the branch currently checked out.
 - `gh` is available and authenticated.
-- `cursor-agent` is available on `PATH` and authenticated. The skill assumes Composer 2.5 is the active model in the user's Cursor account; if your account routes to a different model, set the model via `cursor-agent` configuration before running.
+- `cursor-agent` is available on `PATH` and authenticated. The skill assumes Composer is the active model in the user's Cursor account; if your account routes to a different model, set the model via `cursor-agent` configuration before running.
 - `codex` is available on `PATH`.
 
 Before generating a PR title or PR body, read local repo rules first:
@@ -169,7 +169,7 @@ Require the `Verdict` section to end with one of:
 
 Do not ask for compliments, extra summary sections, or style feedback outside that structure.
 
-## Composer 2.5 (cursor-agent) invocation
+## Composer (cursor-agent) invocation
 
 Invoke each Composer round via `cursor-agent` in non-interactive print mode with the user's standard flags:
 
@@ -186,7 +186,7 @@ Do not run any other `cursor-agent` mode. The flags `-p -f` are mandatory per us
 Use a prompt equivalent to:
 
 ```text
-You are Composer 2.5 reviewing work completed on this branch.
+You are Composer reviewing work completed on this branch.
 
 Run the `/code-review` slash command for this review. Do not use the parallel variant.
 
@@ -302,9 +302,9 @@ Rules:
 
 ## Review Loop
 
-The loop runs two agents in strict order: **Composer 2.5 first, then Codex**. Each agent has a max of 2 rounds and exits early on any approving verdict.
+The loop runs two agents in strict order: **Composer first, then Codex**. Each agent has a max of 2 rounds and exits early on any approving verdict.
 
-### Phase A: Composer 2.5 rounds (max 2)
+### Phase A: Composer rounds (max 2)
 
 For round 1, then round 2 if no approval yet:
 
