@@ -1,11 +1,7 @@
 # cc-config
 
-Via ssh
-```
-git clone git@github.com:aryan-binazir/cc-config.git "${XDG_CONFIG_HOME:-$HOME/}/.claude"
-```
+A common place for skills and other shareable agent configuration used across
+Codex, Claude, Cursor, and related tools.
 
-Via http
-```
-git clone https://github.com/aryan-binazir/cc-config.git "${XDG_CONFIG_HOME:-$HOME/}/.claude"
-```
+`AGENTS.md` is the canonical shared instruction file. Tool-specific files such
+as `CLAUDE.md` can symlink back to it when needed.
