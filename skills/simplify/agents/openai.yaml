@@ -1,0 +1,4 @@
+interface:
+  display_name: "Simplify"
+  short_description: "Readable technical teaching mode"
+  default_prompt: "Use $simplify for the rest of this conversation."
