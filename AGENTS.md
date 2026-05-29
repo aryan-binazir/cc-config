@@ -10,15 +10,13 @@
 - Before major work, check for project-specific agent rules (AGENTS.md, CLAUDE.md, .cursorrules, etc).
 
 # Self-Improvement Loop
-- After ANY correction from the user: update _scratch/_lessons/lessons.md with the pattern.
+- After any correction from the user, update ~/_scratch/_lessons/lessons.md if you are not in a git repo, or _scratch/_lessons/lessons.md if the repo has that pattern.
 - Write rules for yourself that prevent the same mistake.
 - Ruthlessly iterate on these lessons until mistake rate drops.
 - Review lessons at session start for relevant project.
 
 # Git Rules
-- Do not force-push or rewrite history.
-- Never add Co-Authored-By lines to commits.
-- Commit message format: `type(TICKET): description` (e.g. `fix(BBA-9): Added logging package`). Types: `feat`, `fix`, `chore`, `refactor`.
+- Commit message format: `type(TICKET): description` (e.g. `fix(BBA-9): Added logging package`). Types: `feat`, `fix`, `chore`, `refactor`. If the current branch does not include a ticket ID, choose a reasonable ticket name.
   - The type is determined by the ticket's overall purpose and MUST stay consistent across ALL commits and the PR title for that ticket. Check existing commits on the branch before committing.
 - PR descriptions use this structure. Testing is optional — omit if not applicable:
   ### Problem
@@ -26,4 +24,4 @@
   ### Decisions
   ### Testing
   How it was tested, or how to test it.
-  Followed by a collapsed `<details>` block titled "Agent Context" containing verbose context an agent would find helpful when reviewing the PR.
+  Follow this with a collapsed `<details>` block titled "Agent Context" containing any detailed context an agent would find helpful when reviewing the PR. Make this block as thorough/verbose as needed to help future agents understand our context.
