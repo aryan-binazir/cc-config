@@ -16,10 +16,22 @@ PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-cursor-agent -p -f "$PROMPT"
+cursor-agent -p -f --model composer-2.5 "$PROMPT"
 ```
 
-The flags `-p -f` are the expected local convention for headless Cursor/Composer calls in these workflows.
+The flags `-p -f` are the expected local convention for headless Cursor/Composer calls in these workflows. Use `--model composer-2.5` by default when no model is specified.
+
+## Model Selection
+
+Use `composer-2.5` unless the user explicitly specifies a different model.
+
+If the user specifies Opus, use the current pinned Claude Opus model:
+
+```bash
+cursor-agent -p -f --model claude-opus-4-8-thinking-high "$PROMPT"
+```
+
+If the user specifies an exact model name, pass that exact model with `--model`.
 
 ## Prompt Guidance
 
