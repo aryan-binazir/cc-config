@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review committed changes on the current branch since it diverged from the base branch and report only issues that need fixing. Default mode uses parallel sub-agent passes for correctness, security, performance, maintainability, and edge cases, then integrates a single findings-first review. Use `code-review single` only when the user explicitly asks for a single-pass review.
+description: Review committed changes on the current branch since it diverged from the base branch and report only issues that need fixing. Use when the user asks for a review of committed branch changes, a diff review against main, or whether the current branch is safe to merge. Default mode uses parallel sub-agent passes for correctness, security, performance, maintainability, and edge cases, then integrates a single findings-first review. Use `code-review single` only when the user explicitly asks for a single-pass review.
 ---
 
 # Code Review
@@ -39,6 +39,8 @@ If a file appears in the diff that wasn't intentionally modified on this branch,
 ## Parallel Review
 
 Use this mode by default.
+
+Use parallel sub-agents only when they can work independently from the same diff.
 
 If an implementation contract (Goal, Accepted scope, Assumptions, Out of scope, Validation approach) is provided in the caller's prompt, include it in each sub-agent's prompt so they review against the contract too. Respect Out of scope items — do not treat them as missing work.
 
