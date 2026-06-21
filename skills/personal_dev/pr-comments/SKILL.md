@@ -9,6 +9,16 @@ Build a stable checklist of active PR comments for the PR attached to the curren
 
 ## Fast Path
 
+Use the bundled helper first:
+
+```bash
+uv run --script /home/ar/repos/cc-config/skills/personal_dev/pr-comments/scripts/pr_comments.py sync --repo "$PWD"
+```
+
+It resolves the current branch's PR, fetches PR metadata, review threads/comments, issue comments, and review summaries, merges with `_scratch/_pr_reviews/pr-<number>.json`, and renders the checklist.
+
+If the helper cannot run, do the same work manually:
+
 1. Resolve the current branch's PR.
 2. Fetch PR metadata, review threads/comments, issue comments, and review summaries with one batched query when available; otherwise use the fewest calls needed.
 3. For review comments, fetch thread id plus thread-level `isResolved`; it lives on the thread, not the comment.
@@ -39,7 +49,13 @@ Auto-reopen and clear resolution when an item becomes active again, or its `upda
 
 Discussion-first is mandatory. Do not start code changes before a decision on the relevant item.
 
-For each selected number, ask whether to accept and implement, reject with rationale, or defer. Then mark it handled and persist `resolution` (`accepted`/`rejected`/`deferred`) plus a short `resolutionNote`. Stay scoped to PR comments.
+For each selected number, ask whether to accept and implement, reject with rationale, or defer. Then mark it handled and persist `resolution` (`accepted`/`rejected`/`deferred`) plus a short `resolutionNote`:
+
+```bash
+uv run --script /home/ar/repos/cc-config/skills/personal_dev/pr-comments/scripts/pr_comments.py mark --repo "$PWD" --number 3 --resolution accepted --note "Will implement suggested guard."
+```
+
+Stay scoped to PR comments.
 
 Never mention tool/vendor names in user-facing output. Never sign with a product or assistant name.
 
