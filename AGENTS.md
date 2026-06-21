@@ -10,10 +10,6 @@
 - Before major work, check for project-specific agent rules (AGENTS.md, CLAUDE.md, .cursorrules, etc).
 
 # Self-Improvement Loop
-- After any correction from the user, update ~/_scratch/_lessons/lessons.md if you are not in a git repo, or _scratch/_lessons/lessons.md if the repo has that pattern.
-- Write rules for yourself that prevent the same mistake.
-- Ruthlessly iterate on these lessons until mistake rate drops.
-- Review lessons at session start for relevant project.
 - When a skill under ~/repos/cc-config/skills causes wasted effort, confusion, or a wrong turn, the agent may ask permission to improve that skill. Keep this limited to skill/process improvements; do not silently expand the user's current task.
 - If the user grants permission and the agent changes a skill, the final response must say which skill changed, summarize what changed, and offer a concrete revert or adjustment path.
 
