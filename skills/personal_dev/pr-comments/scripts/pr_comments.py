@@ -95,6 +95,42 @@ query(
 """
 
 
+REPLY_THREAD_MUTATION = """\
+mutation($threadId: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $threadId, body: $body}) {
+    comment {
+      id
+      url
+    }
+  }
+}
+"""
+
+
+RESOLVE_THREAD_MUTATION = """\
+mutation($threadId: ID!) {
+  resolveReviewThread(input: {threadId: $threadId}) {
+    thread {
+      id
+      isResolved
+    }
+  }
+}
+"""
+
+
+UNRESOLVE_THREAD_MUTATION = """\
+mutation($threadId: ID!) {
+  unresolveReviewThread(input: {threadId: $threadId}) {
+    thread {
+      id
+      isResolved
+    }
+  }
+}
+"""
+
+
 RESOLUTIONS = {"accepted", "rejected", "deferred"}
 
 
@@ -246,6 +282,16 @@ def graphql(repo: Path, ref: PrRef, cursors: dict[str, str | None]) -> dict[str,
     if cursors.get("threads"):
         cmd += ["-F", f"threadsCursor={cursors['threads']}"]
     payload = run_json(cmd, repo=repo, stdin=QUERY)
+    if payload.get("errors"):
+        raise ScriptError("GitHub GraphQL errors:\n" + json.dumps(payload["errors"], indent=2))
+    return payload
+
+
+def graphql_mutation(repo: Path, query: str, fields: dict[str, str]) -> dict[str, Any]:
+    cmd = ["gh", "api", "graphql", "-F", "query=@-"]
+    for key, value in fields.items():
+        cmd += ["-f", f"{key}={value}"]
+    payload = run_json(cmd, repo=repo, stdin=query)
     if payload.get("errors"):
         raise ScriptError("GitHub GraphQL errors:\n" + json.dumps(payload["errors"], indent=2))
     return payload
@@ -685,28 +731,147 @@ def show(args: argparse.Namespace) -> int:
     return 0
 
 
-def mark(args: argparse.Namespace) -> int:
+def load_state_for_pr(args: argparse.Namespace) -> tuple[Path, dict[str, Any], Path]:
     repo = args.repo.resolve()
-    if args.resolution not in RESOLUTIONS:
-        raise ScriptError(f"resolution must be one of: {', '.join(sorted(RESOLUTIONS))}")
     pr_number = args.pr or resolve_current_pr(repo).number
     path = state_path(repo, args.state_dir, pr_number)
-    state = load_state(path, None, repo)
+    return repo, load_state(path, None, repo), path
 
-    target = None
+
+def find_item_by_number(state: dict[str, Any], number: str) -> dict[str, Any]:
     for item in state["itemsById"].values():
-        if isinstance(item, dict) and str(item.get("number")) == args.number:
-            target = item
-            break
-    if target is None:
-        raise ScriptError(f"could not find PR comment number {args.number} in {path}")
+        if isinstance(item, dict) and str(item.get("number")) == number:
+            return item
+    pr_number = (state.get("pr") or {}).get("number", "unknown")
+    raise ScriptError(f"could not find PR comment number {number} in PR {pr_number}")
 
-    target["status"] = "handled"
-    target["resolution"] = args.resolution
-    target["resolutionNote"] = args.note
-    target["resolutionAt"] = utc_now()
+
+def items_in_thread(state: dict[str, Any], thread_id: str) -> list[dict[str, Any]]:
+    return [
+        item
+        for item in state["itemsById"].values()
+        if isinstance(item, dict) and item.get("threadId") == thread_id
+    ]
+
+
+def mark_item_handled(item: dict[str, Any], resolution: str, note: str) -> None:
+    item["status"] = "handled"
+    item["resolution"] = resolution
+    item["resolutionNote"] = note
+    item["resolutionAt"] = utc_now()
+
+
+def body_from_args(body: str | None, body_file: Path | None, label: str) -> str:
+    if body_file:
+        value = body_file.read_text(encoding="utf-8")
+    else:
+        value = body or ""
+    value = value.strip()
+    if not value:
+        raise ScriptError(f"{label} cannot be empty")
+    return value
+
+
+def mark(args: argparse.Namespace) -> int:
+    if args.resolution not in RESOLUTIONS:
+        raise ScriptError(f"resolution must be one of: {', '.join(sorted(RESOLUTIONS))}")
+    _, state, path = load_state_for_pr(args)
+    target = find_item_by_number(state, args.number)
+    mark_item_handled(target, args.resolution, args.note)
     write_json(path, state)
     print(render(state))
+    return 0
+
+
+def post_reply(repo: Path, state: dict[str, Any], item: dict[str, Any], body: str) -> dict[str, Any]:
+    thread_id = text(item.get("threadId"))
+    if thread_id:
+        payload = graphql_mutation(repo, REPLY_THREAD_MUTATION, {"threadId": thread_id, "body": body})
+        comment = payload["data"]["addPullRequestReviewThreadReply"]["comment"]
+        return {"kind": "review_thread_reply", "id": comment.get("id"), "url": comment.get("url")}
+
+    pr_number = str((state.get("pr") or {}).get("number") or "")
+    if not pr_number:
+        raise ScriptError("state is missing pr.number")
+    output = run(["gh", "pr", "comment", pr_number, "--body", body], repo=repo).strip()
+    return {"kind": "pr_comment", "url": output or None}
+
+
+def set_thread_resolution(repo: Path, state: dict[str, Any], item: dict[str, Any], resolved: bool) -> dict[str, Any]:
+    thread_id = text(item.get("threadId"))
+    if not thread_id:
+        raise ScriptError(f"comment number {item.get('number')} is not a review thread comment")
+    mutation = RESOLVE_THREAD_MUTATION if resolved else UNRESOLVE_THREAD_MUTATION
+    payload = graphql_mutation(repo, mutation, {"threadId": thread_id})
+    key = "resolveReviewThread" if resolved else "unresolveReviewThread"
+    thread = payload["data"][key]["thread"]
+
+    now = utc_now()
+    for thread_item in items_in_thread(state, thread_id):
+        thread_item["resolved"] = resolved
+        thread_item["active"] = not resolved
+        if resolved:
+            thread_item["githubResolvedAt"] = now
+        else:
+            thread_item["githubUnresolvedAt"] = now
+            thread_item["active"] = True
+    return {"threadId": thread.get("id"), "isResolved": thread.get("isResolved")}
+
+
+def reply(args: argparse.Namespace) -> int:
+    repo, state, path = load_state_for_pr(args)
+    target = find_item_by_number(state, args.number)
+    body = body_from_args(args.body, args.body_file, "reply body")
+    result = post_reply(repo, state, target, body)
+    target.setdefault("githubReplies", []).append({"body": body, "createdAt": utc_now(), **result})
+    write_json(path, state)
+    print(render(state))
+    if result.get("url"):
+        print(f"\nPosted reply: {result['url']}")
+    return 0
+
+
+def resolve(args: argparse.Namespace) -> int:
+    repo, state, path = load_state_for_pr(args)
+    target = find_item_by_number(state, args.number)
+    result = set_thread_resolution(repo, state, target, resolved=True)
+    write_json(path, state)
+    print(render(state))
+    print(f"\nResolved GitHub review thread: {result['threadId']}")
+    return 0
+
+
+def unresolve(args: argparse.Namespace) -> int:
+    repo, state, path = load_state_for_pr(args)
+    target = find_item_by_number(state, args.number)
+    result = set_thread_resolution(repo, state, target, resolved=False)
+    write_json(path, state)
+    print(render(state))
+    print(f"\nReopened GitHub review thread: {result['threadId']}")
+    return 0
+
+
+def accept(args: argparse.Namespace) -> int:
+    repo, state, path = load_state_for_pr(args)
+    target = find_item_by_number(state, args.number)
+    mark_item_handled(target, "accepted", args.note)
+
+    reply_result = None
+    reply_body = body_from_args(args.reply, args.reply_file, "reply body") if args.reply or args.reply_file else None
+    if reply_body:
+        reply_result = post_reply(repo, state, target, reply_body)
+        target.setdefault("githubReplies", []).append({"body": reply_body, "createdAt": utc_now(), **reply_result})
+
+    resolve_result = None
+    if args.resolve:
+        resolve_result = set_thread_resolution(repo, state, target, resolved=True)
+
+    write_json(path, state)
+    print(render(state))
+    if reply_result and reply_result.get("url"):
+        print(f"\nPosted reply: {reply_result['url']}")
+    if resolve_result:
+        print(f"Resolved GitHub review thread: {resolve_result['threadId']}")
     return 0
 
 
@@ -720,7 +885,12 @@ def add_common(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Fetch, merge, render, and mark stable PR comment checklists.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Fetch, merge, render, mark, reply to, and resolve stable PR comment checklists. "
+            "GitHub write commands are explicit: reply, resolve, unresolve, and accept with --reply/--resolve."
+        )
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     sync_parser = subparsers.add_parser("sync", help="Fetch PR comments, merge state, persist it, and render the checklist.")
@@ -734,13 +904,67 @@ def build_parser() -> argparse.ArgumentParser:
     show_parser.add_argument("--pr", type=int, help="PR number. Defaults to the current branch PR.")
     show_parser.set_defaults(func=show)
 
-    mark_parser = subparsers.add_parser("mark", help="Mark a checklist item handled after discussion.")
+    mark_parser = subparsers.add_parser("mark", help="Mark a checklist item handled locally after discussion.")
     add_common(mark_parser)
     mark_parser.add_argument("--pr", type=int, help="PR number. Defaults to the current branch PR.")
     mark_parser.add_argument("--number", required=True, help="Stable checklist number, for example 3 or 3.1.")
     mark_parser.add_argument("--resolution", required=True, choices=sorted(RESOLUTIONS))
     mark_parser.add_argument("--note", required=True, help="Short resolution note.")
     mark_parser.set_defaults(func=mark)
+
+    accept_parser = subparsers.add_parser(
+        "accept",
+        help="Mark a numbered item accepted locally; optionally reply on GitHub and resolve its review thread.",
+        description=(
+            "Mark a numbered item accepted in local triage state. Add --reply/--reply-file to post a GitHub reply. "
+            "Add --resolve to resolve the GitHub review thread when the item is an inline review comment."
+        ),
+    )
+    add_common(accept_parser)
+    accept_parser.add_argument("--pr", type=int, help="PR number. Defaults to the current branch PR.")
+    accept_parser.add_argument("--number", required=True, help="Stable checklist number, for example 3 or 3.1.")
+    accept_parser.add_argument("--note", required=True, help="Short local acceptance note.")
+    accept_reply = accept_parser.add_mutually_exclusive_group()
+    accept_reply.add_argument("--reply", help="GitHub reply body to post while accepting.")
+    accept_reply.add_argument("--reply-file", type=Path, help="File containing the GitHub reply body to post while accepting.")
+    accept_parser.add_argument("--resolve", action="store_true", help="Also resolve the GitHub review thread.")
+    accept_parser.set_defaults(func=accept)
+
+    reply_parser = subparsers.add_parser(
+        "reply",
+        help="Post a GitHub reply for a numbered item.",
+        description=(
+            "Post a GitHub reply for a stable checklist number. Inline review comments get a review-thread reply. "
+            "Issue comments and review summaries get a top-level PR conversation comment."
+        ),
+    )
+    add_common(reply_parser)
+    reply_parser.add_argument("--pr", type=int, help="PR number. Defaults to the current branch PR.")
+    reply_parser.add_argument("--number", required=True, help="Stable checklist number, for example 3 or 3.1.")
+    reply_body = reply_parser.add_mutually_exclusive_group(required=True)
+    reply_body.add_argument("--body", help="GitHub reply body.")
+    reply_body.add_argument("--body-file", type=Path, help="File containing the GitHub reply body.")
+    reply_parser.set_defaults(func=reply)
+
+    resolve_parser = subparsers.add_parser(
+        "resolve",
+        help="Resolve the GitHub review thread for a numbered inline review comment.",
+        description="Resolve the GitHub review thread for a stable checklist number that points at an inline review comment.",
+    )
+    add_common(resolve_parser)
+    resolve_parser.add_argument("--pr", type=int, help="PR number. Defaults to the current branch PR.")
+    resolve_parser.add_argument("--number", required=True, help="Stable checklist number, for example 3 or 3.1.")
+    resolve_parser.set_defaults(func=resolve)
+
+    unresolve_parser = subparsers.add_parser(
+        "unresolve",
+        help="Reopen the GitHub review thread for a numbered inline review comment.",
+        description="Reopen the GitHub review thread for a stable checklist number that points at an inline review comment.",
+    )
+    add_common(unresolve_parser)
+    unresolve_parser.add_argument("--pr", type=int, help="PR number. Defaults to the current branch PR.")
+    unresolve_parser.add_argument("--number", required=True, help="Stable checklist number, for example 3 or 3.1.")
+    unresolve_parser.set_defaults(func=unresolve)
 
     return parser
 

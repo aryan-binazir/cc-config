@@ -55,6 +55,22 @@ For each selected number, ask whether to accept and implement, reject with ratio
 uv run --script /home/ar/repos/cc-config/skills/personal_dev/pr-comments/scripts/pr_comments.py mark --repo "$PWD" --number 3 --resolution accepted --note "Will implement suggested guard."
 ```
 
+For accepted feedback, use the shorter accept command:
+
+```bash
+uv run --script /home/ar/repos/cc-config/skills/personal_dev/pr-comments/scripts/pr_comments.py accept --repo "$PWD" --number 3 --note "Will implement suggested guard."
+```
+
+GitHub-visible writes are allowed only after the relevant discussion decision. Use explicit helper commands so the state file stays in sync:
+
+```bash
+uv run --script /home/ar/repos/cc-config/skills/personal_dev/pr-comments/scripts/pr_comments.py reply --repo "$PWD" --number 3 --body "Fixed in the latest commit."
+uv run --script /home/ar/repos/cc-config/skills/personal_dev/pr-comments/scripts/pr_comments.py resolve --repo "$PWD" --number 3
+uv run --script /home/ar/repos/cc-config/skills/personal_dev/pr-comments/scripts/pr_comments.py accept --repo "$PWD" --number 3 --note "Fixed" --reply "Fixed in the latest commit." --resolve
+```
+
+Use `unresolve` only when reopening a review thread is intentional.
+
 Stay scoped to PR comments.
 
 Never mention tool/vendor names in user-facing output. Never sign with a product or assistant name.
