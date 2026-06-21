@@ -12,6 +12,7 @@ todos/
 
 # Local directory
 local/
+skills/rocket/rocket.local.yaml
 
 # Update lock file
 .update.lock

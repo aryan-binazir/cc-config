@@ -84,15 +84,14 @@ Full CLI coverage: 155 endpoints across todos, cards, messages, files, schedule,
 1. **Choose the right output mode** — `--jq` when you need to filter/extract data; `--json` for full JSON; `--md` when presenting results to a human (see Output Modes below). **Never pipe to external `jq` — use `--jq` instead.**
 2. **Parse URLs first** with `basecamp url parse "<url>"` to extract IDs
 3. **Comments are flat** - reply to parent recording, not to comments
-4. **Check context** via `.basecamp/config.json` before assuming project, but do not trust ambient context for mutations when the user has scoped work to a specific account or project.
+4. **Check context** via `.basecamp/config.json` before assuming project
 5. **Content fields accept Markdown and @mentions** — message body and comment content accept Markdown syntax; the CLI converts to HTML automatically. Use Markdown formatting (lists, bold, links, code blocks) for rich content. Four mention syntaxes are available (prefer deterministic for agents):
    - **`[@Name](mention:SGID)`** — zero API calls, embeds SGID directly (preferred for agents)
    - **`[@Name](person:ID)`** — one API call, resolves person ID to SGID via pingable set
    - **`@sgid:VALUE`** — inline SGID embed for pipeline composability
    - **`@Name` / `@First.Last`** — fuzzy name resolution (may be ambiguous)
    For todos, documents, and cards, content is sent as-is — use plain text or HTML directly.
-6. **Project scope is mandatory for most commands** — via `--in <project>` or `.basecamp/config.json`. Cross-project exceptions: `basecamp reports assigned` for assigned work, `basecamp assignments` for structured assignment views, `basecamp reports overdue` for overdue todos, `basecamp reports schedule` for upcoming schedule across all projects, `basecamp recordings <type>` for browsing by type, `basecamp notifications` for notifications, `basecamp gauges list` for account-wide gauges. For scoped mutations, pass explicit `--account <id>` and `--project`/`--in <id>` instead of relying on active context.
-7. **Expect sandbox/keychain auth mismatches** — in sandboxed environments, some Basecamp commands may appear authenticated while keychain-backed API access still fails with `auth_required`. If a live Basecamp read/write matters and fails this way, retry outside the sandbox instead of assuming the user is logged out.
+6. **Project scope is mandatory for most commands** — via `--in <project>` or `.basecamp/config.json`. Cross-project exceptions: `basecamp reports assigned` for assigned work, `basecamp assignments` for structured assignment views, `basecamp reports overdue` for overdue todos, `basecamp reports schedule` for upcoming schedule across all projects, `basecamp recordings <type>` for browsing by type, `basecamp notifications` for notifications, `basecamp gauges list` for account-wide gauges.
 
 ### Output Modes
 
@@ -142,12 +141,6 @@ basecamp <cmd> --page 1     # First page only, no auto-pagination
 - `--assignee me` resolves to current user
 - `--due tomorrow` / `--due +3` / `--due "next week"` - natural date parsing
 - Project from `.basecamp/config.json` if `--in` not specified
-
-### Sandbox and Auth
-
-- Basecamp auth may behave differently inside a sandbox than outside it when credentials live in the system keychain.
-- If project-scoped commands or raw `basecamp api` calls fail with `auth_required` in a sandbox, retry outside the sandbox before asking the user to log in again.
-- Prefer explicit `--account` and `--project` flags for live writes so auth/context bugs cannot redirect work into the wrong project.
 
 ## Quick Reference
 
@@ -527,8 +520,8 @@ basecamp comments update <id> "Updated" --in <project>
 ### Files & Documents
 
 ```bash
-basecamp files list --in <project> --json               # List root contents (folders, files, docs)
-basecamp files list --vault <folder_id> --in <project>  # List a specific folder's contents
+basecamp files list --in <project> --json               # List all (folders, files, docs)
+basecamp files list --vault <folder_id> --in <project>  # List folder contents
 basecamp files show <id> --in <project>                 # Show item (auto-detects type)
 basecamp files download <id> --in <project>             # Download file
 basecamp files download <id> --out ./dir                # Download to specific dir
@@ -543,13 +536,6 @@ basecamp files update <id> --title "New" --content "Updated"
 ```
 
 **Subcommands:** `folders`, `uploads`, `documents` (each with pagination flags)
-
-**Docs & Files notes:**
-- `basecamp docs folders list` and `basecamp docs documents list` default to the root vault. Pass `--vault <folder_id>` when inspecting nested content.
-- Basecamp does not expose a trustworthy documented move workflow for Docs & Files folders/documents through the CLI. Prefer `copy -> verify -> trash old` rather than assuming a move endpoint exists.
-- For structural migrations, use a dry-run planner first, then apply, then a verify-only pass before deleting the old structure.
-- When using raw `basecamp api put` to update a document, include both `title` and `content`. Sending only content can blank or reset the title.
-- Slash-containing imported titles such as `Technology Stack/Discussions` may be better normalized into real folder structure than preserved literally as one doc title.
 
 ### Schedule
 
@@ -568,8 +554,6 @@ basecamp schedule settings --include-due --in <project>  # Include todos/cards d
 ```
 
 **Flags:** `--all-day`, `--notify`, `--participants <ids>`, `--no-subscribe`, `--subscribe "people"` (mutually exclusive), `--status` (active/archived/trashed)
-
-**Schedule note:** `basecamp schedule create` requires RFC3339 timestamps in `--starts-at` / `--ends-at` even for all-day events. Plain dates like `2026-04-29` will fail.
 
 ### Check-ins
 

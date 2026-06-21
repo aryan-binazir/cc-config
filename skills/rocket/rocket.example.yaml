@@ -1,0 +1,75 @@
+# Copy this file to rocket.local.yaml on a machine that needs different defaults.
+# rocket.local.yaml is ignored by git. Keep profile names semantic and boring:
+# standard, claude, cursor, fast, strict, etc.
+
+defaults:
+  plan_profile: standard
+  review_profile: standard
+
+plan_profiles:
+  standard:
+    critic:
+      name: Cursor
+      runner: cursor
+      model: null
+      timeout_ms: 900000
+    review_profile: standard
+
+  claude:
+    critic:
+      name: Claude
+      runner: claude
+      model: null
+      timeout_ms: 900000
+    review_profile: claude
+
+  cursor:
+    critic:
+      name: Cursor
+      runner: cursor
+      model: null
+      timeout_ms: 900000
+    review_profile: cursor
+
+review_profiles:
+  standard:
+    slash_command: /code-review-parallel
+    summary_title: Rocket Review Summary
+    diary_name: rocket_review
+    reviewers:
+      - name: Cursor
+        runner: cursor
+        model: null
+        max_rounds: 2
+      - name: Codex
+        runner: codex
+        model: null
+        max_rounds: 2
+
+  claude:
+    slash_command: /code-review-parallel
+    summary_title: Rocket Review Summary
+    diary_name: rocket_review
+    reviewers:
+      - name: Codex
+        runner: codex
+        model: null
+        max_rounds: 2
+      - name: Claude
+        runner: claude
+        model: null
+        max_rounds: 2
+
+  cursor:
+    slash_command: /code-review-parallel
+    summary_title: Rocket Review Summary
+    diary_name: rocket_review
+    reviewers:
+      - name: Codex
+        runner: codex
+        model: null
+        max_rounds: 2
+      - name: Cursor
+        runner: cursor
+        model: null
+        max_rounds: 2

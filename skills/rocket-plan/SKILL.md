@@ -1,6 +1,6 @@
 ---
 name: rocket-plan
-description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants Codex to grill them with hard clarification questions until the contract is unambiguous, settle a goal and implementation contract, update the Linear ticket when applicable, drive implementation strictly test-first, push, and then hand off in-session to $rocket-review without further babysitting.
+description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants an end-to-end implementation flow: clarify the goal, settle an implementation contract, run the configured one-round pre-approval critique, drive implementation strictly test-first, push, and hand off in-session to the configured rocket-review profile. Optional usage: `rocket-plan <profile>`.
 ---
 
 # Rocket Plan
@@ -14,7 +14,36 @@ This skill is strict on purpose:
 - It does not silently guess past unresolved ambiguity.
 - It does not soften the clarification phase. It grills the user on every branch where the spec is ambiguous, until the contract is unambiguous.
 - It does not write production code without a failing test driving it. Test-first is mandatory.
-- It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket-review`.
+- It does not stop at code completion. The promise ends at a reviewed PR handoff via `$rocket-review <review-profile>`.
+
+## Rocket Config
+
+Before choosing a plan critic or review handoff, read the rocket config:
+
+1. `skills/rocket/rocket.local.yaml` if it exists.
+2. `skills/rocket/rocket.example.yaml` for defaults and for any profile missing from local config.
+
+If the user invokes `rocket-plan <profile>`, use `<profile>` as the plan profile name.
+If the user invokes bare `rocket-plan`, use `defaults.plan_profile`.
+
+Stop if the selected plan profile does not exist. Do not infer a profile from a hyphenated tool list.
+
+Each plan profile must provide:
+- `critic.name`
+- `critic.runner`: one of `claude`, `codex`, or `cursor`
+- optional `critic.model`
+- optional `critic.timeout_ms`; default `900000`
+- `review_profile`, passed to `$rocket-review` after implementation
+
+Runner invocation rules:
+- `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
+- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
+- `cursor`: `cursor-agent -p "$PROMPT"`
+
+When `model` is set, pass it with the runner's supported `--model <model>` flag.
+Do not pass `cursor-agent -f`/`--force` for plan critique. The plan critique is advisory and must be read-only.
+
+The plan critique is exactly one external round. Do not run follow-up critique rounds unless the user explicitly asks in the current conversation.
 
 ## Accepted Inputs
 
@@ -42,16 +71,22 @@ Required checks:
 git rev-parse --is-inside-work-tree
 command -v gh
 gh auth status
-command -v claude
 git ls-remote --exit-code
 ```
+
+Also check the configured critic runner:
+- `claude` -> `command -v claude`
+- `codex` -> `command -v codex`
+- `cursor` -> `command -v cursor-agent`
+
+If the selected `review_profile` exists in config, also check every configured review runner now so the promised review handoff is not doomed later.
 
 Additional required checks:
 - Confirm the current working directory is the intended repo/worktree.
 - If the input is a Linear ticket ID or URL, fetch the full ticket and stop if it is inaccessible.
 - Inspect `git status -sb` before implementation. If unrelated dirty changes are present and cannot be safely separated, stop and report that instead of guessing.
 
-Do not proceed with a degraded workflow. Missing auth, missing `claude`, unreachable remotes, or inaccessible Linear tickets are hard stops.
+Do not proceed with a degraded workflow. Missing auth, missing configured runners, unreachable remotes, or inaccessible Linear tickets are hard stops.
 
 ## Phase 1: Spec Intake and Clarification
 
@@ -170,15 +205,15 @@ Then:
 
 Do not begin implementation until the contract is settled.
 
-### Pre-Approval Claude critique
+### Pre-Approval configured critique
 
 After the contract is settled and before presenting the plan for user approval:
 1. Draft the execution plan.
-2. Run the Claude plan critique below.
+2. Run exactly one configured critic round.
 3. Revise the plan as needed.
 4. Stop if unresolved material concerns remain that require user input.
 
-Do not call `update_plan`, present the plan for approval, update Linear, create or switch branches, persist the contract, or begin implementation until the Claude critique loop is complete.
+Do not call `update_plan`, present the plan for approval, update Linear, create or switch branches, persist the contract, or begin implementation until the configured critique is complete.
 
 The drafted plan must:
 - restate the finalized implementation contract
@@ -186,32 +221,25 @@ The drafted plan must:
 - explain why the approach is the simplest repo-idiomatic path and which existing patterns or integration points it will use
 - include a strict test-first validation plan that lists each failing test in the order it will be written, the production change it will force into existence, and the command used to run it; tests-after, all-upfront, or alongside-the-code patterns are not acceptable
 - include validation and commit checkpoints aligned to red-green-refactor cycles when practical
-- explicitly include `$rocket-review` as the final step
+- explicitly include `$rocket-review <review-profile>` as the final step
 
-Ask Claude for a plan critique before presenting the plan for user approval.
+Ask the configured critic for a plan critique before presenting the plan for user approval.
 
 Rules:
-- Run Claude after the user clarification round has settled the contract and after you have drafted the execution plan.
-- Run the first Claude plan critique before user approval, then revise the plan to address material concerns.
-- Run follow-up Claude critique rounds only while there are unresolved material concerns about overengineering, codebase fit, validation, scope, or risky assumptions. Do not loop on style preferences, wording, or non-blocking taste comments.
-- Cap plan critique at 3 total Claude rounds unless the user explicitly asks for more. If material concerns remain after the cap, present the unresolved concerns to the user instead of continuing the loop.
-- Do not ask Claude to implement anything.
-- Ask Claude to review the contract and proposed plan for overengineering, avoidable complexity, missing simpler codebase-native approaches, violations of repo-local conventions, weak test strategy, hidden scope expansion, and risky assumptions.
+- Run the critic after the user clarification round has settled the contract and after you have drafted the execution plan.
+- Do not ask the critic to implement anything.
+- Ask the critic to review the contract and proposed plan for overengineering, avoidable complexity, missing simpler codebase-native approaches, violations of repo-local conventions, weak test strategy, hidden scope expansion, and risky assumptions.
 - Include the repo/worktree path, branch, relevant ticket/spec, contract, proposed execution plan, and validation plan.
-- If Claude identifies a clearly better simpler approach, revise the plan before showing it to the user.
-- If Claude raises a real ambiguity that changes scope or user-facing behavior, ask the user before proceeding.
-- If Claude raises feedback that seems potentially correct but depends on product intent, user preference, risk tolerance, rollout expectations, or another judgment the user can reasonably decide, ask the user before accepting or rejecting it.
-- For every follow-up critique after round 1, include a prior-feedback ledger in the prompt:
-  - accepted Claude recommendations and how the plan changed
-  - rejected Claude recommendations and why you are not willing to accept them
-  - unresolved concerns that still need Claude to re-check
-- If you intentionally reject Claude's advice, state the reason in the user-visible plan.
-- Allow up to the full 15-minute budget for the Claude plan critique: `900000` ms. Do not stop early just because Claude has been quiet for a few minutes. If the critique exceeds the full budget, treat it as a timeout failure and report the blocker instead of silently skipping it.
+- If the critic identifies a clearly better simpler approach, revise the plan before showing it to the user.
+- If the critic raises a real ambiguity that changes scope or user-facing behavior, ask the user before proceeding.
+- If the critic raises feedback that depends on product intent, user preference, risk tolerance, rollout expectations, or another judgment the user can reasonably decide, ask the user before accepting or rejecting it.
+- If you intentionally reject the critic's advice, state the reason in the user-visible plan.
+- Allow up to the configured timeout, default `900000` ms. Do not stop early just because the critic has been quiet. If the critique exceeds the full budget, treat it as a timeout failure and report the blocker instead of silently skipping it.
 
 Use a prompt equivalent to:
 
 ```text
-You are Claude advising Codex before implementation starts.
+You are <critic.name> advising the implementing agent before implementation starts.
 
 Review target:
 - Repo/worktree: <absolute path>
@@ -226,14 +254,6 @@ Proposed execution plan:
 
 Validation plan:
 <tests and commands>
-
-Prior Claude feedback ledger, for follow-up rounds only:
-- Accepted:
-  - <recommendation and plan change>
-- Rejected:
-  - <recommendation and reason it was not accepted>
-- Still unresolved:
-  - <concern Claude should re-check>
 
 Give brutally honest planning feedback before code is written.
 
@@ -254,9 +274,9 @@ Return:
 No implementation. No compliments. No padding.
 ```
 
-### Planning approval gate after Claude critique
+### Planning approval gate after critique
 
-**important** After the Claude critique loop is complete and before implementation starts, call `update_plan` and present the revised plan back to the user for feedback. Stop there until the user explicitly approves the plan. Do not claim that the skill can switch collaboration modes by itself; the requirement is the visible planning approval gate. Do not run another Claude plan critique after presenting the plan unless the user explicitly asks for one.
+**important** After the configured critique is complete and before implementation starts, call `update_plan` and present the revised plan back to the user for feedback. Stop there until the user explicitly approves the plan. Do not claim that the skill can switch collaboration modes by itself; the requirement is the visible planning approval gate. Do not run another configured critique after presenting the plan unless the user explicitly asks for one.
 
 Do not edit files, update Linear, create or switch branches, persist the contract, or begin implementation until the user explicitly approves the revised plan.
 
@@ -386,19 +406,19 @@ When implementation is complete:
 1. Ensure all intended changes are committed.
 2. Push the current branch.
 3. Verify that the upstream branch exists and matches local `HEAD`.
-4. Invoke `$rocket-review` as a skill in the same Codex session.
+4. Invoke `$rocket-review <review-profile>` as a skill in the same Codex session, where `<review-profile>` is the selected plan profile's `review_profile`.
 
 The handoff rules are strict:
 - Do not reimplement `rocket-review` inline.
 - Do not shell out to a separate `rocket-review` process.
 - Do not describe this as starting a new session.
 - Do not reconstruct the contract from memory if the file already exists.
-- Point `$rocket-review` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
+- Point `$rocket-review <review-profile>` at `_scratch/_contracts/<branch>.md` as the preferred spec source. This is the highest-priority review contract when it exists.
 - You may include the Linear ticket reference or raw spec only as secondary context.
 
 If the final push fails, the upstream branch does not exist, or upstream does not match local `HEAD`, stop and report the blocker instead of invoking `$rocket-review`.
 
-If `$rocket-review` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
+If `$rocket-review <review-profile>` cannot run, stop and report the exact blocker. Do not silently skip the review phase.
 
 ## What This Skill Does Not Do
 
