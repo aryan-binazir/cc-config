@@ -363,7 +363,7 @@ If the `tdd` skill is available, use it to drive the test-first red-green-refact
 - The only acceptable exception is when the repo's test setup makes a strict red-green-refactor loop genuinely impractical or wasteful for that specific change. In that case, state the exception explicitly in the execution plan or in a checkpoint commit message and use the closest approximation: write the test first within the smallest practical slice, even if it covers slightly more than one line of production code.
 - If the plan identifies independent workstreams, use sub-agents to parallelize them. Each sub-agent must follow the same test-first loop within its workstream.
 - Follow repo-local conventions from `CLAUDE.md`, `AGENTS.md`, and nearby rules.
-- If a repo-local `CLAUDE.md` exists, read it before coding.
+- If a repo-local `AGENTS.md` exists, read it before coding.
 - Keep changes scoped to the contract.
 - Implement only enough production behavior to satisfy the settled contract, repo-local standards, and the failing test you just wrote.
 - Commit incrementally at logical checkpoints. A checkpoint is at minimum one red-green-refactor cycle, not a batched set of untested changes.
