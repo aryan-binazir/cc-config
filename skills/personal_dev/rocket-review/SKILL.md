@@ -19,8 +19,8 @@ Your job is to take the current checked-out branch, ensure it has a PR, run the 
 
 Before choosing reviewers, read the rocket config:
 
-1. `skills/rocket/rocket.local.yaml` if it exists.
-2. `skills/rocket/rocket.example.yaml` for defaults and for any profile missing from local config.
+1. `skills/personal_dev/rocket/rocket.local.yaml` if it exists.
+2. `skills/personal_dev/rocket/rocket.example.yaml` for defaults and for any profile missing from local config.
 
 If the user invokes `rocket-review <profile>`, use `<profile>` as the review profile name.
 If the user invokes bare `rocket-review`, use `defaults.review_profile`.

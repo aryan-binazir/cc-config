@@ -20,8 +20,8 @@ This skill is strict on purpose:
 
 Before choosing a plan critic or review handoff, read the rocket config:
 
-1. `skills/rocket/rocket.local.yaml` if it exists.
-2. `skills/rocket/rocket.example.yaml` for defaults and for any profile missing from local config.
+1. `skills/personal_dev/rocket/rocket.local.yaml` if it exists.
+2. `skills/personal_dev/rocket/rocket.example.yaml` for defaults and for any profile missing from local config.
 
 If the user invokes `rocket-plan <profile>`, use `<profile>` as the plan profile name.
 If the user invokes bare `rocket-plan`, use `defaults.plan_profile`.
