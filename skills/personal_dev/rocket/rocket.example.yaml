@@ -33,7 +33,7 @@ plan_profiles:
 
 review_profiles:
   standard:
-    slash_command: /code-review-parallel
+    slash_command: /code-review
     summary_title: Rocket Review Summary
     diary_name: rocket_review
     reviewers:
@@ -47,7 +47,7 @@ review_profiles:
         max_rounds: 2
 
   claude:
-    slash_command: /code-review-parallel
+    slash_command: /code-review
     summary_title: Rocket Review Summary
     diary_name: rocket_review
     reviewers:
@@ -61,7 +61,7 @@ review_profiles:
         max_rounds: 2
 
   cursor:
-    slash_command: /code-review-parallel
+    slash_command: /code-review
     summary_title: Rocket Review Summary
     diary_name: rocket_review
     reviewers:

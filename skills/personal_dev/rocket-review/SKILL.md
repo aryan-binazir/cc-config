@@ -28,7 +28,7 @@ If the user invokes bare `rocket-review`, use `defaults.review_profile`.
 Stop if the selected review profile does not exist. Do not infer a profile from a hyphenated tool list.
 
 Each review profile must provide:
-- `slash_command`, usually `/code-review` or `/code-review-parallel`
+- `slash_command`, usually `/code-review`; use `/code-review single` only for an explicit single-pass profile
 - `summary_title`, used in the final PR comment disclosure summary
 - `diary_name`, used for the local diary filename
 - `reviewers`, an ordered list
@@ -249,7 +249,7 @@ Respect Out of scope items. Do not treat them as missing work.
 
 Also review implementation quality. Flag any case where the branch solved the problem in a sloppy, overcomplicated, non-idiomatic, or brittle way. Call out simpler existing repo patterns, helpers, abstractions, or integration points that should have been used instead.
 
-Review only the changes introduced on this branch. The configured slash command handles scoping.
+Review only the changes introduced on this branch. The configured slash command handles scoping. The canonical `/code-review` command runs parallel review by default; only `/code-review single` runs the single-pass alternative.
 
 Give a brutally honest review of whether the current branch satisfies the contract and whether it used the simplest repo-idiomatic implementation path.
 

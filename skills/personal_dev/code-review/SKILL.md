@@ -1,11 +1,11 @@
 ---
 name: code-review
-description: Review only the committed changes on the current branch since it diverged from the base branch and report only issues that need fixing. Use when the user asks for a review of committed branch changes, a diff review against main, or whether the current branch is safe to merge.
+description: Review committed changes on the current branch since it diverged from the base branch and report only issues that need fixing. Default mode uses parallel sub-agent passes for correctness, security, performance, maintainability, and edge cases, then integrates a single findings-first review. Use `code-review single` only when the user explicitly asks for a single-pass review.
 ---
 
 # Code Review
 
-Review only the changes introduced on the current branch compared with its merge-base against the default branch.
+Review only the changes introduced on the current branch since merge-base. Use parallel sub-agents by default, and only use single-pass review when the user explicitly asks for `code-review single`.
 
 ## Scope
 
@@ -36,7 +36,25 @@ git diff --stat $BASE..HEAD
 
 If a file appears in the diff that wasn't intentionally modified on this branch, ignore it -- it's likely a rebase artifact.
 
-## Review Focus
+## Parallel Review
+
+Use this mode by default.
+
+If an implementation contract (Goal, Accepted scope, Assumptions, Out of scope, Validation approach) is provided in the caller's prompt, include it in each sub-agent's prompt so they review against the contract too. Respect Out of scope items — do not treat them as missing work.
+
+- **Agent 1: Correctness & Regressions** -- Does this code actually work? Logic errors, broken algorithms, wrong assumptions. Will merging break existing functionality? Removed behavior, changed contracts, broken integrations.
+- **Agent 2: Security & Performance** -- Injection risks, auth issues, data exposure, secrets in code. N+1 queries, unnecessary loops, memory leaks, expensive operations.
+- **Agent 3: Maintainability & Edge Cases** -- Naming, complexity, duplication, missing error handling, test coverage gaps. What inputs would break this? Null handling, empty arrays, boundary conditions, race conditions.
+
+Be specific. Point out exactly what's wrong and where. No padding.
+
+Only use information from the diff. If you're unsure whether something is an issue, say so rather than guessing.
+
+## Single Review
+
+Use this mode only when the user explicitly asks for `code-review single` or a caller explicitly requests single-pass review.
+
+Review focus:
 
 1. **Correctness**: Logic errors, broken algorithms, wrong assumptions.
 2. **Regressions**: Removed behavior, changed contracts, broken integrations.
