@@ -14,17 +14,18 @@ Pass only:
 - original ticket ID, ticket URL, or raw spec
 - selected plan profile
 - configured critic runner and review runner names
-- the preflight checks from `rocket-plan`
+- the explicit checks and JSON schema below
 
-The sub-agent owns only preflight and ticket/source intake. It must not edit
-files, create branches, update tickets, draft the implementation contract, or
-read downstream skills. Delegation must not reduce functionality: the same
+The sub-agent owns only this bounded fact-gathering task and ticket/source
+intake. It must not edit files, create branches, update tickets, or draft the
+implementation contract. Delegation must not reduce functionality: the same
 checks, blockers, and repo-rule awareness apply as inline preflight.
 
 Use a prompt equivalent to:
 
 ```text
-Run rocket-plan preflight only.
+Check these repository facts and ticket/source details. Return only the JSON
+shape below.
 
 Repo/worktree: <absolute path>
 Input: <ticket ID, ticket URL, or raw spec>
@@ -71,6 +72,9 @@ tokens. Use null/empty arrays instead of long explanations. Shape:
   "next_action": "settle_contract|stop_blocked"
 }
 ```
+
+When composing the sub-agent message, do not mention rocket-plan, skills, or
+preflight. Give only the bounded task, inputs, checks, and JSON schema.
 
 The main agent consumes only the JSON. If the sub-agent returns extra prose,
 extract the JSON and ignore the rest. If no valid JSON is returned, stop as
