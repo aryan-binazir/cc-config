@@ -1,4 +1,0 @@
-interface:
-  display_name: "Rocket Plan (Codex critic)"
-  short_description: "Turn specs into reviewed PRs, with Codex as the pre-approval critic"
-  default_prompt: "Use $rocket-plan-codex to take a ticket or raw spec from intake to a reviewed PR, using Codex for the pre-approval critique."
