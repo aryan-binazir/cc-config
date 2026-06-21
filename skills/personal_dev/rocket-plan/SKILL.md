@@ -1,6 +1,12 @@
 ---
 name: rocket-plan
-description: Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake through coding and into a reviewed PR. Use this when the user wants an end-to-end implementation flow: clarify the goal, settle an implementation contract, run the configured one-round pre-approval critique, drive implementation strictly test-first, push, and hand off in-session to the configured rocket-review profile. Optional usage: `rocket-plan <profile>`.
+description: >-
+  Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake
+  through coding and into a reviewed PR. Use this when the user wants an
+  end-to-end implementation flow: clarify the goal, settle an implementation
+  contract, run the configured one-round pre-approval critique, drive
+  implementation strictly test-first, push, and hand off in-session to the
+  configured rocket-review profile. Optional usage: `rocket-plan <profile>`.
 ---
 
 # Rocket Plan

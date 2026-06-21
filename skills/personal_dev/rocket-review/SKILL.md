@@ -1,6 +1,11 @@
 ---
 name: rocket-review
-description: Run the final configured review loop for a completed branch, whether or not a PR already exists. Use this whenever the user says `rocket-review`, asks for the final review loop, or wants Codex to ensure the current branch has a PR, run the configured reviewers, patch what should be patched, and post one final PR summary comment. Optional usage: `rocket-review <profile>`.
+description: >-
+  Run the final configured review loop for a completed branch, whether or not a
+  PR already exists. Use this whenever the user says `rocket-review`, asks for
+  the final review loop, or wants Codex to ensure the current branch has a PR,
+  run the configured reviewers, patch what should be patched, and post one final
+  PR summary comment. Optional usage: `rocket-review <profile>`.
 ---
 
 # Rocket Review
