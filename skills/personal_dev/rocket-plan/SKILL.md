@@ -65,7 +65,7 @@ Then verify:
 git rev-parse --is-inside-work-tree
 command -v gh
 gh auth status
-git ls-remote --exit-code
+git ls-remote --exit-code origin HEAD >/dev/null
 git status -sb
 ```
 
