@@ -7,9 +7,10 @@
 # Workflow
 - _scratch/_context/{branch}.md is the source of truth for project state.
 - Update context when plans, assumptions, or decisions change.
+- The context-file workflow applies to proper ticket-backed or branch-backed project work. For lightweight no-ticket explorations, one-off scripts, quick local experiments, or small code investigations where Ar has not provided a ticket or asked for durable project state, do not create, read, or update `_scratch/_context/*` just to satisfy this rule.
 - For ticket-backed work, do not treat `_scratch/_context/main.md` as the active state file just because the current branch is `main`.
 - Resolve the ticket key first from the user prompt, Linear/Jira, or intended branch name, then use `_scratch/_context/<ticket-key>.md` until a real feature branch exists.
-- If no ticket key or intended branch can be determined, ask Ar which context key/branch to use before reading or writing project state.
+- If the work appears ticket-backed or branch-backed but no ticket key or intended branch can be determined, ask Ar which context key/branch to use before reading or writing project state.
 - Read `_scratch/_context/main.md` only for broad repo-level state, not as the working memory for a specific ticket.
 - Keep the active context file current: update or remove stale assumptions, plans, and status notes instead of letting outdated state accumulate.
 - Before major work, check for project-specific agent rules (AGENTS.md, CLAUDE.md, .cursorrules, etc).
