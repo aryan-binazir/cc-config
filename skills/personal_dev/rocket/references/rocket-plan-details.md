@@ -1,6 +1,9 @@
 # Rocket Plan Details
 
-Load only the sections needed for the active phase.
+Load only the sections needed for the active phase. When extracting sections,
+use exact line ranges or a fence-aware method; simple `awk`/`sed` heading
+extractors that stop at any `^## ` line can break on fenced markdown examples in
+`Contract Template`.
 
 ## Delegated Preflight Capsule
 
@@ -14,6 +17,7 @@ Pass only:
 - original ticket ID, ticket URL, or raw spec
 - selected plan profile
 - configured critic runner and review runner names
+- absolute path to `skills/personal_dev/rocket/scripts/repo_facts.py`
 - the explicit checks and JSON schema below
 
 The sub-agent owns only this bounded fact-gathering task and ticket/source
@@ -33,15 +37,30 @@ Selected plan profile: <profile>
 Critic runner to check: <runner>
 Review runners to check: <runner list>
 
+First run:
+uv run --script <repo_facts.py path> --repo <absolute path> --input <input> --critic-runner <runner> --review-runners <comma-separated runners>
+
+Use that JSON as the source of truth for deterministic repository and tool
+facts.
+
 Checks:
-- Confirm this is a git worktree and the path is the intended repo.
-- Read only current-repo AGENTS.md, CLAUDE.md, and nearby .cursorrules if present.
-- Check gh is installed and authenticated.
-- Check origin HEAD is reachable.
-- Check git status and whether dirty changes block work.
-- Check configured critic/review runner commands are installed.
-- If input is Linear, fetch the ticket and summarize only the facts needed to
-  start contract settlement.
+- Confirm from the script JSON that this is a git worktree and the path is the
+  intended repo.
+- Read only the current-repo rule files listed by the script JSON and summarize
+  relevant rules briefly.
+- Confirm from the script JSON that gh is installed/authenticated, origin HEAD
+  is reachable, git status is understood, and configured runner commands are
+  installed.
+- Decide whether dirty changes reported by the script block work.
+- If the script JSON reports any blockers, include those blockers unchanged,
+  skip ticket fetching, and return `next_action: "stop_blocked"`.
+- If there are no blockers and the script JSON has `source.type_hint: "linear"`,
+  or the input is a Linear URL, fetch the Linear ticket and summarize only the
+  facts needed to start contract settlement.
+- Copy the script JSON's `source.type_hint` into `context.source_type_hint`.
+- Copy the script JSON's `context.branch_setup_command` into
+  `context.branch_setup_command`. Do not run that command; branch changes belong
+  to the main agent after this bounded check returns.
 
 Return JSON only, no markdown, no command logs, no prose. Keep it under 1200
 tokens. Use null/empty arrays instead of long explanations. Shape:
@@ -69,6 +88,13 @@ tokens. Use null/empty arrays instead of long explanations. Shape:
     "priority": null,
     "description_gaps": []
   },
+  "context": {
+    "ticket_key": null,
+    "suggested_context_path": null,
+    "suggested_branch": null,
+    "branch_setup_command": null,
+    "source_type_hint": null
+  },
   "next_action": "settle_contract|stop_blocked"
 }
 ```
@@ -90,16 +116,31 @@ evidence, not raw search dumps.
 
 During pre-contract codebase exploration:
 - Separate discovery from reading. First find candidate files with `rg -l`,
-  `rg --files`, or narrowly scoped filename searches.
+  `rg --files | head`, or narrowly scoped filename searches.
 - Do not run broad repo-wide `rg -n` searches for generic terms like `table`,
   `component`, `roster`, `page`, `draft`, `state`, or `test` unless the output is
   capped and the query is already scoped to a small directory.
+- During pre-contract exploration, cap `rg -n` line-hit output at 40 lines or
+  fewer. If 40 hits is not enough, refine the query/path instead of raising the
+  cap. Larger caps are acceptable for path-only discovery, not line dumps.
+- Do not use uncapped `rg --files | rg ...` pipelines during planning. Add
+  `head`, narrow the path, or switch to `rg -l` so the transcript gets candidate
+  files, not a file-list dump.
+- Do not read multiple large files or broad test files before the contract. Use
+  symbol/label searches to find the relevant ranges first.
+- For UI tickets, resolve the actual route/component surface before reading
+  comparison components or broad tests. If several candidates appear, inspect the
+  smallest route stubs or exact label hits first, then read only the selected
+  component/test ranges.
+- Do not use `sed` to read more than 80 source lines during pre-contract
+  exploration unless the file is already known to be small and central. Prefer
+  `sed -n '<small-range>' path/to/file` around the exact symbol/line hits.
 - Exclude noisy paths by default: `node_modules`, `dist`, `coverage`, generated
   files, lockfiles, build artifacts, and package-manager internals.
 - Prefer commands that return file paths or small symbol hits before reading
   source:
   - `rg -l "specific phrase|test id|component name" src tests`
-  - `rg -n "specificSymbol|data-testid" path/to/file`
+  - `rg -n "specificSymbol|data-testid" path/to/file | head -40`
   - `sed -n '<small-range>' path/to/file`
 - Cap exploratory output. If a search would return more than roughly 80 lines,
   refine the query or switch to `rg -l`; do not dump it into the transcript.
@@ -145,6 +186,19 @@ exclusions, and `Validation approach` for the tests/checks that will drive and
 verify the work.
 
 ## Clarification Coverage
+
+If the `grill-with-docs` skill is available, use it to run this phase and skip
+the inline rules below. Otherwise, follow the rules below.
+
+Before implementation, grill the user. Go down every branch where the spec is
+ambiguous, every decision that has a real cost to get wrong, and every assumption
+that would change the implementation if flipped. Treat planning as the cheap
+phase and act like a senior engineer who refuses to start work until the contract
+is understood end to end.
+
+Be aggressive about surfacing hard questions, not polite about avoiding them. Do
+not pre-soften, batch everything into one shallow round, or skip questions to be
+efficient.
 
 If the source is Linear, make the clarification message self-contained:
 - ticket summary

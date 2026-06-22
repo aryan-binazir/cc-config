@@ -21,10 +21,11 @@ PR, run retired CodeRabbit workflows, or silently switch review profiles.
 
 ## Config
 
-Read config before choosing reviewers:
-
-1. `skills/personal_dev/rocket/rocket.local.yaml` if it exists.
-2. `skills/personal_dev/rocket/rocket.example.yaml` for defaults and missing profiles.
+Run `uv run --script
+/home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/resolve_config.py`
+before choosing reviewers. It reads `rocket.local.yaml` over
+`rocket.example.yaml`; do not also read the config files by hand after this
+succeeds.
 
 Use `rocket-review <profile>` when provided; otherwise use `defaults.review_profile`.
 Stop if the selected `review_profiles.<profile>` does not exist. Do not infer a

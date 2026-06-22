@@ -35,8 +35,9 @@ normally before acting.
 - If delegated preflight cannot run, stop before inline checks with
   `delegated_preflight_unavailable`, unless Ar explicitly approves an inline
   bypass in the current conversation.
-- Read `rocket.local.yaml` first; read `rocket.example.yaml` only for defaults or
-  profiles missing from local config.
+- Resolve config with `uv run --script
+  /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/resolve_config.py`;
+  do not read the YAML files directly unless that script fails.
 - Do not read `rocket-review` or downstream skills during preflight; config gives
   the runner list needed for availability checks.
 - Load only the needed section of
@@ -48,9 +49,11 @@ normally before acting.
 
 ## Config
 
-Read config before choosing a critic or review handoff:
-1. `skills/personal_dev/rocket/rocket.local.yaml` if it exists.
-2. `skills/personal_dev/rocket/rocket.example.yaml` only for defaults and missing profiles.
+Run `uv run --script
+/home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/resolve_config.py`
+before choosing a critic or review handoff. It reads `rocket.local.yaml` over
+`rocket.example.yaml` and returns the selected profiles as JSON. Do not also read
+the config files by hand after this succeeds.
 
 Use `rocket-plan <profile>` when provided; otherwise use `defaults.plan_profile`.
 Stop if `plan_profiles.<profile>` is missing.
@@ -79,6 +82,15 @@ The main agent consumes only the returned JSON. Do not paste or summarize the
 sub-agent transcript. If no valid JSON is returned, stop with
 `delegated_preflight_invalid_output`. Do not retry with another preflight agent.
 
+If the returned JSON identifies a ticket key and the worktree is clean, run the
+exact command from `context.branch_setup_command` before codebase exploration.
+Do not reconstruct the command from memory. If the command is missing, run
+`uv run --script
+/home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py
+--input "<original ticket/spec>"` from the target repo. If branch setup reports
+`not_on_main_for_branch_create`, `dirty_worktree`, `ticket_key_required`, or
+another failure, stop and ask Ar instead of planning from the wrong branch.
+
 Preflight must cover current-repo rules, intended worktree, git state, GitHub
 auth, origin reachability, configured critic/review runner availability, and
 Linear/source access when applicable. Missing auth, missing configured runners,
@@ -92,9 +104,9 @@ assumptions, decisions, implementation status, or review handoff state changes.
 
 Read `Planning Exploration Discipline` before pre-contract codebase exploration.
 In short: discover candidate files before reading, prefer `rg -l` and exact
-symbols/labels, exclude noisy paths, cap exploratory output around 80 lines, read
-narrow line ranges, and delegate genuinely broad discovery only with a compact
-summary return.
+symbols/labels, exclude noisy paths, never dump broad search/file output, avoid
+wide `sed` reads before the contract, and delegate genuinely broad discovery
+only with a compact summary return.
 
 ## Intake And Contract
 
@@ -103,7 +115,9 @@ provided, fetched Linear content is source of truth and raw spec text is
 supplemental.
 
 Before contract settlement, read `Contract Template` and `Clarification Coverage`
-from the details reference. Convert the source into the exact contract shape:
+from the details reference. If the `grill-with-docs` skill is available, use it
+for the clarification/grilling phase and treat the inline clarification rules as
+fallback. Convert the source into the exact contract shape:
 `Goal`, `Accepted scope`, `Assumptions`, `Out of scope`, and `Validation
 approach`.
 
@@ -145,9 +159,10 @@ final step.
 
 - Linear sync: if a Linear ticket exists, read `Linear Managed Region` and update
   only the marker-bounded region.
-- Branch: if on `main`, create `aryan-binazir/<ticket-id-or-short-slug>`; if
-  already on a feature branch, use it. For raw specs, ask once for required
-  ticket/branch naming during clarification.
+- Branch: if the safe preflight branch step did not already create/switch
+  branches, create `aryan-binazir/<ticket-id-or-short-slug>` from a clean `main`
+  worktree; if already on a matching feature branch, use it. For raw specs, ask
+  once for required ticket/branch naming during clarification.
 - Contract file: read `Contract Persistence` and persist the settled contract to
   `_scratch/_contracts/<branch>.md` before code changes. Treat `_scratch` as
   local review state unless Ar asks to commit it.
