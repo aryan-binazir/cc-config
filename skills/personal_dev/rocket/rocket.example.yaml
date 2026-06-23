@@ -1,6 +1,18 @@
 # Copy this file to rocket.local.yaml on a machine that needs different defaults.
 # rocket.local.yaml is ignored by git. Keep profile names semantic and boring:
 # standard, claude, cursor, fast, strict, etc.
+#
+# Repo-owned implementer agent templates live outside runtime-local config:
+# - agents/codex/rocket-implementer-beta.toml
+# - agents/claude/rocket-implementer-beta.md
+#
+# Symlink or copy them into the runtime-specific discovery location on each
+# machine when testing rocket-plan-sub-beta. For example:
+# - Codex project agent: .codex/agents/rocket-implementer-beta.toml
+# - Claude project agent: .claude/agents/rocket-implementer-beta.md
+#
+# Keep implementer.model and effort aligned with the installed/symlinked agent
+# template unless the runtime supports and honors per-invocation model overrides.
 
 defaults:
   plan_profile: standard
@@ -13,6 +25,12 @@ plan_profiles:
       runner: cursor
       model: null
       timeout_ms: 900000
+    implementer:
+      agent: rocket-implementer-beta
+      runner: codex
+      model: gpt-5.5
+      reasoning_effort: medium
+      template: agents/codex/rocket-implementer-beta.toml
     review_profile: standard
 
   claude:
@@ -21,6 +39,12 @@ plan_profiles:
       runner: claude
       model: null
       timeout_ms: 900000
+    implementer:
+      agent: rocket-implementer-beta
+      runner: claude
+      model: sonnet
+      effort: medium
+      template: agents/claude/rocket-implementer-beta.md
     review_profile: claude
 
   cursor:
@@ -29,6 +53,12 @@ plan_profiles:
       runner: cursor
       model: null
       timeout_ms: 900000
+    implementer:
+      agent: rocket-implementer-beta
+      runner: codex
+      model: gpt-5.5
+      reasoning_effort: medium
+      template: agents/codex/rocket-implementer-beta.toml
     review_profile: cursor
 
 review_profiles:
