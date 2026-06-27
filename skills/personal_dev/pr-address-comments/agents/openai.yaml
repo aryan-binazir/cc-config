@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Address Comments"
+  short_description: "Handle agent PR comments locally"
+  default_prompt: "Use $pr-address-comments to handle my agent-prefixed PR comments."
