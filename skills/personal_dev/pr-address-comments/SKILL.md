@@ -70,8 +70,11 @@ Codex: addressed in commit `abc1234`.
 Question-only reply:
 
 ```md
-Codex: Answer: <direct answer to the question>.
+Codex: <direct answer to the question>.
 ```
+
+Use the current agent label followed by the direct reply; do not include an
+extra `Answer:` prefix.
 
 With tests:
 
