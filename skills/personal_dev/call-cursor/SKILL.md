@@ -31,6 +31,17 @@ If the user specifies Opus, use the current pinned Claude Opus model:
 cursor-agent -p -f --model claude-opus-4-8-thinking-high "$PROMPT"
 ```
 
+If the user specifies Sonnet, use the current CLI-exposed Sonnet 5 Extra High
+alias:
+
+```bash
+cursor-agent -p -f --model claude-sonnet-5-xhigh "$PROMPT"
+```
+
+`cursor-agent --list-models` currently labels that alias as `Sonnet 5 1M Extra
+High`. Do not use it when the user explicitly asks for a non-1M Sonnet model;
+no accepted 300K Sonnet 5 Extra High tag has been found in the local CLI.
+
 If the user specifies an exact model name, pass that exact model with `--model`.
 
 ## Prompt Guidance
