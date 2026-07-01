@@ -20,6 +20,7 @@ RUNNER_BINARIES = {
     "claude": "claude",
     "codex": "codex",
     "cursor": "cursor-agent",
+    "cursor-agent": "cursor-agent",
 }
 
 
@@ -107,6 +108,7 @@ def repo_facts(
     input_value: str,
     critic_runner: str | None,
     review_runners: str | None,
+    headless_runner: str | None,
     timeout_ms: int,
 ) -> dict[str, Any]:
     repo = repo.resolve()
@@ -139,11 +141,14 @@ def repo_facts(
 
     critic = runner_available(critic_runner) if critic_runner else None
     review_runner_results = [runner_available(runner) for runner in split_csv(review_runners)]
+    headless = runner_available(headless_runner) if headless_runner else None
     if critic and not critic["available"]:
         blockers.append(f"critic_runner_missing:{critic['runner']}")
     for runner in review_runner_results:
         if not runner["available"]:
             blockers.append(f"review_runner_missing:{runner['runner']}")
+    if headless and not headless["available"]:
+        blockers.append(f"headless_runner_missing:{headless['runner']}")
 
     ticket_key = detect_ticket_key(input_value)
     branch_ticket_key = detect_ticket_key(branch)
@@ -168,6 +173,15 @@ def repo_facts(
             ]
         )
 
+    tools: dict[str, Any] = {
+        "gh": {"available": gh_path is not None, "path": gh_path, "authenticated": bool(gh_auth["ok"])},
+        "origin_reachable": bool(origin.get("ok")),
+        "critic_runner": critic,
+        "review_runners": review_runner_results,
+    }
+    if headless is not None:
+        tools["headless_runner"] = headless
+
     return {
         "ok": not blockers,
         "blockers": blockers,
@@ -181,12 +195,7 @@ def repo_facts(
             "dirty_summary": dirty_summary,
             "rule_files": rule_files(repo),
         },
-        "tools": {
-            "gh": {"available": gh_path is not None, "path": gh_path, "authenticated": bool(gh_auth["ok"])},
-            "origin_reachable": bool(origin.get("ok")),
-            "critic_runner": critic,
-            "review_runners": review_runner_results,
-        },
+        "tools": tools,
         "context": {
             "ticket_key": ticket_key,
             "suggested_key": context_key,
@@ -210,11 +219,19 @@ def main() -> int:
     parser.add_argument("--input", required=True)
     parser.add_argument("--critic-runner")
     parser.add_argument("--review-runners")
+    parser.add_argument("--headless-runner")
     parser.add_argument("--timeout-ms", type=int, default=10_000)
     args = parser.parse_args()
     try:
         emit(
-            repo_facts(args.repo, args.input, args.critic_runner, args.review_runners, args.timeout_ms),
+            repo_facts(
+                args.repo,
+                args.input,
+                args.critic_runner,
+                args.review_runners,
+                args.headless_runner,
+                args.timeout_ms,
+            ),
             pretty=args.pretty,
         )
         return 0

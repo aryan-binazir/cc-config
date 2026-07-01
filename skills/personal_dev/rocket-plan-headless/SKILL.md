@@ -1,23 +1,24 @@
 ---
-name: rocket-plan-sub-beta
+name: rocket-plan-headless
 description: >-
   Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake
   through coding and into a reviewed PR. Use this when the user wants an
   end-to-end implementation flow: clarify the goal, settle an implementation
   contract, run the configured one-round pre-approval critique, drive
-  implementation strictly test-first through a configured fresh implementation
-  sub-agent, push, and hand off in-session to the configured rocket-review
-  profile. Optional usage: `rocket-plan-sub-beta PROFILE`.
+  implementation strictly test-first through a configured headless CLI runner
+  (`cursor-agent`, `claude`, or `codex`), push, and hand off in-session to the
+  configured rocket-review profile. Optional usage: `rocket-plan-headless
+  PROFILE`.
 ---
 
-# Rocket Plan Sub Beta
+# Rocket Plan Headless
 
 Use this for end-to-end implementation work, not ordinary planning or ticket
 analysis. The promise is: clarify the goal, settle a durable implementation
 contract, get one configured pre-approval critique, wait for visible user
-approval, write a compact implementation capsule, delegate implementation to a
-configured fresh sub-agent, push, and invoke `$rocket-review <review-profile>` in
-the same session.
+approval, write a compact implementation capsule, run implementation through a
+configured headless CLI runner, push, and invoke `$rocket-review <review-profile>`
+in the same session.
 
 Do not skip preflight, treat the original spec as the contract, guess past
 material ambiguity, write production code without a driving test, merge the PR,
@@ -53,35 +54,52 @@ normally before acting.
 
 Run `uv run --script
 /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/resolve_config.py`
-before choosing a critic or review handoff. It reads `rocket.local.yaml` over
-`rocket.example.yaml` and returns the selected profiles as JSON. Do not also read
-the config files by hand after this succeeds.
+before choosing a critic, headless implementer, or review handoff. It reads
+`rocket.local.yaml` over `rocket.example.yaml` and returns the selected profiles
+as JSON. Do not also read the config files by hand after this succeeds.
 
-Use `rocket-plan-sub-beta <profile>` when provided; otherwise use
+Use `rocket-plan-headless <profile>` when provided; otherwise use
 `defaults.plan_profile`. Stop if `plan_profiles.<profile>` is missing.
 
 Each plan profile provides `critic.name`, `critic.runner` (`claude`, `codex`, or
 `cursor`), optional `critic.model`, optional `critic.timeout_ms` defaulting to
-`900000`, optional `implementer`, and `review_profile` for `$rocket-review`.
+`900000`, optional `headless`, and `review_profile` for `$rocket-review`.
 
-When present, `implementer` provides the sub-agent to use after approval:
-`implementer.agent` is the runtime agent name, `implementer.runner` is `codex` or
-`claude`, `implementer.model` is the runtime-specific model value,
-`implementer.reasoning_effort` is the Codex effort key, `implementer.effort` is
-the Claude effort key, and `implementer.template` is the repo-owned template path
-under `agents/`. Template paths are informational; the runtime must have the
-agent installed, copied, or symlinked where that runtime discovers agents. Keep
-the configured model/effort aligned with the installed agent template unless the
-runtime supports and honors per-invocation model overrides.
+When present, `headless` provides the CLI implementer to run after approval:
+`headless.runner` is `cursor-agent`, `claude`, or `codex`, `headless.model` is
+the runner-specific model value, `headless.reasoning_effort` is the Codex
+`model_reasoning_effort` value, `headless.effort` is the Claude effort value,
+and `headless.timeout_ms` defaults to `900000`. If `headless.runner` is missing,
+use `codex`.
 
-Runner commands:
+Critic runner commands:
 - `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
 - `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
 - `cursor`: `cursor-agent -p "$PROMPT"`
 
-When `model` is set, pass the runner's supported `--model <model>` flag. Do not
-pass Cursor `-f` for plan critique. The configured critique is exactly one
-external round unless Ar asks for more in the current conversation.
+Headless implementation commands:
+- `cursor-agent`: `cursor-agent -p --yolo --trust --model <model> "$PROMPT"`
+- `claude`: `claude --dangerously-skip-permissions -p --model <model> --effort <effort> "$PROMPT"`
+- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox --model <model> -c model_reasoning_effort="<effort>" "$PROMPT" < /dev/null`
+
+When `model` is set, pass the runner's supported `--model <model>` flag. For
+`cursor-agent`, use `--model composer-2.5` when no model is configured. For
+`claude`, use `--model sonnet` and `--effort high` when not configured. For
+`codex`, use `--model gpt-5.5` and `-c model_reasoning_effort="xhigh"` when not
+configured. Do not pass Cursor `--yolo` or `-f` for plan critique; use YOLO only
+for headless implementation. The configured critique is exactly one external
+round unless Ar asks for more in the current conversation.
+
+Model research commands used for these defaults:
+- `codex exec --help` confirms `--model`, `-c`, and
+  `--dangerously-bypass-approvals-and-sandbox`; `codex debug models` lists
+  `gpt-5.5` with `low`, `medium`, `high`, and `xhigh` reasoning levels.
+- `claude --help` confirms `--model`, `--effort`, `-p`, and
+  `--dangerously-skip-permissions`; it documents aliases such as `opus` and
+  `sonnet`.
+- `cursor-agent --help` confirms `--model`, `--trust`, and `--yolo`; `--yolo`
+  is the alias for forced Run Everything mode, and `cursor-agent --list-models`
+  lists `composer-2.5` as current.
 
 ## Preflight
 
@@ -89,6 +107,24 @@ Read only the `Delegated Preflight Capsule` section of the details reference,
 then spawn exactly one no-fork sub-agent for preflight and source/ticket intake.
 Delegation is a context-management optimization only: it must perform the same
 checks and enforce the same blockers as inline preflight.
+
+Pass the selected plan profile's `headless.runner` as the optional headless
+implementation runner for preflight. If no runner is configured, pass `codex`.
+When adapting the shared `Delegated Preflight Capsule`, add this one extra line
+to the preflight input:
+
+```text
+Headless implementation runner to check: <runner>
+```
+
+Also add this flag to the `repo_facts.py` command shown in that capsule:
+
+```bash
+--headless-runner <runner>
+```
+
+Require the returned `tools` object to include `headless_runner` from the script
+JSON. Missing or unavailable headless runners are hard blockers.
 
 The main agent consumes only the returned JSON. Do not paste or summarize the
 sub-agent transcript. If no valid JSON is returned, stop with
@@ -104,10 +140,10 @@ Do not reconstruct the command from memory. If the command is missing, run
 another failure, stop and ask Ar instead of planning from the wrong branch.
 
 Preflight must cover current-repo rules, intended worktree, git state, GitHub
-auth, origin reachability, configured critic/review runner availability, and
-Linear/source access when applicable. Missing auth, missing configured runners,
-unreachable remotes, inaccessible tickets, and unsafe dirty changes are hard
-stops.
+auth, origin reachability, configured critic/review runner availability,
+configured headless implementation runner availability, and Linear/source access
+when applicable. Missing auth, missing configured runners, unreachable remotes,
+inaccessible tickets, and unsafe dirty changes are hard stops.
 
 If repo rules require `_scratch/_context/<branch>.md`, update it when plans,
 assumptions, decisions, implementation status, or review handoff state changes.
@@ -164,8 +200,8 @@ Stop until Ar explicitly approves.
 
 The visible plan must include the finalized contract, concise execution steps,
 why this is the simplest repo-idiomatic path, strict test-first cycles,
-validation/commit checkpoints, and `$rocket-review <review-profile>` as the
-final step.
+validation/commit checkpoints, the configured headless implementation runner,
+and `$rocket-review <review-profile>` as the final step.
 
 ## After Approval
 
@@ -181,7 +217,7 @@ final step.
 - Implementation capsule: write a compact implementation capsule next to the
   contract at `_scratch/_contracts/<branch>.implementation.md` before code
   changes. This capsule, not the planning transcript, is the source passed to the
-  implementer.
+  headless implementer.
 
 ## Implementation Capsule
 
@@ -203,43 +239,42 @@ mistake.
 
 ## Implementation
 
-Spawn exactly one fresh implementation sub-agent after the implementation
-capsule is written. Use the selected plan profile's `implementer.agent` and
-state the configured runner/model/effort in the spawn instruction. Pass only the
-capsule path, the repo path, and this task: implement the capsule through strict
-test-first cycles. Do not paste the planning transcript into the implementer
-prompt.
+Run exactly one configured headless implementation process after the
+implementation capsule is written. Pass only the capsule path, the repo path, and
+this task: implement the capsule through strict test-first cycles. Do not paste
+the planning transcript into the implementer prompt.
 
-If `implementer.agent` is missing, use the runtime's execution-focused default
-worker agent. If a configured implementer agent is not available in the current
-runtime, stop with `implementation_agent_unavailable` unless Ar explicitly
-approves a fallback in the current conversation.
+The headless prompt must instruct the implementer to use the `tdd` skill if
+available. Otherwise it must read `Implementation Discipline` and follow that
+loop. It may edit files, run tests, and create logical checkpoint commits when
+that matches the approved plan. It must not push, invoke `$rocket-review`,
+broaden scope beyond the capsule, or ask the main agent to reconstruct planning
+context.
 
-The implementer must use the `tdd` skill if available. Otherwise it must read
-`Implementation Discipline` and follow that loop. It may edit files, run tests,
-and create logical checkpoint commits when that matches the approved plan. It
-must not push, invoke `$rocket-review`, broaden scope beyond the capsule, or ask
-the main agent to reconstruct planning context.
-
-The implementer must return a compact summary only:
+The headless implementer must return a compact summary only:
 - files changed
 - commits created, if any
 - tests/validation run and results
 - blockers or spec ambiguities
 - any intentional deviations from the capsule
 
-The main agent consumes only that compact return, then inspects git status,
+Run the headless command from the target repo root with the configured
+`headless.timeout_ms`. If the configured runner is unavailable, fails
+non-interactive auth, exits non-zero, times out, or cannot be invoked with the
+configured model, stop with `headless_implementation_failed` and report the
+exact runner, command shape, elapsed time, exit status, and useful output. Do not
+fallback to inline implementation or another runner unless Ar explicitly
+approves that in the current conversation.
+
+The main agent consumes only the compact return, then inspects git status,
 reviews the resulting diff or commits as needed, runs targeted validation, runs
 repo-required broader validation, and creates any missing logical checkpoint
 commits. Run `make lint` before each commit unless repo rules define another
 command.
 
-If a fresh implementation sub-agent cannot run, stop with
-`implementation_delegation_unavailable` unless Ar explicitly approves an inline
-bypass in the current conversation.
-
-Fix ordinary code/test failures silently. Stop only when a failure reveals real
-spec ambiguity or a required permission/tooling blocker.
+Fix ordinary code/test failures silently after the headless implementer returns.
+Stop only when a failure reveals real spec ambiguity or a required
+permission/tooling blocker.
 
 ## Review Handoff
 

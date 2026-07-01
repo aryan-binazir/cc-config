@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rocket Plan Headless"
+  short_description: "Turn specs into reviewed PRs via a headless CLI implementer"
+  default_prompt: "Use $rocket_plan_headless to take a ticket or raw spec from intake to a reviewed PR with headless CLI implementation."
