@@ -124,13 +124,17 @@ def repo_facts(
     dirty_summary = compact_lines(status.get("stdout", ""))
     head = git_output(repo, ["rev-parse", "HEAD"]) if is_worktree else {"stdout": ""}
 
-    origin = (
-        git_output(repo, ["ls-remote", "--exit-code", "origin", "HEAD"], timeout_ms=timeout_ms)
+    origin_main = (
+        git_output(
+            repo,
+            ["ls-remote", "--exit-code", "origin", "refs/heads/main"],
+            timeout_ms=timeout_ms,
+        )
         if is_worktree
         else {"ok": False}
     )
-    if is_worktree and not origin["ok"]:
-        blockers.append("origin_head_unreachable")
+    if is_worktree and not origin_main["ok"]:
+        blockers.append("origin_main_unreachable")
 
     gh_path = shutil.which("gh")
     gh_auth = run_cmd(["gh", "auth", "status"], timeout_ms=timeout_ms) if gh_path else {"ok": False}
@@ -152,11 +156,11 @@ def repo_facts(
 
     ticket_key = detect_ticket_key(input_value)
     branch_ticket_key = detect_ticket_key(branch)
-    if ticket_key and branch_ticket_key and ticket_key != branch_ticket_key:
-        blockers.append(f"branch_ticket_mismatch:{branch_ticket_key}!={ticket_key}")
 
     context_key = ticket_key or branch
-    context_path = str(repo / "_scratch" / "_context" / f"{context_key}.md") if context_key else None
+    context_path = (
+        str(repo / "_scratch" / "_context" / f"{context_key}.md") if context_key else None
+    )
     suggested_branch = f"aryan-binazir/{ticket_key}" if ticket_key else None
     branch_setup_command = None
     if ticket_key:
@@ -170,12 +174,19 @@ def repo_facts(
                 repo,
                 "--ticket-key",
                 ticket_key,
+                "--base-branch",
+                "main",
             ]
         )
 
     tools: dict[str, Any] = {
-        "gh": {"available": gh_path is not None, "path": gh_path, "authenticated": bool(gh_auth["ok"])},
-        "origin_reachable": bool(origin.get("ok")),
+        "gh": {
+            "available": gh_path is not None,
+            "path": gh_path,
+            "authenticated": bool(gh_auth["ok"]),
+        },
+        "origin_reachable": bool(origin_main.get("ok")),
+        "origin_main": {"available": bool(origin_main.get("ok"))},
         "critic_runner": critic,
         "review_runners": review_runner_results,
     }
@@ -202,13 +213,15 @@ def repo_facts(
             "suggested_path": context_path,
             "suggested_branch": suggested_branch,
             "branch_setup_command": branch_setup_command,
+            "branch_setup_creates_worktree": bool(ticket_key),
             "read_main_for_ticket_work": False,
+            "base_branch": "main",
         },
         "source": {
             "type_hint": "linear" if ticket_key else "raw",
             "ticket_key": ticket_key,
         },
-        "judgment_needed": ["dirty_worktree"] if dirty_summary else [],
+        "judgment_needed": ["dirty_worktree"] if dirty_summary and not ticket_key else [],
     }
 
 

@@ -48,10 +48,13 @@ Checks:
   intended repo.
 - Read only the current-repo rule files listed by the script JSON and summarize
   relevant rules briefly.
-- Confirm from the script JSON that gh is installed/authenticated, origin HEAD
+- Confirm from the script JSON that gh is installed/authenticated, `origin/main`
   is reachable, git status is understood, and configured runner commands are
   installed.
-- Decide whether dirty changes reported by the script block work.
+- Treat the current checkout's branch and dirty state as context, not a branch
+  setup blocker, because the main agent will run the script-provided command to
+  create or reuse a ticket worktree from the latest `origin/main`. Dirty state
+  blocks only when it is in the target branch's returned worktree.
 - If the script JSON reports any blockers, include those blockers unchanged,
   skip ticket fetching, and return `next_action: "stop_blocked"`.
 - If there are no blockers and the script JSON has `source.type_hint: "linear"`,
@@ -59,8 +62,8 @@ Checks:
   facts needed to start contract settlement.
 - Copy the script JSON's `source.type_hint` into `context.source_type_hint`.
 - Copy the script JSON's `context.branch_setup_command` into
-  `context.branch_setup_command`. Do not run that command; branch changes belong
-  to the main agent after this bounded check returns.
+  `context.branch_setup_command`. Do not run that command; ticket worktree setup
+  belongs to the main agent after this bounded check returns.
 
 Return JSON only, no markdown, no command logs, no prose. Keep it under 1200
 tokens. Use null/empty arrays instead of long explanations. Shape:

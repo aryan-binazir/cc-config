@@ -58,6 +58,86 @@ def current_branch(repo: Path) -> str | None:
     return branch or None
 
 
+def sanitize_path_segment(value: str) -> str:
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-")
+    return sanitized or "rocket-worktree"
+
+
+def default_worktree_path(repo: Path, ticket_key: str) -> Path:
+    return repo.parent / f"{repo.name}-{sanitize_path_segment(ticket_key)}"
+
+
+def local_branch_exists(repo: Path, branch: str) -> bool:
+    result = git_output(repo, ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"])
+    return bool(result["ok"])
+
+
+def parse_worktrees(output: str) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    for line in output.splitlines():
+        if not line.strip():
+            if current:
+                entries.append(current)
+                current = {}
+            continue
+        key, _, value = line.partition(" ")
+        if key == "worktree":
+            current["path"] = value
+        elif key == "branch":
+            current["branch"] = value.removeprefix("refs/heads/")
+    if current:
+        entries.append(current)
+    return entries
+
+
+def worktree_for_branch(repo: Path, branch: str) -> Path | None:
+    result = git_output(repo, ["worktree", "list", "--porcelain"])
+    if not result["ok"]:
+        return None
+    for entry in parse_worktrees(result["stdout"]):
+        if entry.get("branch") == branch and entry.get("path"):
+            return Path(entry["path"])
+    return None
+
+
+def worktree_dirty(path: Path) -> bool:
+    status = git_output(path, ["status", "--porcelain=v1"])
+    return bool(status["stdout"].strip())
+
+
+def fetch_latest_base(repo: Path, remote: str, base_branch: str, timeout_ms: int) -> dict[str, Any]:
+    fetch = git_output(
+        repo,
+        [
+            "fetch",
+            "--prune",
+            remote,
+            f"refs/heads/{base_branch}:refs/remotes/{remote}/{base_branch}",
+        ],
+        timeout_ms=timeout_ms,
+    )
+    if not fetch["ok"]:
+        return {
+            "ok": False,
+            "failure_mode": "main_unavailable",
+            "remote": remote,
+            "base_branch": base_branch,
+            "stderr": fetch["stderr"],
+        }
+    ref = f"{remote}/{base_branch}"
+    verify = git_output(repo, ["rev-parse", "--verify", ref])
+    if not verify["ok"]:
+        return {
+            "ok": False,
+            "failure_mode": "main_unavailable",
+            "remote": remote,
+            "base_branch": base_branch,
+            "stderr": verify["stderr"],
+        }
+    return {"ok": True, "base_ref": ref, "base_head": verify["stdout"].strip()}
+
+
 def detect_ticket_key(*values: str | None) -> str | None:
     for value in values:
         if not value:
@@ -85,46 +165,130 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
     target = args.branch_name or f"{args.prefix}/{ticket_key}"
     current = current_branch(repo)
     current_ticket = detect_ticket_key(current)
-    status = git_output(repo, ["status", "--porcelain=v1"])
-    dirty = bool(status["stdout"].strip())
 
-    if dirty:
-        return {"ok": False, "failure_mode": "dirty_worktree", "current_branch": current, "target_branch": target}
-    if current == target:
-        return {"ok": True, "action": "already_on_branch", "branch": current}
+    latest_base = fetch_latest_base(repo, args.remote, args.base_branch, args.timeout_ms)
+    if not latest_base["ok"]:
+        return latest_base
+    base_fields = {key: value for key, value in latest_base.items() if key != "ok"}
 
-    local = git_output(repo, ["show-ref", "--verify", "--quiet", f"refs/heads/{target}"])
-    if local["ok"]:
-        switched = git_output(repo, ["switch", target])
-        return {"ok": switched["ok"], "action": "switched_existing", "branch": target, "stderr": switched["stderr"]}
-
-    remote = git_output(repo, ["show-ref", "--verify", "--quiet", f"refs/remotes/origin/{target}"])
-    if remote["ok"]:
-        switched = git_output(repo, ["switch", "--track", f"origin/{target}"])
-        return {"ok": switched["ok"], "action": "tracked_remote", "branch": target, "stderr": switched["stderr"]}
-
-    if current not in {"main", "master"}:
+    target_worktree = worktree_for_branch(repo, target)
+    if target_worktree:
+        if worktree_dirty(target_worktree):
+            return {
+                "ok": False,
+                "failure_mode": "dirty_target_worktree",
+                "current_branch": current,
+                "current_ticket_key": current_ticket,
+                "target_branch": target,
+                "ticket_key": ticket_key,
+                "worktree_path": str(target_worktree),
+            }
         return {
-            "ok": False,
-            "failure_mode": "not_on_main_for_branch_create",
-            "current_branch": current,
-            "current_ticket_key": current_ticket,
-            "target_branch": target,
-            "ticket_key": ticket_key,
+            "ok": True,
+            "action": "existing_worktree",
+            "branch": target,
+            "worktree_path": str(target_worktree),
+            **base_fields,
         }
 
-    created = git_output(repo, ["switch", "-c", target])
-    return {"ok": created["ok"], "action": "created", "branch": target, "stderr": created["stderr"]}
+    worktree_path = (args.worktree_path or default_worktree_path(repo, ticket_key)).resolve()
+    if worktree_path.exists():
+        return {
+            "ok": False,
+            "failure_mode": "worktree_path_exists",
+            "target_branch": target,
+            "ticket_key": ticket_key,
+            "worktree_path": str(worktree_path),
+        }
+
+    if current == target:
+        return {
+            "ok": True,
+            "action": "already_on_branch",
+            "branch": current,
+            "worktree_path": str(repo),
+            **base_fields,
+        }
+
+    if local_branch_exists(repo, target):
+        added = git_output(repo, ["worktree", "add", str(worktree_path), target])
+        return {
+            "ok": added["ok"],
+            "action": "attached_existing_branch",
+            "branch": target,
+            "worktree_path": str(worktree_path),
+            "stderr": added["stderr"],
+            **base_fields,
+        }
+
+    remote = git_output(repo, ["ls-remote", "--exit-code", args.remote, f"refs/heads/{target}"])
+    if remote["ok"]:
+        fetch_target = git_output(
+            repo,
+            [
+                "fetch",
+                "--prune",
+                args.remote,
+                f"refs/heads/{target}:refs/remotes/{args.remote}/{target}",
+            ],
+            timeout_ms=args.timeout_ms,
+        )
+        if not fetch_target["ok"]:
+            return {
+                "ok": False,
+                "failure_mode": "target_branch_fetch_failed",
+                "target_branch": target,
+                "stderr": fetch_target["stderr"],
+            }
+        added = git_output(
+            repo,
+            [
+                "worktree",
+                "add",
+                "--track",
+                "-b",
+                target,
+                str(worktree_path),
+                f"{args.remote}/{target}",
+            ],
+        )
+        return {
+            "ok": added["ok"],
+            "action": "tracked_remote_worktree",
+            "branch": target,
+            "worktree_path": str(worktree_path),
+            "stderr": added["stderr"],
+            **base_fields,
+        }
+
+    created = git_output(
+        repo,
+        ["worktree", "add", "-b", target, str(worktree_path), latest_base["base_ref"]],
+    )
+    return {
+        "ok": created["ok"],
+        "action": "created_worktree_from_main",
+        "branch": target,
+        "worktree_path": str(worktree_path),
+        "stderr": created["stderr"],
+        **base_fields,
+    }
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create or switch to a ticket branch from a safe worktree.")
+    parser = argparse.ArgumentParser(
+        description="Create or reuse a ticket worktree from the latest remote main."
+    )
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--ticket-key")
     parser.add_argument("--input", default="")
     parser.add_argument("--branch-name")
     parser.add_argument("--prefix", default="aryan-binazir")
+    parser.add_argument("--remote", default="origin")
+    parser.add_argument("--base-branch", default="main")
+    parser.add_argument("--worktree-path", type=Path)
+    parser.add_argument("--timeout-ms", type=int, default=10_000)
     args = parser.parse_args()
     try:
         emit(ensure_branch(args), pretty=args.pretty)
