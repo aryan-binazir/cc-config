@@ -75,10 +75,10 @@ use `codex`.
 Critic runner commands:
 - `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
 - `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
-- `cursor`: `cursor-agent -p "$PROMPT"`
+- `cursor`: `cursor-agent --print --trust "$PROMPT"`
 
 Headless implementation commands:
-- `cursor-agent`: `cursor-agent -p --yolo --trust --model <model> "$PROMPT"`
+- `cursor-agent`: `cursor-agent --print --force --trust --model <model> "$PROMPT"`
 - `claude`: `claude --dangerously-skip-permissions -p --model <model> --effort <effort> "$PROMPT"`
 - `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox --model <model> -c model_reasoning_effort="<effort>" "$PROMPT" < /dev/null`
 
@@ -86,7 +86,7 @@ When `model` is set, pass the runner's supported `--model <model>` flag. For
 `cursor-agent`, use `--model composer-2.5` when no model is configured. For
 `claude`, use `--model sonnet` and `--effort high` when not configured. For
 `codex`, use `--model gpt-5.5` and `-c model_reasoning_effort="xhigh"` when not
-configured. Do not pass Cursor `--yolo` or `-f` for plan critique; use YOLO only
+configured. Do not pass Cursor `--force` for plan critique; use force mode only
 for headless implementation. The configured critique is exactly one external
 round unless Ar asks for more in the current conversation.
 
@@ -94,11 +94,11 @@ Model research commands used for these defaults:
 - `codex exec --help` confirms `--model`, `-c`, and
   `--dangerously-bypass-approvals-and-sandbox`; `codex debug models` lists
   `gpt-5.5` with `low`, `medium`, `high`, and `xhigh` reasoning levels.
-- `claude --help` confirms `--model`, `--effort`, `-p`, and
+- `claude --help` confirms `--model`, `--effort`, `--print`, and
   `--dangerously-skip-permissions`; it documents aliases such as `opus` and
   `sonnet`.
-- `cursor-agent --help` confirms `--model`, `--trust`, and `--yolo`; `--yolo`
-  is the alias for forced Run Everything mode, and `cursor-agent --list-models`
+- `cursor-agent --help` confirms `--model`, `--trust`, and `--force`, and
+  `cursor-agent --list-models`
   lists `composer-2.5` as current.
 
 ## Preflight

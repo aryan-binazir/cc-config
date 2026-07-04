@@ -65,10 +65,10 @@ Each plan profile provides `critic.name`, `critic.runner` (`claude`, `codex`, or
 Runner commands:
 - `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
 - `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
-- `cursor`: `cursor-agent -p "$PROMPT"`
+- `cursor`: `cursor-agent --print --trust "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag. Do not
-pass Cursor `-f` for plan critique. The configured critique is exactly one
+pass Cursor force mode for plan critique. The configured critique is exactly one
 external round unless Ar asks for more in the current conversation.
 
 ## Preflight

@@ -38,7 +38,7 @@ and `max_rounds`.
 Runner commands:
 - `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
 - `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
-- `cursor`: `cursor-agent -p -f "$PROMPT"`
+- `cursor`: `cursor-agent --print --force --trust "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag.
 
