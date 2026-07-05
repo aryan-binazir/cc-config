@@ -86,11 +86,11 @@ sub-agent transcript. If no valid JSON is returned, stop with
 
 If the returned JSON identifies a ticket key, run the exact command from
 `context.branch_setup_command` before codebase exploration. Do not reconstruct
-the command from memory. This command must fetch the latest `origin/main` and
-create or reuse a ticket worktree from that base; the caller does not need to be
-on `main`. Parse its JSON output and continue all exploration, context,
-contract, implementation capsule, implementation, validation, commit, push, and
-review work from the returned `worktree_path`. If the command is missing, run
+the command from memory. This command must fetch the latest `origin/main`; new
+ticket worktrees must live under `~/repos/.worktrees/<repo-name>/<ticket-key>`,
+and the caller does not need to be on `main`. Parse its JSON output and continue
+all exploration, context, contract, implementation capsule, implementation,
+validation, commit, push, and review work from the returned `worktree_path`. If the command is missing, run
 `uv run --script
 /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py
 --input "<original ticket/spec>"` from the target repo. If branch setup reports
@@ -170,9 +170,9 @@ final step.
   only the marker-bounded region.
 - Branch: if the safe preflight branch step did not already return a worktree,
   run `ensure_branch.py` to create or reuse
-  `aryan-binazir/<ticket-id-or-short-slug>` in a worktree from the latest
-  `origin/main`; if already on a matching feature branch, use it. For raw specs,
-  ask once for required ticket/branch naming during clarification.
+  `aryan-binazir/<ticket-id-or-short-slug>` in `~/repos/.worktrees/<repo-name>/`
+  from the latest `origin/main`; if already on a matching feature branch, use it.
+  For raw specs, ask once for required ticket/branch naming during clarification.
 - Contract file: read `Contract Persistence` and persist the settled contract to
   `_scratch/_contracts/<branch>.md` before code changes. Treat `_scratch` as
   local review state unless Ar asks to commit it.

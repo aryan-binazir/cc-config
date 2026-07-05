@@ -64,7 +64,13 @@ def sanitize_path_segment(value: str) -> str:
 
 
 def default_worktree_path(repo: Path, ticket_key: str) -> Path:
-    return repo.parent / f"{repo.name}-{sanitize_path_segment(ticket_key)}"
+    return (
+        Path.home()
+        / "repos"
+        / ".worktrees"
+        / repo.name
+        / sanitize_path_segment(ticket_key)
+    )
 
 
 def local_branch_exists(repo: Path, branch: str) -> bool:
@@ -200,6 +206,7 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
             "ticket_key": ticket_key,
             "worktree_path": str(worktree_path),
         }
+    worktree_path.parent.mkdir(parents=True, exist_ok=True)
 
     if current == target:
         return {
