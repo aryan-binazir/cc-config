@@ -109,10 +109,11 @@ When composing the sub-agent message, do not mention rocket-plan, skills, or
 preflight. Give only the bounded task, inputs, checks, and JSON schema.
 
 The main agent consumes only the JSON. If the sub-agent returns extra prose,
-extract the JSON and ignore the rest. If no valid JSON is returned, stop as
-blocked with `delegated_preflight_invalid_output`; do not spawn another
-preflight agent and do not fall back to inline preflight without explicit current
-conversation approval from Ar.
+extract the JSON and ignore the rest. If no valid JSON is returned, retry once
+with one fresh preflight sub-agent. If the retry also returns no valid JSON,
+stop as blocked with `delegated_preflight_invalid_output`; do not spawn further
+preflight agents and do not fall back to inline preflight without explicit
+current conversation approval from Ar.
 
 ## Planning Exploration Discipline
 
