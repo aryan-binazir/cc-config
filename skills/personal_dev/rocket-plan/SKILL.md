@@ -145,10 +145,12 @@ After the contract is settled and before presenting the plan:
 3. Revise the plan for valid feedback.
 4. Stop if unresolved material concerns require Ar's input.
 
-Do not call `update_plan`, present the plan for approval, update Linear, create
-or switch branches, persist the contract, or edit files until critique is
-complete. If the critic times out after the configured budget, report the
-timeout instead of silently skipping critique.
+Do not call `update_plan`, present the plan for approval, update Linear,
+persist the contract, or edit files until critique is complete. The required
+preflight branch/worktree setup is the only branch setup allowed before
+critique; do not create or switch any other branches. If the critic times out
+after the configured budget, report the timeout instead of silently skipping
+critique.
 
 ## Approval Gate
 
