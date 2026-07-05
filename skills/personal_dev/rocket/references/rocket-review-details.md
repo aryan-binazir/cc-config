@@ -158,10 +158,15 @@ _scratch/_reviews/<diary_name>_<branch-safe>.md
 Use branch name as identity and replace `/` with `-` only for the filename.
 Create `_scratch/_reviews` if needed.
 
-Use reviewer-and-round sections:
+Use reviewer-and-round sections and keep a compact ledger at the top:
 
 ```md
 # Rocket Review: <branch>
+
+## Review Ledger
+- Cursor - Needs fixes - 1st round
+- Cursor - Approved with fixes - 2nd round
+- Codex - Approved - 1st round
 
 ## Cursor Round 1
 ### Verdict: NEEDS FIXES
@@ -184,6 +189,11 @@ Rules:
 - Keep each round self-contained.
 - If a severity group has no items, write `- (none)`.
 - Include the round commit hash for patched items.
+- Keep the ledger updated after each reviewer round.
+- Use ledger verdict labels: `APPROVE` -> `Approved`,
+  `APPROVE WITH FIXES` -> `Approved with fixes`, and `NEEDS FIXES` ->
+  `Needs fixes`.
+- Use ordinal round labels such as `1st round`, `2nd round`, and `3rd round`.
 - If a later round finds a new issue caused by an earlier patch, say that in the
   finding text instead of inventing a new status.
 - Do not claim a patch, skip, or open item unless it happened in that round.
@@ -201,6 +211,10 @@ Shape:
 
 **Profile:** <profile>
 **Rounds:** <reviewer round count>
+**Review ledger:**
+- Cursor - Approved with fixes - 2nd round
+- Codex - Approved - 1st round
+
 **Cursor verdict:** APPROVE WITH FIXES
 **Codex verdict:** APPROVE
 
@@ -223,6 +237,11 @@ Shape:
 
 Rules:
 - Use a closed `<details>` block; do not add `open`.
+- Include `Review ledger` copied from the diary before reviewer verdict lines.
+- Do not summarize review as complete unless every configured reviewer has a
+  ledger line.
+- If any reviewer ledger line is `Needs fixes`, the overall review is not
+  approved.
 - Use configured reviewer names as section headings.
 - Each reviewer verdict line uses the verdict token from that reviewer's final
   round. If it ended on `NEEDS FIXES`, write
