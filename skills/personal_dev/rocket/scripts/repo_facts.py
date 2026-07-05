@@ -218,7 +218,9 @@ def repo_facts(
             "base_branch": "main",
         },
         "source": {
-            "type_hint": "linear" if ticket_key else "raw",
+            # A ticket-shaped key does not identify the tracker. Callers must
+            # resolve Linear vs Jira with available tooling, not key format.
+            "type_hint": "ticket" if ticket_key else "raw",
             "ticket_key": ticket_key,
         },
         "judgment_needed": ["dirty_worktree"] if dirty_summary and not ticket_key else [],

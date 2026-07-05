@@ -94,7 +94,8 @@ missing or empty after normalization, treat the output as malformed.
 Parse verdicts by locating `## Verdict` and taking the last non-empty line under
 that section, uppercased with surrounding whitespace and trailing punctuation
 stripped. Approval requires exact `APPROVE` or `APPROVE WITH FIXES`. Any other
-token, including `NEEDS FIXES` or `REJECT`, is non-approval.
+token is non-approval; this includes `NEEDS FIXES` and foreign/legacy tokens
+such as `REJECT` from reviewers that ignore the requested format.
 
 Do not collapse `APPROVE WITH FIXES` into `APPROVE`. Severity counts do not end a
 reviewer phase; only the verdict token does.

@@ -36,13 +36,13 @@ Prefer the bundled helper:
 
 ```bash
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-/Users/ar/repos/cc-config/skills/nvim/scripts/open_nvim_tmux.sh "$repo_root" path/to/file.go 150
+/home/ar/repos/cc-config/skills/personal_dev/nvim/scripts/open_nvim_tmux.sh "$repo_root" path/to/file.go 150
 ```
 
 With a column:
 
 ```bash
-/Users/ar/repos/cc-config/skills/nvim/scripts/open_nvim_tmux.sh "$repo_root" path/to/file.go 150 14
+/home/ar/repos/cc-config/skills/personal_dev/nvim/scripts/open_nvim_tmux.sh "$repo_root" path/to/file.go 150 14
 ```
 
 Fallback if the helper is unavailable:

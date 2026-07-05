@@ -41,8 +41,6 @@ Discussion-first is mandatory. Do not start code changes before a decision on th
 
 For each selected number, ask whether to accept and implement, reject with rationale, or defer. Then mark it handled and persist `resolution` (`accepted`/`rejected`/`deferred`) plus a short `resolutionNote`. Stay scoped to PR comments.
 
-Never mention tool/vendor names in user-facing output. Never sign with a product or assistant name.
-
 ## Output
 
 Always output:

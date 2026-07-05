@@ -37,7 +37,7 @@ and `max_rounds`.
 
 Runner commands:
 - `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
-- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
+- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT" < /dev/null`
 - `cursor`: `cursor-agent --print --force --trust "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag.
@@ -94,9 +94,11 @@ Supply the spec directly to every reviewer. Do not make reviewers discover it.
 
 Use the best available source in this order:
 1. `_scratch/_contracts/<branch>.md` from `rocket-plan`
-2. a Linear ticket ID
-3. a full Linear ticket URL
-4. explicit fallback spec text
+2. a Linear or Jira ticket ID (resolve the tracker with available tooling; do
+   not assume it from the key format)
+3. a full Linear or Jira ticket URL
+4. a markdown spec file path supplied by Ar
+5. explicit fallback spec text
 
 Use the raw branch path for contracts. Example:
 `aryan-binazir/BBA-11` maps to `_scratch/_contracts/aryan-binazir/BBA-11.md`.
@@ -128,7 +130,7 @@ If no PR exists:
   prefixes, derive the title from consistent branch commit subjects; stop if
   they are inconsistent.
 - If repo-local rules do not define a body shape, use the fallback in
-  `skills/personal_dev/rocket/references/rocket-review-details.md`.
+  `/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-review-details.md`.
 - Populate the PR body from the contract, landed changes, and validation that
   actually ran.
 
@@ -149,7 +151,8 @@ For `summary_title: Rocket Review Summary`, the line is:
 <summary>Rocket Review Summary</summary>
 ```
 
-Do not add diary resume logic.
+Do not add diary resume logic. One rocket review per PR is intentional; if Ar
+wants a fresh review, Ar deletes the summary comment first.
 
 ## Practical Sequence
 
@@ -158,7 +161,7 @@ Do not add diary resume logic.
 3. Ensure the review target is pushed and upstream matches local `HEAD`.
 4. Resolve or create the PR non-interactively.
 5. Check the completion shortcut and stop if review is already complete.
-6. Read `skills/personal_dev/rocket/references/rocket-review-details.md`.
+6. Read `/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-review-details.md`.
 7. Run configured reviewers in order.
 8. After each round, decide patch/skip/open, commit and push fixes if needed,
    re-verify upstream freshness, then update the diary.
@@ -170,7 +173,7 @@ Do not add diary resume logic.
 Before constructing reviewer prompts, parsing output, writing the diary, posting
 the final comment, or syncing Linear, you must read:
 
-`skills/personal_dev/rocket/references/rocket-review-details.md`
+`/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-review-details.md`
 
 Reviewer prompts must include the spec/contract, branch, PR number and URL,
 repo/worktree path, configured slash command, and instructions to:

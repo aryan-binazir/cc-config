@@ -72,21 +72,31 @@ Only use information from the diff. If you're unsure whether something is an iss
 List only issues that need fixing. No compliments. No padding.
 
 ```
-## Critical (must fix before merge)
+## Critical
+Must fix before merge.
 - [file:line] - [what is wrong and why it matters]
 
-## High (should fix)
+## High
+Should fix.
 - [file:line] - [what is wrong and why it matters]
 
-## Low (consider fixing)
+## Low
+Consider fixing.
 - [file:line] - [what is wrong and why it matters]
 
 ## Uncertain
 - [file:line] - [potential issue and why it is uncertain]
 
 ## Verdict
-[APPROVE / NEEDS FIXES / REJECT] - [1 sentence summary]
+[1 sentence summary]
+APPROVE | APPROVE WITH FIXES | NEEDS FIXES
 ```
+
+The `## Verdict` section must end with exactly one of these tokens on its own
+line: `APPROVE`, `APPROVE WITH FIXES`, or `NEEDS FIXES`. Use `APPROVE` when the
+branch is ready to merge as-is, `APPROVE WITH FIXES` when it is acceptable but
+specific fixes should land before merge, and `NEEDS FIXES` when it is not yet
+acceptable.
 
 If no issues are found, say so plainly.
 
@@ -96,7 +106,7 @@ Also save a concise artifact to `_scratch/_reviews/{branchname}-review.md` using
 
 ```
 ## Verdict
-[APPROVE / NEEDS FIXES / REJECT]
+[APPROVE / APPROVE WITH FIXES / NEEDS FIXES]
 
 ## Blocking
 [BLOCKING / NON-BLOCKING] - [1 short sentence on whether the findings are worth blocking over]

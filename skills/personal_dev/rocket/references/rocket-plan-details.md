@@ -14,7 +14,7 @@ conversation.
 
 Pass only:
 - repo/worktree absolute path
-- original ticket ID, ticket URL, or raw spec
+- original ticket ID, ticket URL, markdown spec file path, or raw spec
 - selected plan profile
 - configured critic runner and review runner names
 - absolute path to `skills/personal_dev/rocket/scripts/repo_facts.py`
@@ -32,7 +32,7 @@ Check these repository facts and ticket/source details. Return only the JSON
 shape below.
 
 Repo/worktree: <absolute path>
-Input: <ticket ID, ticket URL, or raw spec>
+Input: <ticket ID, ticket URL, markdown spec file path, or raw spec>
 Selected plan profile: <profile>
 Critic runner to check: <runner>
 Review runners to check: <runner list>
@@ -57,9 +57,12 @@ Checks:
   blocks only when it is in the target branch's returned worktree.
 - If the script JSON reports any blockers, include those blockers unchanged,
   skip ticket fetching, and return `next_action: "stop_blocked"`.
-- If there are no blockers and the script JSON has `source.type_hint: "linear"`,
-  or the input is a Linear URL, fetch the Linear ticket and summarize only the
-  facts needed to start contract settlement.
+- If there are no blockers and the input is an explicit Linear or Jira URL, use
+  that tracker. If the script JSON has `source.type_hint: "ticket"` with no URL,
+  resolve the key with available Linear/Jira tooling; do not assume the tracker
+  from the key format alone. If the input is a markdown spec file path, read
+  that file as the spec instead of fetching a ticket. In all cases summarize
+  only the facts needed to start contract settlement.
 - Copy the script JSON's `source.type_hint` into `context.source_type_hint`.
 - Copy the script JSON's `context.branch_setup_command` into
   `context.branch_setup_command`. Do not run that command; ticket worktree setup
@@ -84,7 +87,7 @@ tokens. Use null/empty arrays instead of long explanations. Shape:
     "review_runners": [{"runner": "...", "available": true}]
   },
   "ticket": {
-    "source_type": "linear|raw|unknown",
+    "source_type": "linear|jira|spec_file|raw|unknown",
     "id": null,
     "title": null,
     "summary": null,

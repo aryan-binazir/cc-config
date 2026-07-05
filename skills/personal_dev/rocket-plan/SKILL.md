@@ -1,7 +1,8 @@
 ---
 name: rocket-plan
 description: >-
-  Take a Linear ticket, Linear ticket URL, or raw implementation spec from intake
+  Take a Linear or Jira ticket, ticket URL, markdown spec file, or raw
+  implementation spec from intake
   through coding and into a reviewed PR. Use this when the user wants an
   end-to-end implementation flow: clarify the goal, settle an implementation
   contract, run the configured one-round pre-approval critique, drive
@@ -41,7 +42,8 @@ normally before acting.
 - Do not read `rocket-review` or downstream skills during preflight; config gives
   the runner list needed for availability checks.
 - Load only the needed section of
-  `skills/personal_dev/rocket/references/rocket-plan-details.md` for each phase.
+  `/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-plan-details.md`
+  for each phase.
 - Treat large raw search output as a planning bug. Use surgical, capped
   exploration until implementation begins.
 - Give at most one short preflight-start update and one short result/blocker
@@ -64,11 +66,13 @@ Each plan profile provides `critic.name`, `critic.runner` (`claude`, `codex`, or
 
 Runner commands:
 - `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
-- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
+- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT" < /dev/null`
 - `cursor`: `cursor-agent --print --trust "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag. Do not
-pass Cursor force mode for plan critique. The configured critique is exactly one
+pass Cursor force mode for plan critique. These exact commands take precedence
+over the generic `call-cursor`/`call-codex`/`call-claude` skill conventions
+(for example, `call-cursor` defaults to `-f`; critics must not use force mode). The configured critique is exactly one
 external round unless Ar asks for more in the current conversation.
 
 ## Preflight
@@ -115,9 +119,10 @@ only with a compact summary return.
 
 ## Intake And Contract
 
-Accept a Linear ticket ID, Linear URL, or raw spec. If multiple sources are
-provided, fetched Linear content is source of truth and raw spec text is
-supplemental.
+Accept a Linear or Jira ticket ID, a Linear or Jira ticket URL, a markdown spec
+file path, or raw spec text. Do not assume the tracker from a bare ticket key;
+resolve it with available tooling. If multiple sources are provided, fetched
+ticket content is source of truth and raw spec text is supplemental.
 
 Before contract settlement, read `Contract Template` and `Clarification Coverage`
 from the details reference. If the `grill-with-docs` skill is available, use it
@@ -146,7 +151,10 @@ After the contract is settled and before presenting the plan:
 4. Stop if unresolved material concerns require Ar's input.
 
 Do not call `update_plan`, present the plan for approval, update Linear,
-persist the contract, or edit files until critique is complete. The required
+persist the contract, or edit files until critique is complete. Updating
+`_scratch/_context/<branch>.md` is exempt from this rule: the no-edit rule
+means no code or repo file changes, and required context-file updates may
+happen at any phase. The required
 preflight branch/worktree setup is the only branch setup allowed before
 critique; do not create or switch any other branches. If the critic times out
 after the configured budget, report the timeout instead of silently skipping
@@ -190,7 +198,7 @@ spec ambiguity or a required permission/tooling blocker.
 
 When implementation is complete, ensure intended changes are committed, push the
 current branch, verify upstream matches local `HEAD`, and invoke
-`$rocket-review <review-profile>` in the same Codex session.
+`$rocket-review <review-profile>` in the same agent session.
 
 Do not reimplement `rocket-review` inline, shell out to a separate
 `rocket-review` process, describe review as a new session, or reconstruct the
