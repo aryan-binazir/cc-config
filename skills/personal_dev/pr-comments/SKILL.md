@@ -27,6 +27,10 @@ Store JSON at `_scratch/_pr_reviews/pr-<number>.json`:
 
 Create `_scratch/_pr_reviews/` if missing.
 
+This file is the single shared PR state store: the `pr-address-comments` skill
+writes its handled state into an `agent` object on the same `itemsById` entries.
+Preserve any `agent` fields when updating items; never delete them.
+
 Numbering:
 
 - Top-level items get `1`, `2`, `3`; replies get `1.1`, `1.2`.

@@ -38,9 +38,11 @@ and `max_rounds`.
 Runner commands:
 - `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
 - `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT" < /dev/null`
-- `cursor`: `cursor-agent --print --force --trust "$PROMPT"`
+- `cursor`: `cursor-agent --print --trust "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag.
+Reviewers are read-only: do not pass Cursor force mode, and the reviewer prompt
+must forbid file modification. Patching findings is the main agent's job.
 
 ## Preflight
 

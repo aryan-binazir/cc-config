@@ -1,11 +1,11 @@
 ---
 name: eng-ticket
-description: Generate or review engineering tickets that are ready for automated implementation. Use this when the user wants to write a ticket, scope work out, turn a rough idea into an implementation-ready ticket, tighten an existing ticket, prepare work for $rocket_plan, or check whether a ticket is good enough for autonomous execution.
+description: Generate or review engineering tickets that are ready for automated implementation. Use this when the user wants to write a ticket, scope work out, turn a rough idea into an implementation-ready ticket, tighten an existing ticket, prepare work for $rocket-plan, or check whether a ticket is good enough for autonomous execution.
 ---
 
 # Eng Ticket
 
-Generate and review engineering tickets with `rocket_plan` consumability as the primary quality bar.
+Generate and review engineering tickets with `rocket-plan` consumability as the primary quality bar.
 
 The goal is not just readable tickets. The goal is tickets that let an implementation agent move with minimal clarification and minimal invention.
 
@@ -16,8 +16,8 @@ Choose one mode:
 - `Review` when the user already has a ticket and wants a hard critique against the template and downstream automation needs.
 
 Choose one ticket type:
-- `Implementation` for code-producing work that should map cleanly into `$rocket_plan`.
-- `Spike / ADR` for investigation or decision-record work that does not directly feed into `$rocket_plan`.
+- `Implementation` for code-producing work that should map cleanly into `$rocket-plan`.
+- `Spike / ADR` for investigation or decision-record work that does not directly feed into `$rocket-plan`.
 
 Default to `Implementation` unless the deliverable is clearly a design artifact, research outcome, or decision document.
 
@@ -177,7 +177,7 @@ For review mode, prefer this structure:
 
 ```md
 ## Verdict
-[Ready for rocket_plan / Needs work]
+[Ready for rocket-plan / Needs work]
 
 ## Findings
 - [section] - [what is vague or missing and how to fix it]
@@ -192,10 +192,10 @@ If the user asks for a full rewrite, provide the rewritten ticket after the find
 
 For generation mode, output the finished ticket directly in markdown. Do not wrap it in commentary unless the user asked for analysis first.
 
-Optimize for clean mapping into `$rocket_plan`:
+Optimize for clean mapping into `$rocket-plan`:
 - `Goal` should map directly to `Goal`
 - `Accepted scope` should map directly to `Accepted scope`
-- `Assumptions` should minimize what `rocket_plan` has to invent
+- `Assumptions` should minimize what `rocket-plan` has to invent
 - `Out of scope` should protect review from expanding the work
 - `Validation approach` should tell the implementer how to prove completion
 
@@ -203,7 +203,7 @@ Optimize for clean mapping into `$rocket_plan`:
 
 - It does not create or update Linear tickets directly.
 - It does not implement code.
-- It does not replace `$rocket_plan` clarification entirely.
+- It does not replace `$rocket-plan` clarification entirely.
 - It does not defer structural ambiguity by normalizing everything into `[DECIDE: ...]`.
 
 ## Output Quality Bar

@@ -76,6 +76,9 @@ Use NEEDS FIXES when the branch is not yet acceptable.
 
 Within each finding, include concrete file and line references when possible.
 No padding. No compliments.
+
+You are a reviewer only. Do not modify, create, or delete any files, do not
+commit, and do not push. Report findings; the implementing agent applies fixes.
 ```
 
 ## Output Normalization

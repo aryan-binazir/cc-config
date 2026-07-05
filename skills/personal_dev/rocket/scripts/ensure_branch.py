@@ -206,16 +206,10 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
             "ticket_key": ticket_key,
             "worktree_path": str(worktree_path),
         }
+    # Note: if the current checkout is already on the target branch, the
+    # worktree_for_branch lookup above returns it, so no same-branch case
+    # reaches this point.
     worktree_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if current == target:
-        return {
-            "ok": True,
-            "action": "already_on_branch",
-            "branch": current,
-            "worktree_path": str(repo),
-            **base_fields,
-        }
 
     if local_branch_exists(repo, target):
         added = git_output(repo, ["worktree", "add", str(worktree_path), target])

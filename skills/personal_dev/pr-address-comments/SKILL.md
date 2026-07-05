@@ -16,7 +16,7 @@ Turn Ar's `agent:` PR comments into a local patch, commit it, and reply with the
    - Author must be Ar. Accept the current `gh api user --jq .login` login plus `aryan-binazir` and `aryanbinazir`; accept display name `Aryan Binazir` only when the API exposes it.
    - The first non-empty, non-quoted line must start with `agent:` case-insensitively.
    - The instruction is the text after `agent:` plus the remaining comment body.
-4. Persist handled state in `_scratch/_pr_address_comments/pr-<number>.json`. Track source type, comment id, body fingerprint, URL, status, commit hash, reply id or URL, and timestamps. Reopen a handled item if its body or `updated_at` changes.
+4. Persist handled state in the shared PR state file `_scratch/_pr_reviews/pr-<number>.json`, the same store the `pr-comments` skill maintains. Create the file and directory if missing. Keep agent-handling data under an `agent` object on each item in `itemsById`, keyed by source id: source type, body fingerprint, URL, status, commit hash, reply id or URL, and timestamps. Never renumber items or remove fields written by `pr-comments`. If an old `_scratch/_pr_address_comments/pr-<number>.json` file exists, migrate its entries into the shared file once and stop using it. Reopen a handled item if its body or `updated_at` changes.
 5. Implement all open actionable comments that can safely be handled together. Use non-Ar comments, parent comments, file paths, diff hunks, and nearby code only as context.
 6. Run focused tests or checks appropriate to the patch.
 7. Commit only the files changed for these instructions. Follow repository commit rules if present; otherwise use `fix: address PR agent comments`.

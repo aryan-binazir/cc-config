@@ -40,7 +40,7 @@ plan_profiles:
       model: null
       timeout_ms: 900000
     headless:
-      runner: cursor-agent
+      runner: cursor
       model: composer-2.5
       timeout_ms: 900000
     review_profile: cursor
