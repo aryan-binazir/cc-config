@@ -1,0 +1,26 @@
+# Copy this file to lead.local.yaml and edit that. lead.local.yaml is ignored
+# by git and wins over this file (deep merge). Models are chosen HERE and only
+# here — the lead and implementer skills never hardcode model names.
+#
+# workers: keyed by tier. The lead picks the tier per task; delegate.py
+# resolves the runner/model and runs it.
+
+defaults:
+  tier: medium
+
+workers:
+  xhigh:
+    runner: codex
+    model: gpt-5.5
+    reasoning_effort: xhigh
+    timeout_ms: 1500000
+  high:
+    runner: codex
+    model: gpt-5.5
+    reasoning_effort: high
+    timeout_ms: 1500000
+  medium:
+    runner: codex
+    model: gpt-5.5
+    reasoning_effort: medium
+    timeout_ms: 1500000

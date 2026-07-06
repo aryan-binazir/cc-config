@@ -13,6 +13,7 @@ todos/
 # Local directory
 local/
 skills/personal_dev/rocket/rocket.local.yaml
+skills/personal_dev/lead/lead.local.yaml
 skills/sym_linked/*
 !skills/sym_linked/.gitkeep
 
@@ -31,3 +32,5 @@ context.md
 
 # Scratch files
 _scratch/
+
+__pycache__/
