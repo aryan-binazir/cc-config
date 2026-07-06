@@ -7,7 +7,9 @@ description: Delegate an implementation, analysis, or review task to the configu
 
 Delegate a task to the configured worker. All mechanics (config resolution, runner flags, timeouts, report capture) live in the script — do not read the `call-*` skills or assemble runner commands yourself.
 
-1. **Write a self-contained prompt to a file** at `_scratch/prompts/<short-task-name>.md` in the repo being worked on (create the directory if needed; `_scratch/` is gitignored by convention and Ar prunes it freely — never put anything unrecoverable there). The worker has zero conversation context. Include: the goal and constraints; relevant files, paths, and repo context; verification commands to run (typecheck, lint, tests) with the requirement to report their results; and this exact reporting instruction: end your output with a `## SUMMARY` section, max 15 lines, covering what changed, what was not done, verification results, and open questions.
+1. **Write a self-contained prompt to a file** at `_scratch/prompts/<short-task-name>.md` in the repo being worked on (create the directory if needed; `_scratch/` is gitignored by convention and Ar prunes it freely — never put anything unrecoverable there). The worker has zero conversation context. Include: the goal and constraints; relevant files, paths, and repo context; what must NOT be touched; verification commands to run (typecheck, lint, tests) with the requirement to report their results; and this exact reporting instruction: end your output with a `## SUMMARY` section, max 15 lines, covering what changed, what was not done, verification results, and open questions.
+
+   Readiness test: write the concrete acceptance criteria you will judge the result by into the prompt. If you cannot state them, the task is not ready to delegate — go back to planning.
 
 2. **Run the script in the background** and keep working — never foreground-block on a run expected to exceed a couple of minutes. The script heartbeats to stderr every 60s; a quiet worker is normal. Timeouts come from the YAML (default 25 minutes):
 

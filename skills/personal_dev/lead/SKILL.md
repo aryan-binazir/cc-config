@@ -38,6 +38,8 @@ Run delegations in the background and keep working; waiting costs nothing, but b
 
 Judge the output, not the price. If delegated work does not meet the bar, rerun at a higher tier or with a tighter, more prescriptive prompt, without asking. Never ship mediocre work because it was cheap — and never "fix it yourself" as the escalation path; escalation stays inside the implementer.
 
+When rerunning, decide scrap vs fix-forward. Fundamentally wrong approach: scrap it — revert the attempt's changes (or abandon its worktree) and delegate fresh with a rewritten prompt that names the failed approach so it isn't retried. Close but flawed: fix forward — a follow-up delegation whose prompt states what the previous worker changed, what is wrong with it, and the concrete fix expected. Workers share no memory between runs; every rerun prompt must carry that context itself. Never let a worker patch on top of a foundation you already judged bad.
+
 ## Acceptance discipline
 
 - The Lead reads the actual diff before accepting any delegated implementation. Never relay "done" based on a worker's own report.
