@@ -22,6 +22,8 @@ Tier: `medium` for bulk/mechanical work with a clear spec, `high` for hard or su
 
 3. **Accept from the JSON, not the worker's word.** The JSON includes the worker's `## SUMMARY` and a `git diff --stat` of the working directory. Always check both; open specific changed files selectively when something warrants it. Only open the full report file when the summary is missing or suspicious. For substantial or risky diffs, optionally delegate an independent review pass (the lead skill has the review prompt) before accepting. Never treat the worker's self-report as done.
 
+   If the result is close but needs revision, run a new compact follow-up prompt in the same cwd/worktree (use the JSON `worktree` path when present). Keep feedback specific rather than exhaustive: failed acceptance criteria, relevant files/lines or behavior, short test/error excerpts, and anything that must stay unchanged. Ask for an updated `## SUMMARY`; do not paste full reports or diffs unless the worker needs that context.
+
 If the script returns `ok: false`, surface the exact error and stop. There is no fallback: the invoker never implements the task itself — a Lead reports the failure to Ar and waits.
 
 Wrapper sub-agents are not part of the normal path. Use one only for parallel fan-out where cheap first-pass triage of many reports is wanted, or in environments where the lead cannot run shell commands. Pick the cheapest sub-agent model the host offers; the wrapper's entire prompt is "run this exact delegate.py command and return the report file contents."
