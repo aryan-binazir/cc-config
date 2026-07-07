@@ -51,7 +51,7 @@ When rerunning, decide scrap vs fix-forward. Fundamentally wrong approach: scrap
 
 ## Accepted branch review
 
-After accepting branch-backed implementation work, ensure a draft PR exists, then use `call-codex` headlessly to run one `code-review` skill pass against the pushed branch. Inspect Codex's findings yourself, choose patch/skip/open for each real issue, delegate any patches, and post one collapsed PR comment summarizing the Codex verdict plus patch/skip/open decisions. Do not run the full `rocket-review` loop.
+After accepting branch-backed implementation work, ensure a draft PR exists, then use `call-codex` headlessly to run one `code-review` skill pass against the pushed branch. Inspect Codex's findings yourself, choose patch/skip/open for each real issue, delegate any patches, and post one collapsed PR comment titled `Agent Review` summarizing the Codex verdict plus patch/skip/open decisions. Do not run the full `rocket-review` loop.
 
 ## Review prompt
 
