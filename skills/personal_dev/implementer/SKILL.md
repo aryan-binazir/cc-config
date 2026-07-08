@@ -15,10 +15,10 @@ Delegate a task to the configured worker. All mechanics (config resolution, runn
 
 ```bash
 uv run /home/ar/repos/cc-config/skills/personal_dev/lead/scripts/delegate.py \
-  --tier <xhigh|high|medium> --prompt-file <file> [--worktree]
+  --tier <xhigh|high|medium|low> --prompt-file <file> [--worktree]
 ```
 
-Tier: `medium` for bulk/mechanical work with a clear spec, `high` for hard or subtle work, `xhigh` for the hardest problems. Parallel workers must each get `--worktree` so edits don't collide; the JSON output includes the worktree path.
+Tier: `low` for simple, low-risk mechanical work, `medium` for bulk/mechanical work with a clear spec, `high` for hard or subtle work, `xhigh` for the hardest problems. Parallel workers must each get `--worktree` so edits don't collide; the JSON output includes the worktree path.
 
 3. **Accept from the JSON, not the worker's word.** The JSON includes the worker's `## SUMMARY` and a `git diff --stat` of the working directory. Always check both; open specific changed files selectively when something warrants it. Only open the full report file when the summary is missing or suspicious. For substantial or risky diffs, optionally delegate an independent review pass (the lead skill has the review prompt) before accepting. Never treat the worker's self-report as done.
 

@@ -75,7 +75,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Inspect the merged lead config and resolve a worker tier.")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
     parser.add_argument("--lead-dir", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--tier", help="Worker tier, e.g. xhigh, high, medium. Defaults to defaults.tier.")
+    parser.add_argument("--tier", help="Worker tier, e.g. xhigh, high, medium, low. Defaults to defaults.tier.")
     args = parser.parse_args()
     try:
         emit(resolve(args.lead_dir, args.tier), pretty=args.pretty)

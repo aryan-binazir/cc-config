@@ -24,3 +24,8 @@ workers:
     model: gpt-5.5
     reasoning_effort: medium
     timeout_ms: 1500000
+  low:
+    runner: codex
+    model: gpt-5.5
+    reasoning_effort: low
+    timeout_ms: 1500000

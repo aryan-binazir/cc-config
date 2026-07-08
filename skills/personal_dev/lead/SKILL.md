@@ -34,7 +34,7 @@ Delegate through the active delegation mode. In default mode, read the `implemen
 - Data analysis and long-running verification.
 - Independent second-opinion reviews.
 
-In default mode, pick the tier per task: `medium` for bulk/mechanical work with a clear spec, `high` for hard or subtle implementation the medium worker is likely to fumble, `xhigh` for the hardest problems. When unsure, start medium — a failed cheap attempt is information, not waste.
+In default mode, pick the tier per task: `low` for simple, low-risk mechanical work, `medium` for bulk/mechanical work with a clear spec, `high` for hard or subtle implementation the medium worker is likely to fumble, `xhigh` for the hardest problems. When unsure, start medium — a failed cheap attempt is information, not waste.
 
 Run delegations in the background and keep working; waiting costs nothing, but blocking on a worker when other work exists wastes the session.
 

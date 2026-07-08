@@ -151,7 +151,7 @@ def run_with_heartbeat(cmd: list[str], cwd: Path, timeout_s: float, capture_dir:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Delegate a task to the configured worker model.")
-    parser.add_argument("--tier", help="Worker tier (xhigh, high, medium). Defaults to defaults.tier.")
+    parser.add_argument("--tier", help="Worker tier (xhigh, high, medium, low). Defaults to defaults.tier.")
     parser.add_argument("--prompt", help="Inline prompt text.")
     parser.add_argument("--prompt-file", type=Path, help="File containing the self-contained prompt.")
     parser.add_argument("--cwd", type=Path, default=Path.cwd(), help="Directory to run the worker in.")
