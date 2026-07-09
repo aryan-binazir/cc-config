@@ -6,6 +6,7 @@
 - If a decision is hard to undo or changes user-facing behavior/scope, stop and ask.
 
 # Workflow
+- Use the `implementer` subagent for implementation work.
 - For ticket- or branch-backed work, project state lives in `_scratch/_context/<ticket-key>.md`. Resolve the key from the ticket or intended branch, not from whatever branch is checked out; ask me if you can't determine it.
 - Skip context files entirely for one-off explorations, quick scripts, and questions.
 - `_scratch/_context/main.md` is broad repo-level state only, never a ticket's working memory.
