@@ -1,34 +1,78 @@
 ---
 name: fast-rocket
 description: >-
-  Take a reasonably specified Linear or Jira ticket, ticket URL, markdown spec,
-  or raw implementation spec through focused clarification, a Cursor-critiqued
-  plan, test-driven implementation, verification, PR creation, and a gated
-  Codex review. Use this whenever the user invokes fast-rocket or asks for the
-  lighter, lower-friction alternative to rocket-plan for an end-to-end ticket.
+  Take a Linear issue plus an exact user-supplied branch through focused
+  clarification, a Cursor-critiqued plan, test-driven implementation,
+  verification, commit and push, PR creation, and a gated Codex review. Use
+  this whenever the user invokes fast-rocket or asks for the lighter,
+  lower-friction alternative to rocket-plan for an end-to-end Linear issue.
 ---
 
 # Fast Rocket
 
-Use this for a reasonably specified ticket that should move quickly from intake
+Use this for a reasonably specified Linear issue that should move quickly from intake
 to a reviewed PR. It is separate from Rocket: do not persist a Rocket contract,
 resolve Rocket profiles, invoke `rocket-review`, or wait for explicit approval
 of the implementation plan.
 
+Expect exactly two task inputs:
+
+1. A Linear issue ID or URL.
+2. The exact branch name to use.
+
+For example:
+
+`$fast-rocket BBA-359 aryan-binazir/BBA-359`
+
+If either value is missing, ask for it before proceeding. Resolve the issue as
+Linear with the available Linear skill or connector; do not infer another
+tracker.
+
 Never guess past material ambiguity, skip the required external critiques,
 write production code before a driving test, or merge unless the user asks.
 
-## 1. Understand The Work
+## 1. Resolve The Linear Issue And Worktree
 
-1. Read the supplied Linear or Jira ticket, ticket URL, markdown spec, or raw
-   spec. Resolve tracker data with the relevant available skill or connector.
-2. Read the target repository's instructions and inspect the relevant code,
-   tests, documentation, and current git state before planning.
-3. Make sure the goal, accepted behavior, boundaries, and validation target are
-   understood. Do not rely on the ticket title alone.
+1. Read the supplied Linear issue with the available Linear skill or connector.
+   Do not rely on the title alone.
+2. Resolve the target repository from the issue and current task context. Do
+   not begin planning or code exploration yet.
+3. Extract the Linear issue key and run this verified helper with all four
+   explicit arguments:
+
+   ```bash
+   uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
+     --repo <absolute-repo-path> \
+     --ticket-key <LINEAR-ISSUE-KEY> \
+     --branch-name <exact-user-supplied-branch> \
+     --base-branch main
+   ```
+
+4. Parse the helper's JSON. Require `ok: true`, require `branch` to exactly
+   equal the supplied branch, and use the returned absolute `worktree_path` as
+   the authoritative checkout. The helper handles a current worktree already
+   on the branch, an existing registered worktree, an existing local branch, an
+   existing remote branch, or a new branch and worktree from latest
+   `origin/main`.
+5. Stop and ask the user before proceeding if the target worktree is dirty, its
+   path collides, `main` is unavailable, branch setup fails, the returned branch
+   mismatches, or the returned checkout is not actually on the supplied branch.
+   Do not silently switch or edit another checkout.
+
+This reuses only Rocket's verified branch/worktree helper. Fast Rocket remains
+separate and does not invoke Rocket contracts, profiles, approvals, or review.
+
+From this point forward, run every inspection, context update, plan critique,
+implementation action, validation, commit, push, PR action, and review from the
+returned `worktree_path`. When delegating, give the sub-agent that exact path
+and require it to work only there.
+
+Read the target repository's instructions, relevant code, tests,
+documentation, and git state from that worktree. Make sure the goal, accepted
+behavior, boundaries, and validation target are understood.
 
 When repository rules require `_scratch/_context/<ticket-key>.md`, resolve the
-key from the supplied ticket or intended branch, not the currently checked-out
+key from the supplied issue or intended branch, not the currently checked-out
 branch. Keep that file current as plans, assumptions, or decisions change, and
 delete stale notes instead of accumulating them.
 
@@ -45,7 +89,7 @@ hard-to-reverse architecture.
   skill; fold it into another material question when practical.
 - If the task is clear, proceed immediately apart from any seam confirmation
   still required by `tdd`.
-- If material ambiguity remains after three questions, say the ticket is not
+- If material ambiguity remains after three questions, say the issue is not
   implementation-ready and ask whether to continue clarifying or proceed with
   explicit assumptions.
 
@@ -62,7 +106,7 @@ Read and follow:
 `/home/ar/repos/cc-config/skills/personal_dev/call-cursor/SKILL.md`
 
 Use its exact non-interactive CLI and model-selection conventions to ask Cursor
-to critique the plan against the ticket, repository evidence, and repo-local
+to critique the plan against the Linear issue, repository evidence, and repo-local
 instructions. Give Cursor the complete task and request concrete gaps, risks,
 unnecessary complexity, and simpler repo-native alternatives.
 
@@ -85,7 +129,7 @@ Obey all repository instructions, including any requirement to delegate
 implementation to an `implementer` sub-agent. When delegation is required, the
 implementer changes code only and must not push or open the PR. The main agent
 must inspect status and diff after handoff, and owns validation, commits, pushes,
-PR creation, and Codex review. Keep changes within the ticket's scope and stop
+PR creation, and Codex review. Keep changes within the issue's scope and stop
 if implementation reveals a new material ambiguity.
 
 ## 5. Verify And Open The PR
@@ -94,13 +138,16 @@ Run targeted tests plus every typecheck, lint, test, or other validation require
 by the repository. Fix relevant failures; report unrelated or pre-existing
 failures honestly.
 
-Commit and push according to repo conventions, verify the upstream branch
-matches local `HEAD`, then create or update the PR with fully explicit,
-non-interactive `gh` commands. Provide `--head`, `--title`, and `--body-file` as
+Immediately before committing, require the current branch to exactly match the
+user-supplied branch. Commit according to repo conventions, then push explicitly
+to that branch on `origin`, setting its upstream when needed. Verify the
+upstream branch is `origin/<exact-user-supplied-branch>` and its commit matches
+local `HEAD`. Then create or update the PR with fully explicit, non-interactive
+`gh` commands. Provide `--head`, `--title`, and `--body-file` as
 appropriate; do not use `--fill`, editor prompts, or implicit fork or push
 behavior. Follow the repository's PR title, body, ticket-linking, and assignment
-rules. Confirm the PR targets the intended branch and its head
-is the pushed implementation branch.
+rules. Confirm the PR targets the intended base branch and its head is the exact
+user-supplied, pushed implementation branch.
 
 ## 6. Require A Codex Verdict
 
@@ -109,7 +156,7 @@ Read and follow:
 `/home/ar/repos/cc-config/skills/personal_dev/call-codex/SKILL.md`
 
 Use its exact non-interactive CLI conventions to have Codex review the actual PR
-diff. Supply the full ticket or spec, repo path, base and head commits, PR URL,
+diff. Supply the full Linear issue, repo path, base and head commits, PR URL,
 repo instructions, changed files, and verification results. Tell Codex to remain
 read-only, list only concrete actionable findings, and end with exactly one of:
 
@@ -127,11 +174,12 @@ Handle the verdict literally:
 
 - `APPROVED` or `NO ACTIONABLE FEEDBACK`: finish.
 - `APPROVED WITH FIXES`: apply every listed fix, rerun relevant verification,
-  commit and push the fixes, and confirm upstream freshness. Then finish without
-  requiring another Codex review.
+  commit and push the fixes to the supplied branch, and confirm its upstream
+  matches local `HEAD`. Then finish without requiring another Codex review.
 - `CHANGES REQUESTED`: apply the requested fixes, rerun relevant verification,
-  commit and push, confirm upstream freshness, and ask Codex to review the new
-  PR diff again. Repeat until Codex returns a terminal verdict.
+  commit and push to the supplied branch, confirm its upstream matches local
+  `HEAD`, and ask Codex to review the new PR diff again. Repeat until Codex
+  returns a terminal verdict.
 
 Do not infer approval from friendly prose or the absence of high-severity
 findings. A malformed or missing verdict is not approval; retry once with the
@@ -139,6 +187,7 @@ required format, then stop and report the blocker if it remains malformed.
 
 ## Completion
 
-Report the PR URL, delivered behavior, commits, verification performed, Codex's
-exact terminal verdict, and any remaining caveats. Do not merge the PR unless
-the user explicitly asks.
+Before completion, verify once more that the supplied branch's upstream commit
+matches local `HEAD`. Report the branch, worktree path, PR URL, delivered
+behavior, commits, verification performed, Codex's exact terminal verdict, and
+any remaining caveats. Do not merge the PR unless the user explicitly asks.
