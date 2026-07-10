@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fast Rocket"
+  short_description: "Move a clear ticket quickly into a reviewed PR"
+  default_prompt: "Use $fast-rocket to take this ticket or spec through a lightweight plan, TDD implementation, PR creation, and Codex review."
