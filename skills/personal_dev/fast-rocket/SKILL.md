@@ -1,11 +1,11 @@
 ---
 name: fast-rocket
 description: >-
-  Take a Linear issue plus an exact user-supplied branch through focused
-  clarification, a Cursor-critiqued plan, test-driven implementation,
-  verification, commit and push, PR creation, and a gated Codex review. Use
-  this whenever the user invokes fast-rocket or asks for the lighter,
-  lower-friction alternative to rocket-plan for an end-to-end Linear issue.
+  Take a Linear issue plus an optional exact user-supplied branch through
+  focused clarification, a Cursor-critiqued plan, test-driven implementation,
+  verification, commit and push, PR creation, and a gated Codex review. Use this
+  whenever the user invokes fast-rocket or asks for the lighter, lower-friction
+  alternative to rocket-plan for an end-to-end Linear issue.
 ---
 
 # Fast Rocket
@@ -15,18 +15,19 @@ to a reviewed PR. It is separate from Rocket: do not persist a Rocket contract,
 resolve Rocket profiles, invoke `rocket-review`, or wait for explicit approval
 of the implementation plan.
 
-Expect exactly two task inputs:
+Expect one required task input and one optional input:
 
 1. A Linear issue ID or URL.
-2. The exact branch name to use.
+2. Optionally, the exact branch name to use.
 
 For example:
 
-`$fast-rocket BBA-359 aryan-binazir/BBA-359`
+`$fast-rocket BBA-359`
 
-If either value is missing, ask for it before proceeding. Resolve the issue as
-Linear with the available Linear skill or connector; do not infer another
-tracker.
+If the branch is omitted, derive it as `aryan-binazir/<resolved-linear-issue-key>`.
+If the user supplies a branch, honor it exactly. Ask only when the Linear issue
+ID or URL is missing. Resolve the issue as Linear with the available Linear
+skill or connector; do not infer another tracker or support ticketless work.
 
 Never guess past material ambiguity, skip the required external critiques,
 write production code before a driving test, or merge unless the user asks.
@@ -37,8 +38,8 @@ write production code before a driving test, or merge unless the user asks.
    Do not rely on the title alone.
 2. Resolve the target repository from the issue and current task context. Do
    not begin planning or code exploration yet.
-3. Extract the Linear issue key and run this verified helper with all four
-   explicit arguments:
+3. Extract the Linear issue key. If the user supplied a branch, run this
+   verified helper with that exact branch:
 
    ```bash
    uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
@@ -48,24 +49,35 @@ write production code before a driving test, or merge unless the user asks.
      --base-branch main
    ```
 
+   If the branch was omitted, let the helper derive its default
+   `aryan-binazir/<LINEAR-ISSUE-KEY>` branch by omitting `--branch-name`:
+
+   ```bash
+   uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
+     --repo <absolute-repo-path> \
+     --ticket-key <LINEAR-ISSUE-KEY> \
+     --base-branch main
+   ```
+
 4. Parse the helper's JSON. Require `ok: true`, require `branch` to exactly
-   equal the supplied branch, and use the returned absolute `worktree_path` as
-   the authoritative checkout. The helper handles a current worktree already
-   on the branch, an existing registered worktree, an existing local branch, an
-   existing remote branch, or a new branch and worktree from latest
-   `origin/main`.
+   equal the supplied branch or derived default, and use the returned absolute
+   `worktree_path` as the authoritative checkout. Call that expected branch the
+   resolved branch. The helper handles a current worktree already on the branch,
+   an existing registered worktree, an existing local branch, an existing remote
+   branch, or a new branch and worktree from latest `origin/main`.
 5. Stop and ask the user before proceeding if the target worktree is dirty, its
    path collides, `main` is unavailable, branch setup fails, the returned branch
-   mismatches, or the returned checkout is not actually on the supplied branch.
+   mismatches, or the returned checkout is not actually on the resolved branch.
    Do not silently switch or edit another checkout.
 
 This reuses only Rocket's verified branch/worktree helper. Fast Rocket remains
 separate and does not invoke Rocket contracts, profiles, approvals, or review.
 
-From this point forward, run every inspection, context update, plan critique,
-implementation action, validation, commit, push, PR action, and review from the
-returned `worktree_path`. When delegating, give the sub-agent that exact path
-and require it to work only there.
+Do not assume or independently continue in the caller's checkout. From this
+point forward, run every inspection, context update, plan critique,
+implementation action, validation, commit, push, PR action, and review only from
+the helper-returned authoritative git `worktree_path`. When delegating, give the
+sub-agent that exact path and require it to work only there.
 
 Read the target repository's instructions, relevant code, tests,
 documentation, and git state from that worktree. Make sure the goal, accepted
@@ -139,15 +151,15 @@ by the repository. Fix relevant failures; report unrelated or pre-existing
 failures honestly.
 
 Immediately before committing, require the current branch to exactly match the
-user-supplied branch. Commit according to repo conventions, then push explicitly
+resolved branch. Commit according to repo conventions, then push explicitly
 to that branch on `origin`, setting its upstream when needed. Verify the
-upstream branch is `origin/<exact-user-supplied-branch>` and its commit matches
+upstream branch is `origin/<resolved-branch>` and its commit matches
 local `HEAD`. Then create or update the PR with fully explicit, non-interactive
 `gh` commands. Provide `--head`, `--title`, and `--body-file` as
 appropriate; do not use `--fill`, editor prompts, or implicit fork or push
 behavior. Follow the repository's PR title, body, ticket-linking, and assignment
-rules. Confirm the PR targets the intended base branch and its head is the exact
-user-supplied, pushed implementation branch.
+rules. Confirm the PR targets the intended base branch and its head is the
+resolved, pushed implementation branch.
 
 ## 6. Require A Codex Verdict
 
@@ -174,10 +186,10 @@ Handle the verdict literally:
 
 - `APPROVED` or `NO ACTIONABLE FEEDBACK`: finish.
 - `APPROVED WITH FIXES`: apply every listed fix, rerun relevant verification,
-  commit and push the fixes to the supplied branch, and confirm its upstream
+  commit and push the fixes to the resolved branch, and confirm its upstream
   matches local `HEAD`. Then finish without requiring another Codex review.
 - `CHANGES REQUESTED`: apply the requested fixes, rerun relevant verification,
-  commit and push to the supplied branch, confirm its upstream matches local
+  commit and push to the resolved branch, confirm its upstream matches local
   `HEAD`, and ask Codex to review the new PR diff again. Repeat until Codex
   returns a terminal verdict.
 
@@ -187,7 +199,7 @@ required format, then stop and report the blocker if it remains malformed.
 
 ## Completion
 
-Before completion, verify once more that the supplied branch's upstream commit
+Before completion, verify once more that the resolved branch's upstream commit
 matches local `HEAD`. Report the branch, worktree path, PR URL, delivered
 behavior, commits, verification performed, Codex's exact terminal verdict, and
 any remaining caveats. Do not merge the PR unless the user explicitly asks.
