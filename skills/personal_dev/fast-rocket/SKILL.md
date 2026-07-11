@@ -59,12 +59,17 @@ write production code before a driving test, or merge unless the user asks.
      --base-branch main
    ```
 
+   For any ticket worktree the helper creates, keep its default location:
+   `~/repos/.worktrees/<repo>/<ticket-key>`. Do not pass
+   `--worktree-path` to redirect it to the caller's checkout or another path.
 4. Parse the helper's JSON. Require `ok: true`, require `branch` to exactly
    equal the supplied branch or derived default, and use the returned absolute
    `worktree_path` as the authoritative checkout. Call that expected branch the
    resolved branch. The helper handles a current worktree already on the branch,
    an existing registered worktree, an existing local branch, an existing remote
-   branch, or a new branch and worktree from latest `origin/main`.
+   branch, or a new branch and worktree from latest `origin/main`. If it returns
+   an already registered matching worktree outside the default location, keep
+   using that returned path; do not move or recreate it.
 5. Stop and ask the user before proceeding if the target worktree is dirty, its
    path collides, `main` is unavailable, branch setup fails, the returned branch
    mismatches, or the returned checkout is not actually on the resolved branch.
