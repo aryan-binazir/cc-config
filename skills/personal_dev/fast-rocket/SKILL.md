@@ -15,19 +15,23 @@ to a reviewed PR. It is separate from Rocket: do not persist a Rocket contract,
 resolve Rocket profiles, invoke `rocket-review`, or wait for explicit approval
 of the implementation plan.
 
-Expect one required task input and one optional input:
+Expect one required task input and up to two optional inputs:
 
 1. A Linear issue ID or URL.
 2. Optionally, the exact branch name to use.
+3. Optionally, the literal `grok` implementation modifier.
 
 For example:
 
 `$fast-rocket BBA-359`
 
+`$fast-rocket BBA-359 grok`
+
 If the branch is omitted, derive it as `aryan-binazir/<resolved-linear-issue-key>`.
 If the user supplies a branch, honor it exactly. Ask only when the Linear issue
 ID or URL is missing. Resolve the issue as Linear with the available Linear
 skill or connector; do not infer another tracker or support ticketless work.
+Treat `grok` as the implementation modifier, not as a branch name.
 
 Never guess past material ambiguity, skip the required external critiques,
 write production code before a driving test, or merge unless the user asks.
@@ -166,6 +170,15 @@ implementer changes code only and must not push or open the PR. The main agent
 must inspect status and diff after handoff, and owns validation, commits, pushes,
 PR creation, and Codex review. Keep changes within the issue's scope and stop
 if implementation reveals a new material ambiguity.
+
+If the invocation includes the `grok` modifier, use the `call-cursor` workflow
+with the exact model `grok-4.5-fast-high` as the code-changing implementer
+instead of the repository-required implementation sub-agent. Give it the full
+task, repository, authoritative worktree, plan, test-seam, and repo-instruction
+context; require it to work only in that worktree, follow the TDD workflow and
+repository instructions, and not commit, push, or open a PR. The main agent
+still owns diff inspection, validation, commits, pushes, PR creation, and review.
+Without `grok`, preserve the repository-required implementation sub-agent flow.
 
 ## 5. Verify And Open The PR
 
