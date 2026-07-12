@@ -93,7 +93,25 @@ key from the supplied issue or intended branch, not the currently checked-out
 branch. Keep that file current as plans, assumptions, or decisions change, and
 delete stale notes instead of accumulating them.
 
-## 2. Run A Bounded Clarification Pass
+## 2. Brief, Align, And Clarify
+
+Before asking any clarification question, give the user a compact ticket
+briefing based on the Linear issue and repository evidence:
+
+- **Problem:** what is currently wrong or missing.
+- **Outcome:** what the ticket intends to make true.
+- **Scope and constraints:** the important boundaries, acceptance criteria, and
+  repo-native constraints that shape the likely implementation.
+
+Then ask one explicit alignment question: whether this is the right direction
+or anything should be corrected before proceeding. Do not continue until the
+user confirms the direction or provides a correction. Incorporate corrections
+and re-inspect affected evidence when needed. This alignment gate does not count
+against the clarification-question limit below.
+
+After alignment, continue autonomously through the rest of Fast Rocket. Pause
+again only for the material decisions and blockers already required by this
+workflow; do not turn the implementation plan into another approval gate.
 
 Ask only questions whose answers could materially change scope, acceptance
 criteria, user-facing behavior, API or data contracts, the public test seam, or
