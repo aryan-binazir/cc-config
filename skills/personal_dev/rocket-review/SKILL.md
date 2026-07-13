@@ -33,7 +33,7 @@ profile from a hyphenated tool list.
 
 Each review profile provides `slash_command`, `summary_title`, `diary_name`, and
 ordered `reviewers`. Each reviewer provides `name`, `runner`, optional `model`,
-and `max_rounds`.
+optional Codex `reasoning_effort`, and `max_rounds`.
 
 Runner commands:
 - `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
@@ -41,6 +41,10 @@ Runner commands:
 - `cursor`: `cursor-agent --print --trust "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag.
+When a Codex reviewer sets `reasoning_effort`, pass
+`-c model_reasoning_effort="<reasoning_effort>"`. Stop if
+`reasoning_effort` is configured for a non-Codex reviewer instead of silently
+ignoring it.
 Reviewers are read-only: do not pass Cursor force mode, and the reviewer prompt
 must forbid file modification. Patching findings is the main agent's job.
 
