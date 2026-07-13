@@ -5,7 +5,7 @@ description: >-
   PR already exists. Use this whenever the user says `rocket-review`, asks for
   the final review loop, or wants Codex to ensure the current branch has a PR,
   run the configured reviewers, patch what should be patched, and post one final
-  PR summary comment. Optional usage: `rocket-review <profile>`.
+  PR summary comment. Optional usage: `rocket-review PROFILE`.
 ---
 
 # Rocket Review
@@ -16,8 +16,9 @@ Take the current checked-out branch, ensure it has a PR, run the configured
 review profile against the supplied spec, patch what should be patched, keep a
 strict local diary, and post exactly one final PR summary comment.
 
-This skill does not define implementation work, reinterpret severity, merge the
-PR, run retired CodeRabbit workflows, or silently switch review profiles.
+This skill does not define implementation work, alter reviewer-reported severity
+or verdict tokens, merge the PR, run retired CodeRabbit workflows, or silently
+switch review profiles.
 
 ## Config
 
@@ -171,8 +172,9 @@ wants a fresh review, Ar deletes the summary comment first.
 7. Run configured reviewers in order.
 8. After each round, decide patch/skip/open, commit and push fixes if needed,
    re-verify upstream freshness, then update the diary.
-9. Post one final PR comment derived from the diary.
-10. If a Linear ticket exists, sync the managed region.
+9. Determine the overall Rocket verdict from the final patched branch.
+10. Post one final PR comment derived from the diary.
+11. If a Linear ticket exists, sync the managed region.
 
 ## Review Rounds
 
@@ -188,6 +190,16 @@ repo/worktree path, configured slash command, and instructions to:
 - respect `Out of scope`
 - flag unnecessary complexity, non-idiomatic code, duplicate abstractions,
   brittle shortcuts, and simpler repo-native patterns that should have been used
+- report non-blocking edge cases and hardening opportunities without withholding
+  approval for them
+
+A blocker must show that the current branch cannot safely deliver the core
+ticket: broken goal or acceptance behavior, a concrete realistic in-scope edge
+case with plainly incorrect behavior, or a credible security, data-loss,
+data-corruption, or required-path concurrency failure. Distant or speculative
+edge cases, defense-in-depth, maintainability, simplification, performance
+outside expected scale, and out-of-scope improvements are non-blocking. They may
+still be reported and patched.
 
 Require reviewer output sections:
 - `Critical`
@@ -199,22 +211,34 @@ Require reviewer output sections:
 The `Verdict` section must end with exactly one token: `APPROVE`,
 `APPROVE WITH FIXES`, or `NEEDS FIXES`.
 
-Run configured reviewers in strict order. After patch/skip/open decisions and
-any follow-up commit for that round, `APPROVE` or `APPROVE WITH FIXES` ends that
-reviewer phase. `NEEDS FIXES` continues only if you patched something, pushed
-it, and the reviewer has remaining `max_rounds`.
+Run configured reviewers in strict order. Never run more than two rounds for one
+reviewer, even if configuration requests more. Every round is a full review of
+the current pushed branch. After patch/skip/open decisions and any follow-up
+commit for that round, `APPROVE` or `APPROVE WITH FIXES` ends that reviewer
+phase. `NEEDS FIXES` continues only if you patched something, pushed it, and the
+reviewer has a second round remaining.
 
 For each finding, choose exactly one diary status:
 - `[patched]`
 - `[skipped: not actionable]`
 - `[skipped: reason]`
-- `[open]`
+- `[open: blocker]`
+- `[open: non-blocking]`
 
-Err toward patching plausible findings. Preserve reviewer severity buckets and
-exact verdict tokens. Normalize only the common priority labels described in the
-details reference; do not re-rank findings or infer approval from severity counts.
-Do not promote `NEEDS FIXES` to `APPROVE` because you patched everything; only
-the reviewer's next-round verdict can approve its phase.
+Patch findings that are validated against a credible code path and improve the
+branch; do not patch mere possibilities only to satisfy a reviewer. Decide the
+whole round first, then batch all accepted fixes into the single follow-up commit
+for that round. Preserve reviewer severity buckets and exact verdict tokens.
+Normalize only the common priority labels described in the details reference;
+do not re-rank findings or rewrite a reviewer's verdict.
+
+After the final round's accepted fixes are patched and verified, determine the
+overall Rocket verdict from the final branch rather than the last raw reviewer
+token. Approve when the core ticket is delivered and no validated unresolved
+blocker remains. Non-blocking findings and findings patched after the second
+round remain visible in the diary but do not prevent approval. Withhold approval
+only for an `[open: blocker]`. This overall gate does not change the reviewer
+verdict recorded for each round.
 
 ## Runner Failures
 
@@ -238,7 +262,8 @@ _scratch/_reviews/<diary_name>_<branch-with-slashes-replaced-by-dashes>.md
 
 The diary is the source of truth for the final PR comment. Keep it organized by
 reviewer and round, preserve severity headings, include exact verdict tokens,
-and include the round commit hash for patched items.
+include the round commit hash for patched items, and record the overall Rocket
+verdict plus any unresolved blockers.
 
 At the end, post exactly one `gh pr comment` wrapped in a collapsed `<details>`
 block using the configured `summary_title`. No claim in the PR comment may be

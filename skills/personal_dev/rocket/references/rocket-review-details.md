@@ -108,22 +108,22 @@ reviewer phase; only the verdict token does.
 For each configured reviewer:
 
 1. Run round 1 against the current pushed branch state.
-2. Read findings conservatively and err toward patching.
+2. Validate each finding against a credible code path and the ticket contract.
 3. For each finding, decide `[patched]`, `[skipped: not actionable]`,
-   `[skipped: reason]`, or `[open]`.
+   `[skipped: reason]`, `[open: blocker]`, or `[open: non-blocking]`.
 4. If you patched anything, create one follow-up commit for that round and push it.
 5. Re-verify upstream matches local `HEAD`.
 6. Update the diary for that reviewer round.
 7. If the reviewer returned `APPROVE` or `APPROVE WITH FIXES`, end that reviewer
    phase only after the patch/skip/open decisions and any needed follow-up commit.
 8. If the reviewer returned `NEEDS FIXES`, patched changes were pushed, and
-   `max_rounds` remains, run the next round for that same reviewer.
-9. Stop that reviewer phase after `max_rounds`, or earlier if no patch was made
-   against a `NEEDS FIXES` result.
+   a second round remains, run one more full review for that same reviewer.
+9. Stop that reviewer phase after two rounds, or earlier if no patch was made
+   against a `NEEDS FIXES` result. Never run a third round.
 
 After all reviewer phases, mark any unresolved finding that still matters and is
-not intentionally dismissed as `[open]`. Do not run reviewers outside the
-selected profile and do not run extra rounds beyond `max_rounds`.
+not intentionally dismissed as `[open: blocker]` or `[open: non-blocking]`. Do
+not run reviewers outside the selected profile or beyond two rounds per reviewer.
 
 ## Runner Execution
 
@@ -182,9 +182,15 @@ Use reviewer-and-round sections and keep a compact ledger at the top:
 - [file:line] - description [skipped: reason]
 
 ### Low
-- [file:line] - description [open]
+- [file:line] - description [open: non-blocking]
 
 ### Uncertain
+- (none)
+
+## Rocket Outcome
+### Verdict: APPROVED
+
+### Unresolved Blockers
 - (none)
 ```
 
@@ -197,10 +203,14 @@ Rules:
 - Use ledger verdict labels: `APPROVE` -> `Approved`,
   `APPROVE WITH FIXES` -> `Approved with fixes`, and `NEEDS FIXES` ->
   `Needs fixes`.
-- Use ordinal round labels such as `1st round`, `2nd round`, and `3rd round`.
+- Use ordinal round labels `1st round` and `2nd round`; never run a third round
+  for one reviewer.
 - If a later round finds a new issue caused by an earlier patch, say that in the
   finding text instead of inventing a new status.
 - Do not claim a patch, skip, or open item unless it happened in that round.
+- End with one `Rocket Outcome` derived from the final patched and verified
+  branch. List every `[open: blocker]`; non-blocking open items stay in their
+  reviewer sections.
 
 ## Final PR Comment
 
@@ -215,12 +225,15 @@ Shape:
 
 **Profile:** <profile>
 **Rounds:** <reviewer round count>
+**Rocket verdict:** APPROVED
 **Review ledger:**
 - Cursor - Approved with fixes - 2nd round
 - Codex - Approved - 1st round
 
 **Cursor verdict:** APPROVE WITH FIXES
 **Codex verdict:** APPROVE
+
+**Unresolved blockers:** None.
 
 ### Cursor
 #### Critical
@@ -230,7 +243,7 @@ Shape:
 - [file:line] - description [skipped: reason]
 
 #### Low
-- [file:line] - description [open]
+- [file:line] - description [open: non-blocking]
 
 ### Codex
 #### Critical
@@ -241,16 +254,21 @@ Shape:
 
 Rules:
 - Use a closed `<details>` block; do not add `open`.
+- Copy the overall Rocket verdict and unresolved blockers from the diary before
+  the raw reviewer ledger and verdicts.
 - Include `Review ledger` copied from the diary before reviewer verdict lines.
 - Do not summarize review as complete unless every configured reviewer has a
   ledger line.
-- If any reviewer ledger line is `Needs fixes`, the overall review is not
-  approved.
+- The overall review is not approved only when the diary contains an unresolved
+  `[open: blocker]`. A raw `Needs fixes` ledger line, a patched finding, or an
+  `[open: non-blocking]` item does not by itself withhold Rocket approval.
 - Use configured reviewer names as section headings.
 - Each reviewer verdict line uses the verdict token from that reviewer's final
   round. If it ended on `NEEDS FIXES`, write
-  `NOT APPROVED (NEEDS FIXES after <n> rounds)`.
-- Never write `APPROVE` unless the diary records an approving verdict.
+  `NEEDS FIXES (reviewer verdict after <n> rounds)` without treating that raw
+  token as the overall Rocket verdict.
+- Never rewrite a raw reviewer verdict as `APPROVE`; report Rocket approval
+  separately.
 - Preserve severity headings and statuses exactly.
 - No padding. No compliments.
 
