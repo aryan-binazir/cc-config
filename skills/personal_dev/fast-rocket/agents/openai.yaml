@@ -1,4 +1,4 @@
 interface:
   display_name: "Fast Rocket"
-  short_description: "Move a Linear issue quickly into a reviewed PR"
-  default_prompt: "Use $fast-rocket with this Linear issue and optional exact branch name to work from its helper-returned authoritative worktree through a lightweight plan, TDD implementation, commit and push, PR creation, and Codex review."
+  short_description: "Move a configured tracker issue quickly into a reviewed PR"
+  default_prompt: "Use $fast-rocket with this configured tracker issue and optional branch, implementer, or grill modifiers to work from its authoritative worktree through configured critique, TDD implementation, commit and push, PR creation, and configured review."

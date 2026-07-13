@@ -14,6 +14,7 @@ todos/
 local/
 skills/personal_dev/rocket/rocket.local.yaml
 skills/personal_dev/lead/lead.local.yaml
+skills/personal_dev/fast-rocket/fast-rocket.local.yaml
 skills/sym_linked/*
 !skills/sym_linked/.gitkeep
 

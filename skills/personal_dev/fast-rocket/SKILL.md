@@ -1,69 +1,117 @@
 ---
 name: fast-rocket
 description: >-
-  Take a Linear issue plus an optional exact user-supplied branch through
-  focused clarification, a Cursor-critiqued plan, test-driven implementation,
-  verification, commit and push, PR creation, and a gated Codex review. Use this
+  Take a configured Linear or Jira issue or explicit no-ticket task plus an optional exact
+  user-supplied branch through
+  focused clarification, configured plan critique, test-driven implementation,
+  verification, commit and push, PR creation, and configured review. Use this
   whenever the user invokes fast-rocket or asks for the lighter, lower-friction
-  alternative to rocket-plan for an end-to-end Linear issue.
+  alternative to rocket-plan for an end-to-end task.
 ---
 
 # Fast Rocket
 
-Use this for a reasonably specified Linear issue that should move quickly from intake
-to a reviewed PR. It is separate from Rocket: do not persist a Rocket contract,
-resolve Rocket profiles, invoke `rocket-review`, or wait for explicit approval
-of the implementation plan.
+Use this for a reasonably specified task that should move quickly from intake
+to a reviewed PR. The local config selects Linear or Jira; when the user
+explicitly says there is no ticket, accept a clear task description instead. It
+is separate from Rocket: do not persist a Rocket contract, resolve Rocket plan
+profiles, or wait for explicit approval of the implementation plan.
 
-Expect one required task input and up to two optional inputs:
+Expect one required task input and up to three optional inputs:
 
-1. A Linear issue ID or URL.
+1. An issue ID or URL for the configured tracker, or an explicit `no ticket`
+   task description.
 2. Optionally, the exact branch name to use.
-3. Optionally, the literal `grok` implementation modifier.
+3. Optionally, the literal `implementer` modifier.
+4. Optionally, the literal `grill` modifier.
 
 For example:
 
 `$fast-rocket BBA-359`
 
-`$fast-rocket BBA-359 grok`
+`$fast-rocket BBA-359 implementer`
 
-If the branch is omitted, derive it as `aryan-binazir/<resolved-linear-issue-key>`.
-If the user supplies a branch, honor it exactly. Ask only when the Linear issue
-ID or URL is missing. Resolve the issue as Linear with the available Linear
-skill or connector; do not infer another tracker or support ticketless work.
-Treat `grok` as the implementation modifier, not as a branch name.
+`$fast-rocket BBA-359 grill`
+
+`$fast-rocket no ticket: fix stale cache invalidation`
+
+If the branch is omitted, derive `aryan-binazir/<resolved-issue-key>` for tracked
+work or `aryan-binazir/<task-slug>` for explicit no-ticket work, using a
+reasonable short kebab-case slug. If the user supplies a branch, honor it
+exactly. Unless the user explicitly says there is no ticket, ask for an issue ID
+or URL from the configured tracker. Do not infer another tracker. Treat
+`implementer` and `grill` as modifiers, not as branch names.
 
 Never guess past material ambiguity, skip the required external critiques,
 write production code before a driving test, or merge unless the user asks.
 
-## 1. Resolve The Linear Issue And Worktree
+## Config
 
-1. Read the supplied Linear issue with the available Linear skill or connector.
-   Do not rely on the title alone.
-2. Resolve the target repository from the issue and current task context. Do
+Before interpreting the task input, run:
+
+```bash
+uv run --script /home/ar/repos/cc-config/skills/personal_dev/fast-rocket/scripts/resolve_config.py
+```
+
+The resolver reads the required ignored `fast-rocket.local.yaml` beside this
+skill. Stop on any resolver failure; do not choose a tracker, runner, or model
+from prose or machine availability. The flat config provides `tracker`,
+`critic`, optional `implementer`, optional `grill`, and `review` blocks. Model
+and effort values come only from that resolved config.
+
+For configured `cursor`, `claude`, or `codex` runners, read the matching
+`call-cursor`, `call-claude`, or `call-codex` skill before invocation. Pass the
+configured `model`, `effort`, `reasoning_effort`, and `timeout_ms` when present;
+omit absent options so the runner uses its own defaults. Stop if a configured
+runner or model is unavailable instead of silently substituting another.
+
+Pass runner options using their native flags: Cursor `--model`, Claude
+`--model` and `--effort`, and Codex `--model` plus
+`-c model_reasoning_effort="<reasoning_effort>"`. Treat `timeout_ms` as the
+maximum wait for the configured invocation, not as a runner CLI flag.
+
+## 1. Resolve The Task And Worktree
+
+1. For ticketed work, read the supplied issue with the available skill or
+   connector for the configured tracker; do not rely on the title alone. For
+   explicit no-ticket work, use the user's task description as the source of
+   truth.
+2. Resolve the target repository from the issue or current task context. Do
    not begin planning or code exploration yet.
-3. Extract the Linear issue key. If the user supplied a branch, run this
-   verified helper with that exact branch:
+3. Extract the issue key. For no-ticket work, derive `<TASK-SLUG>` and use
+   `NO-TICKET-<TASK-SLUG>` as the synthetic helper key. If the user supplied a
+   branch, run this verified helper with that exact branch:
 
    ```bash
    uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
      --repo <absolute-repo-path> \
-     --ticket-key <LINEAR-ISSUE-KEY> \
+     --ticket-key <ISSUE-KEY-OR-SYNTHETIC-NO-TICKET-KEY> \
      --branch-name <exact-user-supplied-branch> \
      --base-branch main
    ```
 
-   If the branch was omitted, let the helper derive its default
-   `aryan-binazir/<LINEAR-ISSUE-KEY>` branch by omitting `--branch-name`:
+   If the branch was omitted for tracked work, let the helper derive its default
+   `aryan-binazir/<ISSUE-KEY>` branch by omitting `--branch-name`:
 
    ```bash
    uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
      --repo <absolute-repo-path> \
-     --ticket-key <LINEAR-ISSUE-KEY> \
+     --ticket-key <ISSUE-KEY> \
      --base-branch main
    ```
 
-   For any ticket worktree the helper creates, keep its default location:
+   For no-ticket work, always supply the derived branch explicitly so it stays
+   `aryan-binazir/<task-slug>` rather than inheriting the synthetic helper key:
+
+   ```bash
+   uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
+     --repo <absolute-repo-path> \
+     --ticket-key NO-TICKET-<TASK-SLUG> \
+     --branch-name aryan-binazir/<task-slug> \
+     --base-branch main
+   ```
+
+   For any worktree the helper creates, keep its default location:
    `~/repos/.worktrees/<repo>/<ticket-key>`. Do not pass
    `--worktree-path` to redirect it to the caller's checkout or another path.
 4. Parse the helper's JSON. Require `ok: true`, require `branch` to exactly
@@ -79,8 +127,8 @@ write production code before a driving test, or merge unless the user asks.
    mismatches, or the returned checkout is not actually on the resolved branch.
    Do not silently switch or edit another checkout.
 
-This reuses only Rocket's verified branch/worktree helper. Fast Rocket remains
-separate and does not invoke Rocket contracts, profiles, approvals, or review.
+This reuses Rocket's verified branch/worktree helper without invoking Rocket
+contracts or plan profiles. Review invokes Rocket Review only when configured.
 
 Do not assume or independently continue in the caller's checkout. From this
 point forward, run every inspection, context update, plan critique,
@@ -93,17 +141,29 @@ documentation, and git state from that worktree. Make sure the goal, accepted
 behavior, boundaries, and validation target are understood.
 
 When repository rules require `_scratch/_context/<ticket-key>.md`, resolve the
-key from the supplied issue or intended branch, not the currently checked-out
-branch. Keep that file current as plans, assumptions, or decisions change, and
-delete stale notes instead of accumulating them.
+key from the supplied issue or, for no-ticket work, the task slug resolved from
+the intended branch. Never derive it from the currently checked-out branch.
+Keep that file current as plans, assumptions, or decisions change, and delete
+stale notes instead of accumulating them.
 
 ## 2. Brief, Align, And Clarify
 
-Before asking any clarification question, give the user a compact ticket
-briefing based on the Linear issue and repository evidence:
+If the invocation includes `grill`, require a resolved `grill` block and read
+and follow its configured skill from the authoritative worktree. Stop if the
+block or skill is unavailable. The grilling session replaces the normal brief
+and limited clarification flow below; do not continue to planning or
+implementation until the user confirms shared understanding, and skip the
+remainder of this section after that confirmation.
+
+Without `grill`, use the normal flow below. This path assumes the task is
+reasonably defined and asks only the alignment or validation questions that
+materially affect the work.
+
+Before asking any clarification question, give the user a compact task briefing
+based on the tracked issue or no-ticket task description and repository evidence:
 
 - **Problem:** what is currently wrong or missing.
-- **Outcome:** what the ticket intends to make true.
+- **Outcome:** what the task intends to make true.
 - **Scope and constraints:** the important boundaries, acceptance criteria, and
   repo-native constraints that shape the likely implementation.
 
@@ -128,26 +188,23 @@ hard-to-reverse architecture.
   skill; fold it into another material question when practical.
 - If the task is clear, proceed immediately apart from any seam confirmation
   still required by `tdd`.
-- If material ambiguity remains after three questions, say the issue is not
+- If material ambiguity remains after three questions, say the task is not
   implementation-ready and ask whether to continue clarifying or proceed with
   explicit assumptions.
 
 Stop for a user decision whenever the answer is hard to undo or would change
 user-facing behavior or scope.
 
-## 3. Plan And Get Cursor Critique
+## 3. Plan And Get Configured Critique
 
 Write a concise implementation plan covering the intended behavior, affected
 areas, confirmed test seams, red-green slices, and required verification.
 
-Read and follow:
-
-`/home/ar/repos/cc-config/skills/personal_dev/call-cursor/SKILL.md`
-
-Use its exact non-interactive CLI and model-selection conventions to ask Cursor
-to critique the plan against the Linear issue, repository evidence, and repo-local
-instructions. Give Cursor the complete task and request concrete gaps, risks,
-unnecessary complexity, and simpler repo-native alternatives.
+Use the resolved `critic` runner and its exact non-interactive conventions to
+critique the plan against the resolved task, repository evidence, and repo-local
+instructions. Give the critic the complete task and request concrete gaps,
+risks, unnecessary complexity, and simpler repo-native alternatives. Keep the
+critic read-only.
 
 Incorporate actionable feedback. Ask the user only when the critique exposes a
 material decision; otherwise state any reversible assumption and continue.
@@ -164,21 +221,17 @@ Work in vertical red-green slices through the confirmed public seams: write one
 failing behavior test, run it to observe the expected failure, add only enough
 production code to pass, then repeat.
 
-Obey all repository instructions, including any requirement to delegate
-implementation to an `implementer` sub-agent. When delegation is required, the
-implementer changes code only and must not push or open the PR. The main agent
-must inspect status and diff after handoff, and owns validation, commits, pushes,
-PR creation, and Codex review. Keep changes within the issue's scope and stop
-if implementation reveals a new material ambiguity.
+Use the system `implementer` sub-agent by default. If the invocation includes
+the literal `implementer` modifier and the resolved config has an `implementer`
+block, use that configured runner as the code-changing implementer instead. If
+the block is absent, fall back to the system `implementer` sub-agent.
 
-If the invocation includes the `grok` modifier, use the `call-cursor` workflow
-with the exact model `grok-4.5-fast-high` as the code-changing implementer
-instead of the repository-required implementation sub-agent. Give it the full
-task, repository, authoritative worktree, plan, test-seam, and repo-instruction
-context; require it to work only in that worktree, follow the TDD workflow and
-repository instructions, and not commit, push, or open a PR. The main agent
-still owns diff inspection, validation, commits, pushes, PR creation, and review.
-Without `grok`, preserve the repository-required implementation sub-agent flow.
+Give either implementer the full task, repository, authoritative worktree,
+plan, test seam, and repo-instruction context. Require it to work only in that
+worktree, follow the TDD workflow and repository instructions, and not commit,
+push, or open a PR. The main agent must inspect status and diff after handoff and
+owns validation, commits, pushes, PR creation, and review. Keep changes within
+the task's scope and stop if implementation reveals a new material ambiguity.
 
 ## 5. Verify And Open The PR
 
@@ -194,19 +247,24 @@ local `HEAD`. Then create or update the PR with fully explicit, non-interactive
 `gh` commands. Provide `--head`, `--title`, and `--body-file` as
 appropriate; do not use `--fill`, editor prompts, or implicit fork or push
 behavior. Follow the repository's PR title, body, ticket-linking, and assignment
-rules. Confirm the PR targets the intended base branch and its head is the
+rules. For no-ticket work, use the repository's no-ticket convention for the
+commit and PR title, such as `type(no-ticket): description`, and omit ticket
+linking. Confirm the PR targets the intended base branch and its head is the
 resolved, pushed implementation branch.
 
-## 6. Require A Codex Verdict
+## 6. Run Configured Review
 
-Read and follow:
+If `review.runner` is `rocket-review`, read and follow the `rocket-review` skill
+with no explicit profile so that workflow uses its own local default. Supply the
+tracked issue or no-ticket task description as its spec source. Do not also run
+the verdict loop below.
 
-`/home/ar/repos/cc-config/skills/personal_dev/call-codex/SKILL.md`
-
-Use its exact non-interactive CLI conventions to have Codex review the actual PR
-diff. Supply the full Linear issue, repo path, base and head commits, PR URL,
-repo instructions, changed files, and verification results. Tell Codex to remain
-read-only, list only concrete actionable findings, and end with exactly one of:
+Otherwise, use the resolved `review` runner and its exact non-interactive
+conventions to review the actual PR diff. Supply the full tracked issue or
+no-ticket task description, repo path, base and head commits, PR URL, repo
+instructions, changed files, and verification results. Tell the reviewer to
+remain read-only, list only concrete actionable findings, and end with exactly
+one of:
 
 - `APPROVED`
 - `APPROVED WITH FIXES`
@@ -216,18 +274,18 @@ read-only, list only concrete actionable findings, and end with exactly one of:
 Define the choices in the reviewer prompt: use `APPROVED` or
 `NO ACTIONABLE FEEDBACK` when no fixes are needed; use `APPROVED WITH FIXES`
 only for a complete, enumerated fix list that does not need re-review; use
-`CHANGES REQUESTED` when Codex must inspect the result of the fixes.
+`CHANGES REQUESTED` when the reviewer must inspect the result of the fixes.
 
 Handle the verdict literally:
 
 - `APPROVED` or `NO ACTIONABLE FEEDBACK`: finish.
 - `APPROVED WITH FIXES`: apply every listed fix, rerun relevant verification,
   commit and push the fixes to the resolved branch, and confirm its upstream
-  matches local `HEAD`. Then finish without requiring another Codex review.
+  matches local `HEAD`. Then finish without requiring another review.
 - `CHANGES REQUESTED`: apply the requested fixes, rerun relevant verification,
   commit and push to the resolved branch, confirm its upstream matches local
-  `HEAD`, and ask Codex to review the new PR diff again. Repeat until Codex
-  returns a terminal verdict.
+  `HEAD`, and ask the same configured reviewer to review the new PR diff again.
+  Repeat until it returns a terminal verdict.
 
 Do not infer approval from friendly prose or the absence of high-severity
 findings. A malformed or missing verdict is not approval; retry once with the
@@ -237,5 +295,5 @@ required format, then stop and report the blocker if it remains malformed.
 
 Before completion, verify once more that the resolved branch's upstream commit
 matches local `HEAD`. Report the branch, worktree path, PR URL, delivered
-behavior, commits, verification performed, Codex's exact terminal verdict, and
-any remaining caveats. Do not merge the PR unless the user explicitly asks.
+behavior, commits, verification performed, the configured review result, and any
+remaining caveats. Never merge the PR without the user's explicit consent.

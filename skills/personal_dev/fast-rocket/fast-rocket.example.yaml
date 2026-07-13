@@ -1,0 +1,41 @@
+# Copy one flat example below to fast-rocket.local.yaml. The local file is
+# required and ignored by git. The optional implementer block is used only when
+# the invocation includes `implementer`; the optional grill block is used only
+# when the invocation includes `grill`.
+
+# H
+# tracker: linear
+#
+# critic:
+#   runner: cursor
+#   model: grok-4.5-fast-high
+#   timeout_ms: 900000
+#
+# implementer:
+#   runner: cursor
+#   model: grok-4.5-fast-high
+#   timeout_ms: 900000
+#
+# grill:
+#   skill: grill-with-docs
+#
+# review:
+#   runner: codex
+#   model: gpt-5.6-sol
+#   reasoning_effort: high
+#   timeout_ms: 900000
+
+# W
+# tracker: jira
+#
+# critic:
+#   runner: claude
+#   model: fable
+#   effort: high
+#   timeout_ms: 900000
+#
+# grill:
+#   skill: grill-with-docs
+#
+# review:
+#   runner: rocket-review
