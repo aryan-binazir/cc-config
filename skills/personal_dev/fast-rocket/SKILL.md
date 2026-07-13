@@ -47,10 +47,11 @@ write production code before a driving test, or merge unless the user asks.
 
 ## Config
 
-Before interpreting the task input, run:
+Before interpreting the task input, resolve `<fast-rocket-skill-dir>` as the
+absolute directory containing this `SKILL.md`, then run:
 
 ```bash
-uv run --script /home/ar/repos/cc-config/skills/personal_dev/fast-rocket/scripts/resolve_config.py
+uv run --script "<fast-rocket-skill-dir>/scripts/resolve_config.py"
 ```
 
 The resolver reads the required ignored `fast-rocket.local.yaml` beside this
@@ -72,6 +73,9 @@ maximum wait for the configured invocation, not as a runner CLI flag.
 
 ## 1. Resolve The Task And Worktree
 
+Resolve the shared branch helper relative to this skill as
+`<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py`.
+
 1. For ticketed work, read the supplied issue with the available skill or
    connector for the configured tracker; do not rely on the title alone. For
    explicit no-ticket work, use the user's task description as the source of
@@ -83,7 +87,7 @@ maximum wait for the configured invocation, not as a runner CLI flag.
    branch, run this verified helper with that exact branch:
 
    ```bash
-   uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
+   uv run --script "<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py" \
      --repo <absolute-repo-path> \
      --ticket-key <ISSUE-KEY-OR-SYNTHETIC-NO-TICKET-KEY> \
      --branch-name <exact-user-supplied-branch> \
@@ -94,7 +98,7 @@ maximum wait for the configured invocation, not as a runner CLI flag.
    `aryan-binazir/<ISSUE-KEY>` branch by omitting `--branch-name`:
 
    ```bash
-   uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
+   uv run --script "<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py" \
      --repo <absolute-repo-path> \
      --ticket-key <ISSUE-KEY> \
      --base-branch main
@@ -104,7 +108,7 @@ maximum wait for the configured invocation, not as a runner CLI flag.
    `aryan-binazir/<task-slug>` rather than inheriting the synthetic helper key:
 
    ```bash
-   uv run --script /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py \
+   uv run --script "<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py" \
      --repo <absolute-repo-path> \
      --ticket-key NO-TICKET-<TASK-SLUG> \
      --branch-name aryan-binazir/<task-slug> \
@@ -212,10 +216,7 @@ This is one critique round unless the run fails or the user asks for more.
 
 ## 4. Implement Test-First
 
-Read and follow the verified canonical TDD skill completely before
-implementation:
-
-`/home/ar/repos/skills/skills/engineering/tdd/SKILL.md`
+Read and follow the available `tdd` skill completely before implementation.
 
 Work in vertical red-green slices through the confirmed public seams: write one
 failing behavior test, run it to observe the expected failure, add only enough
