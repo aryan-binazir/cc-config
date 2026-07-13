@@ -4,7 +4,7 @@ description: >-
   Take a configured Linear or Jira issue or explicit no-ticket task plus an optional exact
   user-supplied branch through
   focused clarification, configured plan critique, test-driven implementation,
-  verification, commit and push, PR creation, and configured review. Use this
+  verification, commit and push, draft PR creation, and configured review. Use this
   whenever the user invokes fast-rocket or asks for the lighter, lower-friction
   alternative to rocket-plan for an end-to-end task.
 ---
@@ -239,7 +239,7 @@ push, or open a PR. The main agent must inspect status and diff after handoff an
 owns validation, commits, pushes, PR creation, and review. Keep changes within
 the task's scope and stop if implementation reveals a new material ambiguity.
 
-## 5. Verify And Open The PR
+## 5. Verify, Commit, Push, And Open A Draft PR
 
 Run targeted tests plus every typecheck, lint, test, or other validation required
 by the repository. Fix relevant failures; report unrelated or pre-existing
@@ -249,14 +249,19 @@ Immediately before committing, require the current branch to exactly match the
 resolved branch. Commit according to repo conventions, then push explicitly
 to that branch on `origin`, setting its upstream when needed. Verify the
 upstream branch is `origin/<resolved-branch>` and its commit matches
-local `HEAD`. Then create or update the PR with fully explicit, non-interactive
-`gh` commands. Provide `--head`, `--title`, and `--body-file` as
-appropriate; do not use `--fill`, editor prompts, or implicit fork or push
-behavior. Follow the repository's PR title, body, ticket-linking, and assignment
-rules. For no-ticket work, use the repository's no-ticket convention for the
-commit and PR title, such as `type(no-ticket): description`, and omit ticket
-linking. Confirm the PR targets the intended base branch and its head is the
-resolved, pushed implementation branch.
+local `HEAD`. Fast Rocket delivery always includes a commit and push; do not
+leave completed implementation only in the worktree.
+
+Then create or update the PR as a draft with fully explicit, non-interactive
+`gh` commands. Pass `--draft`, `--head`, `--title`, and `--body-file` when
+creating it. If a PR already exists and is not a draft, convert it with
+`gh pr ready --undo <PR-number-or-URL>` before continuing. Do not use `--fill`,
+editor prompts, or implicit fork or push behavior. Follow the repository's PR
+title, body, ticket-linking, and assignment rules. For no-ticket work, use the
+repository's no-ticket convention for the commit and PR title, such as
+`type(no-ticket): description`, and omit ticket linking. Confirm the PR remains
+a draft, targets the intended base branch, and its head is the resolved, pushed
+implementation branch.
 
 ## 6. Run Configured Review
 
