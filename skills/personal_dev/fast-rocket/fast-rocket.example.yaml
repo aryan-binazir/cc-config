@@ -1,9 +1,11 @@
 # Copy one flat example below to fast-rocket.local.yaml. The local file is
-# required and ignored by git. The optional implementer block is used only when
-# the invocation includes `implementer`; the optional grill block is used only
-# when the invocation includes `grill`.
+# required and ignored by git. Set checkout to `worktree` for an isolated linked
+# worktree or `branch` to switch the repository's existing checkout. The optional
+# implementer block is used only when the invocation includes `implementer`; the
+# optional grill block is used only when the invocation includes `grill`.
 
 # H
+# checkout: worktree
 # tracker: linear
 #
 # critic:
@@ -26,6 +28,7 @@
 #   timeout_ms: 900000
 
 # W
+# checkout: branch
 # tracker: jira
 #
 # critic:

@@ -15,6 +15,7 @@ from typing import Any
 RUNNERS = {"claude", "codex", "cursor"}
 REVIEW_RUNNERS = RUNNERS | {"rocket-review"}
 TRACKERS = {"jira", "linear"}
+CHECKOUTS = {"branch", "worktree"}
 GRILL_SKILLS = {"grill-with-docs"}
 
 
@@ -65,6 +66,10 @@ def validate_grill(config: dict[str, Any], errors: list[str]) -> dict[str, Any] 
 
 def validate_config(config: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
+    checkout = config.get("checkout")
+    if checkout not in CHECKOUTS:
+        errors.append(f"checkout must be one of: {', '.join(sorted(CHECKOUTS))}")
+
     tracker = config.get("tracker")
     if tracker not in TRACKERS:
         errors.append(f"tracker must be one of: {', '.join(sorted(TRACKERS))}")
@@ -77,6 +82,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
     return {
         "ok": not errors,
         "errors": errors,
+        "checkout": checkout,
         "tracker": tracker,
         "critic": critic,
         "implementer": implementer,

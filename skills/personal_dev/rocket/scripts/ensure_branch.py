@@ -156,6 +156,7 @@ def detect_ticket_key(*values: str | None) -> str | None:
 
 def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
     repo = args.repo.resolve()
+    checkout_mode = getattr(args, "checkout_mode", "worktree")
     worktree = git_output(repo, ["rev-parse", "--is-inside-work-tree"])
     if not worktree["ok"] or worktree["stdout"].strip() != "true":
         return {"ok": False, "failure_mode": "not_git_worktree", "repo": str(repo)}
@@ -178,6 +179,100 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
     base_fields = {key: value for key, value in latest_base.items() if key != "ok"}
 
     target_worktree = worktree_for_branch(repo, target)
+    if checkout_mode == "branch":
+        if args.worktree_path:
+            return {
+                "ok": False,
+                "failure_mode": "worktree_path_invalid_for_branch_mode",
+                "checkout_mode": checkout_mode,
+            }
+        if worktree_dirty(repo):
+            return {
+                "ok": False,
+                "failure_mode": "dirty_target_checkout",
+                "checkout_mode": checkout_mode,
+                "current_branch": current,
+                "current_ticket_key": current_ticket,
+                "target_branch": target,
+                "ticket_key": ticket_key,
+                "checkout_path": str(repo),
+            }
+        if target_worktree and target_worktree.resolve() != repo:
+            return {
+                "ok": False,
+                "failure_mode": "target_branch_checked_out_elsewhere",
+                "checkout_mode": checkout_mode,
+                "target_branch": target,
+                "ticket_key": ticket_key,
+                "checkout_path": str(repo),
+                "existing_worktree_path": str(target_worktree),
+            }
+        if current == target:
+            return {
+                "ok": True,
+                "action": "existing_branch_checkout",
+                "branch": target,
+                "checkout_mode": checkout_mode,
+                "checkout_path": str(repo),
+                **base_fields,
+            }
+        if local_branch_exists(repo, target):
+            switched = git_output(repo, ["switch", target])
+            return {
+                "ok": switched["ok"],
+                "action": "switched_existing_branch",
+                "branch": target,
+                "checkout_mode": checkout_mode,
+                "checkout_path": str(repo),
+                "stderr": switched["stderr"],
+                **base_fields,
+            }
+        remote = git_output(
+            repo, ["ls-remote", "--exit-code", args.remote, f"refs/heads/{target}"]
+        )
+        if remote["ok"]:
+            fetch_target = git_output(
+                repo,
+                [
+                    "fetch",
+                    "--prune",
+                    args.remote,
+                    f"refs/heads/{target}:refs/remotes/{args.remote}/{target}",
+                ],
+                timeout_ms=args.timeout_ms,
+            )
+            if not fetch_target["ok"]:
+                return {
+                    "ok": False,
+                    "failure_mode": "target_branch_fetch_failed",
+                    "checkout_mode": checkout_mode,
+                    "target_branch": target,
+                    "stderr": fetch_target["stderr"],
+                }
+            switched = git_output(
+                repo,
+                ["switch", "--track", "-c", target, f"{args.remote}/{target}"],
+            )
+            return {
+                "ok": switched["ok"],
+                "action": "tracked_remote_branch",
+                "branch": target,
+                "checkout_mode": checkout_mode,
+                "checkout_path": str(repo),
+                "stderr": switched["stderr"],
+                **base_fields,
+            }
+        switched = git_output(repo, ["switch", "-c", target, latest_base["base_ref"]])
+        return {
+            "ok": switched["ok"],
+            "action": "created_branch_from_main",
+            "branch": target,
+            "checkout_mode": checkout_mode,
+            "checkout_path": str(repo),
+            "stderr": switched["stderr"],
+            **base_fields,
+        }
+
     if target_worktree:
         if worktree_dirty(target_worktree):
             return {
@@ -193,6 +288,8 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
             "ok": True,
             "action": "existing_worktree",
             "branch": target,
+            "checkout_mode": checkout_mode,
+            "checkout_path": str(target_worktree),
             "worktree_path": str(target_worktree),
             **base_fields,
         }
@@ -217,6 +314,8 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
             "ok": added["ok"],
             "action": "attached_existing_branch",
             "branch": target,
+            "checkout_mode": checkout_mode,
+            "checkout_path": str(worktree_path),
             "worktree_path": str(worktree_path),
             "stderr": added["stderr"],
             **base_fields,
@@ -257,6 +356,8 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
             "ok": added["ok"],
             "action": "tracked_remote_worktree",
             "branch": target,
+            "checkout_mode": checkout_mode,
+            "checkout_path": str(worktree_path),
             "worktree_path": str(worktree_path),
             "stderr": added["stderr"],
             **base_fields,
@@ -270,6 +371,8 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
         "ok": created["ok"],
         "action": "created_worktree_from_main",
         "branch": target,
+        "checkout_mode": checkout_mode,
+        "checkout_path": str(worktree_path),
         "worktree_path": str(worktree_path),
         "stderr": created["stderr"],
         **base_fields,
@@ -278,7 +381,7 @@ def ensure_branch(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Create or reuse a ticket worktree from the latest remote main."
+        description="Create or reuse a ticket branch checkout from the latest remote main."
     )
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
     parser.add_argument("--repo", type=Path, default=Path.cwd())
@@ -288,6 +391,7 @@ def main() -> int:
     parser.add_argument("--prefix", default="aryan-binazir")
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--base-branch", default="main")
+    parser.add_argument("--checkout-mode", choices=("branch", "worktree"), default="worktree")
     parser.add_argument("--worktree-path", type=Path)
     parser.add_argument("--timeout-ms", type=int, default=10_000)
     args = parser.parse_args()

@@ -55,10 +55,11 @@ uv run --script "<fast-rocket-skill-dir>/scripts/resolve_config.py"
 ```
 
 The resolver reads the required ignored `fast-rocket.local.yaml` beside this
-skill. Stop on any resolver failure; do not choose a tracker, runner, or model
-from prose or machine availability. The flat config provides `tracker`,
-`critic`, optional `implementer`, optional `grill`, and `review` blocks. Model
-and effort values come only from that resolved config.
+skill. Stop on any resolver failure; do not choose a checkout mode, tracker,
+runner, or model from prose or machine availability. The flat config provides
+`checkout`, `tracker`, `critic`, optional `implementer`, optional `grill`, and
+`review`. `checkout` is either `worktree` or `branch`. Model and effort values
+come only from that resolved config.
 
 For configured `cursor`, `claude`, or `codex` runners, read the matching
 `call-cursor`, `call-claude`, or `call-codex` skill before invocation. Pass the
@@ -71,7 +72,7 @@ Pass runner options using their native flags: Cursor `--model`, Claude
 `-c model_reasoning_effort="<reasoning_effort>"`. Treat `timeout_ms` as the
 maximum wait for the configured invocation, not as a runner CLI flag.
 
-## 1. Cut The Worktree First
+## 1. Prepare The Configured Checkout First
 
 Resolve the shared branch helper relative to this skill as
 `<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py`.
@@ -90,6 +91,7 @@ Resolve the shared branch helper relative to this skill as
      --repo <absolute-repo-path> \
      --ticket-key <ISSUE-KEY-OR-SYNTHETIC-NO-TICKET-KEY> \
      --branch-name <exact-user-supplied-branch> \
+     --checkout-mode <resolved-checkout> \
      --base-branch main
    ```
 
@@ -100,6 +102,7 @@ Resolve the shared branch helper relative to this skill as
    uv run --script "<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py" \
      --repo <absolute-repo-path> \
      --ticket-key <ISSUE-KEY> \
+     --checkout-mode <resolved-checkout> \
      --base-branch main
    ```
 
@@ -111,42 +114,47 @@ Resolve the shared branch helper relative to this skill as
      --repo <absolute-repo-path> \
      --ticket-key NO-TICKET-<TASK-SLUG> \
      --branch-name aryan-binazir/<task-slug> \
+     --checkout-mode <resolved-checkout> \
      --base-branch main
    ```
 
-   For any worktree the helper creates, keep its default location:
-   `~/repos/.worktrees/<repo>/<ticket-key>`. Do not pass
-   `--worktree-path` to redirect it to the caller's checkout or another path.
-3. Parse the helper's JSON. Require `ok: true`, require `branch` to exactly
-   equal the supplied branch or derived default, and use the returned absolute
-   `worktree_path` as the authoritative checkout. Call that expected branch the
-   resolved branch. The helper handles a current worktree already on the branch,
-   an existing registered worktree, an existing local branch, an existing remote
-   branch, or a new branch and worktree from latest `origin/main`. If it returns
-   an already registered matching worktree outside the default location, keep
-   using that returned path; do not move or recreate it.
-4. Immediately tell the user the resolved branch and worktree path so this run
-   is easy to identify among other open worktrees. Worktree setup is Fast
-   Rocket's first state-changing action and must finish before the full issue
-   read, task briefing, critique, planning, or code exploration.
-5. Stop and ask the user before proceeding if the target worktree is dirty, its
-   path collides, `main` is unavailable, branch setup fails, the returned branch
+   In `worktree` mode, keep the helper's default location for any worktree it
+   creates: `~/repos/.worktrees/<repo>/<ticket-key>`. Do not pass
+   `--worktree-path` to redirect it. In `branch` mode, the helper uses the
+   repository path as the checkout and creates or switches the local branch
+   there without creating a linked worktree.
+3. Parse the helper's JSON. Require `ok: true`, require `checkout_mode` to match
+   the resolved config, require `branch` to exactly equal the supplied branch or
+   derived default, and use the returned absolute `checkout_path` as the
+   authoritative checkout. Call that expected branch the resolved branch. In
+   `worktree` mode, the helper may reuse a current or registered worktree or
+   create one from an existing local branch, existing remote branch, or latest
+   `origin/main`. If it returns a registered matching worktree outside the
+   default location, keep using that returned path; do not move or recreate it.
+   In `branch` mode, it reuses, creates, or switches the branch in the repository
+   checkout and stops if that branch is checked out elsewhere.
+4. Immediately tell the user the checkout mode, resolved branch, and checkout
+   path so this run is easy to identify among other open work. Checkout setup is
+   Fast Rocket's first state-changing action and must finish before the full
+   issue read, task briefing, critique, planning, or code exploration.
+5. Stop and ask the user before proceeding if the target checkout is dirty, its
+   path collides, `main` is unavailable, branch setup fails, the branch is
+   checked out elsewhere in `branch` mode, the returned mode or branch
    mismatches, or the returned checkout is not actually on the resolved branch.
    Do not silently switch or edit another checkout.
 
 This reuses Rocket's verified branch/worktree helper without invoking Rocket
 contracts or plan profiles. Review invokes Rocket Review only when configured.
 
-Do not assume or independently continue in the caller's checkout. From this
-point forward, run every inspection, context update, plan critique,
+From this point forward, run every inspection, context update, plan critique,
 implementation action, validation, commit, push, PR action, and review only from
-the helper-returned authoritative git `worktree_path`. When delegating, give the
+the helper-returned authoritative git `checkout_path`. When delegating, give the
 sub-agent that exact path and require it to work only there.
 
 Now read the complete tracked issue; do not rely on its title alone. For
 explicit no-ticket work, use the user's task description as the source of
 truth. Read the target repository's instructions, relevant code, tests,
-documentation, and git state from that worktree. Make sure the goal, accepted
+documentation, and git state from that checkout. Make sure the goal, accepted
 behavior, boundaries, and validation target are understood.
 
 When repository rules require `_scratch/_context/<ticket-key>.md`, resolve the
@@ -158,7 +166,7 @@ stale notes instead of accumulating them.
 ## 2. Brief, Align, And Clarify
 
 If the invocation includes `grill`, require a resolved `grill` block and read
-and follow its configured skill from the authoritative worktree. Stop if the
+and follow its configured skill from the authoritative checkout. Stop if the
 block or skill is unavailable. The grilling session replaces the normal brief
 and limited clarification flow below; do not continue to planning or
 implementation until the user confirms shared understanding, and skip the
@@ -232,9 +240,9 @@ the literal `implementer` modifier and the resolved config has an `implementer`
 block, use that configured runner as the code-changing implementer instead. If
 the block is absent, fall back to the system `implementer` sub-agent.
 
-Give either implementer the full task, repository, authoritative worktree,
+Give either implementer the full task, repository, authoritative checkout,
 plan, test seam, and repo-instruction context. Require it to work only in that
-worktree, follow the TDD workflow and repository instructions, and not commit,
+checkout, follow the TDD workflow and repository instructions, and not commit,
 push, or open a PR. The main agent must inspect status and diff after handoff and
 owns validation, commits, pushes, PR creation, and review. Keep changes within
 the task's scope and stop if implementation reveals a new material ambiguity.
@@ -250,7 +258,7 @@ resolved branch. Commit according to repo conventions, then push explicitly
 to that branch on `origin`, setting its upstream when needed. Verify the
 upstream branch is `origin/<resolved-branch>` and its commit matches
 local `HEAD`. Fast Rocket delivery always includes a commit and push; do not
-leave completed implementation only in the worktree.
+leave completed implementation only in the checkout.
 
 Then create or update the PR as a draft with fully explicit, non-interactive
 `gh` commands. Pass `--draft`, `--head`, `--title`, and `--body-file` when
@@ -305,6 +313,6 @@ required format, then stop and report the blocker if it remains malformed.
 ## Completion
 
 Before completion, verify once more that the resolved branch's upstream commit
-matches local `HEAD`. Report the branch, worktree path, PR URL, delivered
+matches local `HEAD`. Report the checkout mode and path, branch, PR URL, delivered
 behavior, commits, verification performed, the configured review result, and any
 remaining caveats. Never merge the PR without the user's explicit consent.
