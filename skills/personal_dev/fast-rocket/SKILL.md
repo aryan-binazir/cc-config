@@ -71,18 +71,17 @@ Pass runner options using their native flags: Cursor `--model`, Claude
 `-c model_reasoning_effort="<reasoning_effort>"`. Treat `timeout_ms` as the
 maximum wait for the configured invocation, not as a runner CLI flag.
 
-## 1. Resolve The Task And Worktree
+## 1. Cut The Worktree First
 
 Resolve the shared branch helper relative to this skill as
 `<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py`.
 
-1. For ticketed work, read the supplied issue with the available skill or
-   connector for the configured tracker; do not rely on the title alone. For
-   explicit no-ticket work, use the user's task description as the source of
-   truth.
-2. Resolve the target repository from the issue or current task context. Do
-   not begin planning or code exploration yet.
-3. Extract the issue key. For no-ticket work, derive `<TASK-SLUG>` and use
+1. For ticketed work, use the available skill or connector for the configured
+   tracker to verify the issue key and resolve the target repository. Read only
+   the issue context needed for that routing; do not begin the full task brief,
+   planning, critique, or code exploration yet. For explicit no-ticket work,
+   resolve the repository from the user's task context.
+2. Extract the issue key. For no-ticket work, derive `<TASK-SLUG>` and use
    `NO-TICKET-<TASK-SLUG>` as the synthetic helper key. If the user supplied a
    branch, run this verified helper with that exact branch:
 
@@ -118,7 +117,7 @@ Resolve the shared branch helper relative to this skill as
    For any worktree the helper creates, keep its default location:
    `~/repos/.worktrees/<repo>/<ticket-key>`. Do not pass
    `--worktree-path` to redirect it to the caller's checkout or another path.
-4. Parse the helper's JSON. Require `ok: true`, require `branch` to exactly
+3. Parse the helper's JSON. Require `ok: true`, require `branch` to exactly
    equal the supplied branch or derived default, and use the returned absolute
    `worktree_path` as the authoritative checkout. Call that expected branch the
    resolved branch. The helper handles a current worktree already on the branch,
@@ -126,6 +125,10 @@ Resolve the shared branch helper relative to this skill as
    branch, or a new branch and worktree from latest `origin/main`. If it returns
    an already registered matching worktree outside the default location, keep
    using that returned path; do not move or recreate it.
+4. Immediately tell the user the resolved branch and worktree path so this run
+   is easy to identify among other open worktrees. Worktree setup is Fast
+   Rocket's first state-changing action and must finish before the full issue
+   read, task briefing, critique, planning, or code exploration.
 5. Stop and ask the user before proceeding if the target worktree is dirty, its
    path collides, `main` is unavailable, branch setup fails, the returned branch
    mismatches, or the returned checkout is not actually on the resolved branch.
@@ -140,7 +143,9 @@ implementation action, validation, commit, push, PR action, and review only from
 the helper-returned authoritative git `worktree_path`. When delegating, give the
 sub-agent that exact path and require it to work only there.
 
-Read the target repository's instructions, relevant code, tests,
+Now read the complete tracked issue; do not rely on its title alone. For
+explicit no-ticket work, use the user's task description as the source of
+truth. Read the target repository's instructions, relevant code, tests,
 documentation, and git state from that worktree. Make sure the goal, accepted
 behavior, boundaries, and validation target are understood.
 
