@@ -27,9 +27,11 @@ or hand review to a new/external session.
 
 ## Shared Pipeline
 
-Read and follow the full shared pipeline first:
+Resolve this `SKILL.md` to its real path first, then resolve `../rocket` relative
+to its directory and call that absolute path `<rocket-dir>`. Read and follow the
+full shared pipeline first:
 
-`/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-plan-core.md`
+`<rocket-dir>/references/rocket-plan-core.md`
 
 In that file, `<skill>` is `rocket-plan-headless`. This is a capsule-based
 variant: the `Implementation Capsule` section and the capsule bullet in

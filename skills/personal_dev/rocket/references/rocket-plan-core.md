@@ -5,6 +5,8 @@ Read this file fully once at invocation, before acting. In this file, `<skill>`
 means the invoking skill name and `<profile>` means its optional profile
 argument. Each variant's `SKILL.md` defines only its deltas; where a variant
 section extends or overrides this core, the variant wins.
+`<rocket-dir>` means the absolute Rocket directory resolved relative to the
+invoking skill by that variant's `SKILL.md`.
 
 ## Token Discipline
 
@@ -14,12 +16,12 @@ section extends or overrides this core, the variant wins.
   `delegated_preflight_unavailable`, unless Ar explicitly approves an inline
   bypass in the current conversation.
 - Resolve config with `uv run --script
-  /home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/resolve_config.py`;
+  <rocket-dir>/scripts/resolve_config.py`;
   do not read the YAML files directly unless that script fails.
 - Do not read `rocket-review` or downstream skills during preflight; config gives
   the runner list needed for availability checks.
 - Load only the needed section of
-  `/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-plan-details.md`
+  `<rocket-dir>/references/rocket-plan-details.md`
   for each phase.
 - Treat large raw search output as a planning bug. Use surgical, capped
   exploration until implementation begins.
@@ -29,7 +31,7 @@ section extends or overrides this core, the variant wins.
 ## Config
 
 Run `uv run --script
-/home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/resolve_config.py`
+<rocket-dir>/scripts/resolve_config.py`
 before choosing a critic or review handoff. It reads `rocket.local.yaml` over
 `rocket.example.yaml` and returns the selected profiles as JSON. Do not also read
 the config files by hand after this succeeds.
@@ -73,7 +75,7 @@ and the caller does not need to be on `main`. Parse its JSON output and continue
 all exploration, context, contract, implementation, validation, commit, push,
 and review work from the returned `worktree_path`. If the command is missing, run
 `uv run --script
-/home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/ensure_branch.py
+<rocket-dir>/scripts/ensure_branch.py
 --input "<original ticket/spec>"` from the target repo. If branch setup reports
 `main_unavailable`, `dirty_target_worktree`, `worktree_path_exists`,
 `ticket_key_required`, or another failure, stop and ask Ar instead of planning

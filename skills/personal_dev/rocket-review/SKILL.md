@@ -22,8 +22,13 @@ switch review profiles.
 
 ## Config
 
+Resolve this `SKILL.md` to its real path first, then resolve `../rocket` relative
+to its directory and call that absolute path `<rocket-dir>`. Use it for every
+Rocket script and reference below so symlinked installs, home directories, and
+operating systems do not affect the workflow.
+
 Run `uv run --script
-/home/ar/repos/cc-config/skills/personal_dev/rocket/scripts/resolve_config.py`
+<rocket-dir>/scripts/resolve_config.py`
 before choosing reviewers. It reads `rocket.local.yaml` over
 `rocket.example.yaml`; do not also read the config files by hand after this
 succeeds.
@@ -137,7 +142,7 @@ If no PR exists:
   prefixes, derive the title from consistent branch commit subjects; stop if
   they are inconsistent.
 - If repo-local rules do not define a body shape, use the fallback in
-  `/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-review-details.md`.
+  `<rocket-dir>/references/rocket-review-details.md`.
 - Populate the PR body from the contract, landed changes, and validation that
   actually ran.
 
@@ -168,7 +173,7 @@ wants a fresh review, Ar deletes the summary comment first.
 3. Ensure the review target is pushed and upstream matches local `HEAD`.
 4. Resolve or create the PR non-interactively.
 5. Check the completion shortcut and stop if review is already complete.
-6. Read `/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-review-details.md`.
+6. Read `<rocket-dir>/references/rocket-review-details.md`.
 7. Run configured reviewers in order.
 8. After each round, decide patch/skip/open, commit and push fixes if needed,
    re-verify upstream freshness, then update the diary.
@@ -182,7 +187,7 @@ wants a fresh review, Ar deletes the summary comment first.
 Before constructing reviewer prompts, parsing output, writing the diary, posting
 the final comment, or syncing Linear, you must read:
 
-`/home/ar/repos/cc-config/skills/personal_dev/rocket/references/rocket-review-details.md`
+`<rocket-dir>/references/rocket-review-details.md`
 
 Reviewer prompts must include the spec/contract, branch, PR number and URL,
 repo/worktree path, configured slash command, and instructions to:
