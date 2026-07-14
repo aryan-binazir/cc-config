@@ -20,9 +20,9 @@ How it was tested, or how to test it.
 Populate it from the implementation contract, actual code changes, and validation
 that actually ran.
 
-## Reviewer Prompt
+## Reviewer Prompts
 
-Use a prompt equivalent to:
+Use a round 1 prompt equivalent to:
 
 ```text
 You are <reviewer.name> reviewing work completed on this branch.
@@ -57,6 +57,12 @@ default; only `/code-review single` runs the single-pass alternative.
 Give a brutally honest review of whether the current branch satisfies the
 contract and whether it used the simplest repo-idiomatic implementation path.
 
+This is the exhaustive discovery round. Inspect the complete review target and
+find every issue you can substantiate across the contract and implementation
+quality criteria. Do not stop after the first actionable, blocking, or
+high-severity finding. The implementer only gets one discovery pass from you, so
+return the full inventory now.
+
 Return findings grouped exactly as:
 ## Critical
 ## High
@@ -81,6 +87,22 @@ You are a reviewer only. Do not modify, create, or delete any files, do not
 commit, and do not push. Report findings; the implementing agent applies fixes.
 ```
 
+When patched findings qualify for round 2, use a focused follow-up prompt. Give
+the reviewer its complete round 1 output, the disposition of every finding, the
+patch commit, and a concise patch summary. Begin the follow-up request with:
+
+```text
+You gave me these findings in round 1. I patched the accepted findings. Are you
+happy with the fixes?
+```
+
+Tell the reviewer to inspect the current pushed branch, verify every patched
+finding, confirm whether skipped or open findings remain correctly classified,
+and report any unresolved finding or regression caused by the patches. Round 2
+is not a second from-scratch full review. Require the same `Critical`, `High`,
+`Low`, `Uncertain`, and `Verdict` sections and exact verdict tokens as round 1.
+Keep the reviewer read-only.
+
 ## Output Normalization
 
 If a reviewer returns priority-style findings instead of the requested headings,
@@ -100,8 +122,9 @@ stripped. Approval requires exact `APPROVE` or `APPROVE WITH FIXES`. Any other
 token is non-approval; this includes `NEEDS FIXES` and foreign/legacy tokens
 such as `REJECT` from reviewers that ignore the requested format.
 
-Do not collapse `APPROVE WITH FIXES` into `APPROVE`. Severity counts do not end a
-reviewer phase; only the verdict token does.
+Do not collapse `APPROVE WITH FIXES` into `APPROVE`. Preserve the verdict token
+exactly. After round 1, pushed patches trigger the focused second round even when
+the token was `APPROVE` or `APPROVE WITH FIXES`.
 
 ## Review Loop
 
@@ -114,12 +137,13 @@ For each configured reviewer:
 4. If you patched anything, create one follow-up commit for that round and push it.
 5. Re-verify upstream matches local `HEAD`.
 6. Update the diary for that reviewer round.
-7. If the reviewer returned `APPROVE` or `APPROVE WITH FIXES`, end that reviewer
-   phase only after the patch/skip/open decisions and any needed follow-up commit.
-8. If the reviewer returned `NEEDS FIXES`, patched changes were pushed, and
-   a second round remains, run one more full review for that same reviewer.
-9. Stop that reviewer phase after two rounds, or earlier if no patch was made
-   against a `NEEDS FIXES` result. Never run a third round.
+7. If round 1 findings were patched and pushed and a second round remains, run
+   the focused fix-verification prompt for that same reviewer regardless of the
+   round 1 verdict.
+8. If round 1 produced no patch, end that reviewer phase without rerunning the
+   same reviewer against unchanged `HEAD`.
+9. Stop that reviewer phase after round 2. Never turn round 2 into another full
+   discovery pass and never run a third round.
 
 After all reviewer phases, mark any unresolved finding that still matters and is
 not intentionally dismissed as `[open: blocker]` or `[open: non-blocking]`. Do

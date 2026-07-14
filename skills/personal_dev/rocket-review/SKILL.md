@@ -188,6 +188,9 @@ repo/worktree path, configured slash command, and instructions to:
 - review the branch against `Goal`, `Accepted scope`, `Assumptions`, and
   `Validation approach`
 - respect `Out of scope`
+- make round 1 an exhaustive discovery pass over the entire review target; do
+  not stop after finding one actionable issue, and return every finding the
+  reviewer can substantiate
 - flag unnecessary complexity, non-idiomatic code, duplicate abstractions,
   brittle shortcuts, and simpler repo-native patterns that should have been used
 - report non-blocking edge cases and hardening opportunities without withholding
@@ -212,11 +215,14 @@ The `Verdict` section must end with exactly one token: `APPROVE`,
 `APPROVE WITH FIXES`, or `NEEDS FIXES`.
 
 Run configured reviewers in strict order. Never run more than two rounds for one
-reviewer, even if configuration requests more. Every round is a full review of
-the current pushed branch. After patch/skip/open decisions and any follow-up
-commit for that round, `APPROVE` or `APPROVE WITH FIXES` ends that reviewer
-phase. `NEEDS FIXES` continues only if you patched something, pushed it, and the
-reviewer has a second round remaining.
+reviewer, even if configuration requests more. Round 1 is the one full,
+exhaustive review of the current pushed branch. If round 1 findings are patched,
+pushed, and the reviewer has a second round remaining, round 2 is a focused
+follow-up: give the reviewer its complete round 1 output plus the patch decisions
+and commit, then ask whether the fixes are satisfactory. Round 2 must verify the
+round 1 findings and flag unresolved findings or regressions caused by the
+patches; it is not another from-scratch full review. If round 1 produced no
+patch, do not rerun the reviewer against unchanged `HEAD`.
 
 For each finding, choose exactly one diary status:
 - `[patched]`
