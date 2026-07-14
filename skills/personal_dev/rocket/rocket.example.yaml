@@ -53,7 +53,7 @@ review_profiles:
     reviewers:
       - name: Cursor
         runner: cursor
-        model: null
+        model: cursor-grok-4.5-high-fast
         max_rounds: 2
       - name: Codex
         runner: codex
