@@ -224,6 +224,9 @@ round 1 findings and flag unresolved findings or regressions caused by the
 patches; it is not another from-scratch full review. If round 1 produced no
 patch, do not rerun the reviewer against unchanged `HEAD`.
 
+Never tell a round 2 reviewer to "inspect the entire branch independently" or
+otherwise repeat round 1 discovery; use only the focused follow-up scope.
+
 For each finding, choose exactly one diary status:
 - `[patched]`
 - `[skipped: not actionable]`
