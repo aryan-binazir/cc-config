@@ -172,7 +172,8 @@ wants a fresh review, Ar deletes the summary comment first.
 7. Run configured reviewers in order.
 8. After each round, decide patch/skip/open, commit and push fixes if needed,
    re-verify upstream freshness, then update the diary.
-9. Determine the overall Rocket verdict from the final patched branch.
+9. Record every executed round's exact reviewer verdict and any post-round
+   branch state. Never synthesize an overall Rocket verdict.
 10. Post one final PR comment derived from the diary.
 11. If a Linear ticket exists, sync the managed region.
 
@@ -225,7 +226,11 @@ patches; it is not another from-scratch full review. If round 1 produced no
 patch, do not rerun the reviewer against unchanged `HEAD`.
 
 Never tell a round 2 reviewer to "inspect the entire branch independently" or
-otherwise repeat round 1 discovery; use only the focused follow-up scope.
+otherwise repeat round 1 discovery; use only the focused follow-up scope. When
+the configured slash command is `/code-review`, identify the round 2 command as
+`/code-review single` so its default parallel discovery workflow does not run.
+This is a round-scoped prompt change only; do not rewrite the saved reviewer
+configuration.
 
 For each finding, choose exactly one diary status:
 - `[patched]`
@@ -241,13 +246,13 @@ for that round. Preserve reviewer severity buckets and exact verdict tokens.
 Normalize only the common priority labels described in the details reference;
 do not re-rank findings or rewrite a reviewer's verdict.
 
-After the final round's accepted fixes are patched and verified, determine the
-overall Rocket verdict from the final branch rather than the last raw reviewer
-token. Approve when the core ticket is delivered and no validated unresolved
-blocker remains. Non-blocking findings and findings patched after the second
-round remain visible in the diary but do not prevent approval. Withhold approval
-only for an `[open: blocker]`. This overall gate does not change the reviewer
-verdict recorded for each round.
+Every user-facing review report and artifact must display every executed round
+and that round's exact reviewer verdict token. Never collapse the rounds into a
+per-reviewer final verdict, and never derive or display an overall Rocket
+verdict. If accepted findings are patched after a reviewer's final allowed
+round, report the patch and validation separately as post-round branch state.
+That work does not change the reviewer's recorded verdict and must not be
+presented as reviewer approval.
 
 ## Runner Failures
 
@@ -271,8 +276,9 @@ _scratch/_reviews/<diary_name>_<branch-with-slashes-replaced-by-dashes>.md
 
 The diary is the source of truth for the final PR comment. Keep it organized by
 reviewer and round, preserve severity headings, include exact verdict tokens,
-include the round commit hash for patched items, and record the overall Rocket
-verdict plus any unresolved blockers.
+include the round commit hash for patched items, list every round in the review
+ledger, and record unresolved blockers plus any post-round branch state. Do not
+record an overall Rocket verdict.
 
 At the end, post exactly one `gh pr comment` wrapped in a collapsed `<details>`
 block using the configured `summary_title`. No claim in the PR comment may be

@@ -89,7 +89,11 @@ commit, and do not push. Report findings; the implementing agent applies fixes.
 
 When patched findings qualify for round 2, use a focused follow-up prompt. Give
 the reviewer its complete round 1 output, the disposition of every finding, the
-patch commit, and a concise patch summary. Begin the follow-up request with:
+patch commit, and a concise patch summary. If the configured slash command is
+`/code-review`, label this follow-up `/code-review single`; the default command's
+parallel discovery passes are appropriate for round 1 but not fix verification.
+Do not persist that substitution back to config. Begin the follow-up request
+with:
 
 ```text
 You gave me these findings in round 1. I patched the accepted findings. Are you
@@ -99,9 +103,9 @@ happy with the fixes?
 Tell the reviewer to inspect the current pushed branch, verify every patched
 finding, confirm whether skipped or open findings remain correctly classified,
 and report any unresolved finding or regression caused by the patches. Round 2
-is not a second from-scratch full review. Require the same `Critical`, `High`,
-`Low`, `Uncertain`, and `Verdict` sections and exact verdict tokens as round 1.
-Keep the reviewer read-only.
+is one single focused verification pass, not a second from-scratch full review.
+Require the same `Critical`, `High`, `Low`, `Uncertain`, and `Verdict` sections
+and exact verdict tokens as round 1. Keep the reviewer read-only.
 
 ## Output Normalization
 
@@ -192,9 +196,9 @@ Use reviewer-and-round sections and keep a compact ledger at the top:
 # Rocket Review: <branch>
 
 ## Review Ledger
-- Cursor - Needs fixes - 1st round
-- Cursor - Approved with fixes - 2nd round
-- Codex - Approved - 1st round
+- Cursor - `NEEDS FIXES` - 1st round
+- Cursor - `APPROVE WITH FIXES` - 2nd round
+- Codex - `APPROVE` - 1st round
 
 ## Cursor Round 1
 ### Verdict: NEEDS FIXES
@@ -211,8 +215,9 @@ Use reviewer-and-round sections and keep a compact ledger at the top:
 ### Uncertain
 - (none)
 
-## Rocket Outcome
-### Verdict: APPROVED
+## Post-Review Branch State
+### Post-Round Patches
+- [file:line] - description [patched after Cursor round 2] (commit def456; validation: <command>)
 
 ### Unresolved Blockers
 - (none)
@@ -224,17 +229,19 @@ Rules:
 - If a severity group has no items, write `- (none)`.
 - Include the round commit hash for patched items.
 - Keep the ledger updated after each reviewer round.
-- Use ledger verdict labels: `APPROVE` -> `Approved`,
-  `APPROVE WITH FIXES` -> `Approved with fixes`, and `NEEDS FIXES` ->
-  `Needs fixes`.
+- Use the exact verdict token in each ledger line: `APPROVE`,
+  `APPROVE WITH FIXES`, or `NEEDS FIXES`.
 - Use ordinal round labels `1st round` and `2nd round`; never run a third round
   for one reviewer.
 - If a later round finds a new issue caused by an earlier patch, say that in the
   finding text instead of inventing a new status.
 - Do not claim a patch, skip, or open item unless it happened in that round.
-- End with one `Rocket Outcome` derived from the final patched and verified
-  branch. List every `[open: blocker]`; non-blocking open items stay in their
-  reviewer sections.
+- Display every executed round and its exact verdict in the ledger. Do not
+  collapse the ledger to only each reviewer's final round.
+- Never derive or display an overall Rocket verdict.
+- End with `Post-Review Branch State` when there are post-round patches or
+  unresolved blockers. Keep post-round patches separate from reviewer rounds;
+  they do not alter any recorded reviewer verdict.
 
 ## Final PR Comment
 
@@ -249,15 +256,14 @@ Shape:
 
 **Profile:** <profile>
 **Rounds:** <reviewer round count>
-**Rocket verdict:** APPROVED
 **Review ledger:**
-- Cursor - Approved with fixes - 2nd round
-- Codex - Approved - 1st round
-
-**Cursor verdict:** APPROVE WITH FIXES
-**Codex verdict:** APPROVE
+- Cursor - `NEEDS FIXES` - 1st round
+- Cursor - `APPROVE WITH FIXES` - 2nd round
+- Codex - `APPROVE` - 1st round
 
 **Unresolved blockers:** None.
+**Post-round branch state:** One accepted finding patched after Cursor round 2
+and validated at commit def456. Cursor round 2 remains `APPROVE WITH FIXES`.
 
 ### Cursor
 #### Critical
@@ -278,21 +284,16 @@ Shape:
 
 Rules:
 - Use a closed `<details>` block; do not add `open`.
-- Copy the overall Rocket verdict and unresolved blockers from the diary before
-  the raw reviewer ledger and verdicts.
-- Include `Review ledger` copied from the diary before reviewer verdict lines.
+- Copy unresolved blockers and any post-round branch state from the diary.
+- Include `Review ledger` copied from the diary. It must contain one line for
+  every executed reviewer round and preserve that round's exact verdict.
 - Do not summarize review as complete unless every configured reviewer has a
   ledger line.
-- The overall review is not approved only when the diary contains an unresolved
-  `[open: blocker]`. A raw `Needs fixes` ledger line, a patched finding, or an
-  `[open: non-blocking]` item does not by itself withhold Rocket approval.
 - Use configured reviewer names as section headings.
-- Each reviewer verdict line uses the verdict token from that reviewer's final
-  round. If it ended on `NEEDS FIXES`, write
-  `NEEDS FIXES (reviewer verdict after <n> rounds)` without treating that raw
-  token as the overall Rocket verdict.
-- Never rewrite a raw reviewer verdict as `APPROVE`; report Rocket approval
-  separately.
+- Never add a per-reviewer final verdict that hides earlier rounds.
+- Never derive or display an overall Rocket verdict.
+- A post-round patch and validation note must name the round after which it was
+  made and explicitly state that the recorded reviewer verdict is unchanged.
 - Preserve severity headings and statuses exactly.
 - No padding. No compliments.
 
@@ -326,5 +327,6 @@ memory. If syntax is clearly verified, use a collapsed section titled
 `Rocket Review`; otherwise use a plain `## Rocket Review` heading.
 
 Include each reviewer's findings, patched items, skipped items with reasons,
-open items, and final verdict. Keep the ticket description as the final reviewed
-state.
+open items, and every round's exact verdict. Include post-round branch state
+separately when applicable. Never derive or display an overall Rocket verdict.
+Keep the ticket description as the final reviewed state.
