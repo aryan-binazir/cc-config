@@ -10,12 +10,12 @@
 #
 # critic:
 #   runner: cursor
-#   model: grok-4.5-fast-high
+#   model: cursor-grok-4.5-high-fast
 #   timeout_ms: 900000
 #
 # implementer:
 #   runner: cursor
-#   model: grok-4.5-fast-high
+#   model: cursor-grok-4.5-high-fast
 #   timeout_ms: 900000
 #
 # grill:
