@@ -45,12 +45,12 @@ Each reviewer must provide:
 - `max_rounds`
 
 Runner invocation rules for review rounds:
-- `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
-- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
-- `cursor`: `cursor-agent -p -f "$PROMPT"`
+- `claude`: `claude --permission-mode auto -p "$PROMPT"`
+- `codex`: `codex exec --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review "$PROMPT"`
+- `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
 
 When `model` is set, pass it with the runner's supported `--model <model>` flag.
-For Cursor review rounds, keep `-p -f`; this matches the existing user convention for headless review.
+Never replace these modes with a bypass mode.
 
 Approval tokens:
 - `APPROVE`

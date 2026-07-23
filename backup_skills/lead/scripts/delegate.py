@@ -36,7 +36,12 @@ def build_command(worker: dict[str, Any], prompt: str) -> list[str]:
     runner = worker.get("runner")
     model = worker.get("model")
     if runner == "codex":
-        cmd = ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"]
+        cmd = [
+            "codex", "exec",
+            "--sandbox", "workspace-write",
+            "--ask-for-approval", "on-request",
+            "-c", "approvals_reviewer=auto_review",
+        ]
         if model:
             cmd += ["-m", str(model)]
         effort = worker.get("reasoning_effort")
@@ -45,13 +50,13 @@ def build_command(worker: dict[str, Any], prompt: str) -> list[str]:
         cmd.append(prompt)
         return cmd
     if runner == "claude":
-        cmd = ["claude", "--dangerously-skip-permissions"]
+        cmd = ["claude", "--permission-mode", "auto"]
         if model:
             cmd += ["--model", str(model)]
         cmd += ["-p", prompt]
         return cmd
     if runner == "cursor":
-        cmd = ["cursor-agent", "-p", "-f"]
+        cmd = ["cursor-agent", "--print", "--trust", "--sandbox", "enabled"]
         if model:
             cmd += ["--model", str(model)]
         cmd.append(prompt)

@@ -42,12 +42,13 @@ Each plan profile must provide:
 - `review_profile`, passed to `$rocket-review` after implementation
 
 Runner invocation rules:
-- `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
-- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"`
-- `cursor`: `cursor-agent -p "$PROMPT"`
+- `claude`: `claude --permission-mode auto -p "$PROMPT"`
+- `codex`: `codex exec --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review "$PROMPT"`
+- `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
 
 When `model` is set, pass it with the runner's supported `--model <model>` flag.
-Do not pass `cursor-agent -f`/`--force` for plan critique. The plan critique is advisory and must be read-only.
+Never replace these modes with a bypass mode. The plan critique is advisory and
+must be read-only.
 
 The plan critique is exactly one external round. Do not run follow-up critique rounds unless the user explicitly asks in the current conversation.
 
