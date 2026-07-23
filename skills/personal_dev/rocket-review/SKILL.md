@@ -42,16 +42,17 @@ ordered `reviewers`. Each reviewer provides `name`, `runner`, optional `model`,
 optional Codex `reasoning_effort`, and `max_rounds`.
 
 Runner commands:
-- `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
-- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT" < /dev/null`
-- `cursor`: `cursor-agent --print --trust "$PROMPT"`
+- `claude`: `claude --permission-mode auto -p "$PROMPT"`
+- `codex`: `codex exec --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review "$PROMPT" < /dev/null`
+- `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag.
 When a Codex reviewer sets `reasoning_effort`, pass
 `-c model_reasoning_effort="<reasoning_effort>"`. Stop if
 `reasoning_effort` is configured for a non-Codex reviewer instead of silently
 ignoring it.
-Reviewers are read-only: do not pass Cursor force mode, and the reviewer prompt
+Reviewers are read-only. Never pass a bypass mode. Cursor requires CLI
+Auto-review; stop if the installed CLI does not support it. The reviewer prompt
 must forbid file modification. Patching findings is the main agent's job.
 
 ## Preflight

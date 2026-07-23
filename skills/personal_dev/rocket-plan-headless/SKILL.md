@@ -61,11 +61,13 @@ back to a hardcoded runner or model. When `model`, `reasoning_effort`, or
 `effort` is not configured, omit that flag and let the CLI use its own default.
 
 Headless implementation commands:
-- `cursor` / `cursor-agent`: `cursor-agent --print --force --trust --model <model> "$PROMPT"`
-- `claude`: `claude --dangerously-skip-permissions -p --model <model> --effort <effort> "$PROMPT"`
-- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox --model <model> -c model_reasoning_effort="<effort>" "$PROMPT" < /dev/null`
+- `cursor` / `cursor-agent`: `cursor-agent --print --trust --sandbox enabled --model <model> "$PROMPT"`
+- `claude`: `claude --permission-mode auto -p --model <model> --effort <effort> "$PROMPT"`
+- `codex`: `codex exec --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review --model <model> -c model_reasoning_effort="<effort>" "$PROMPT" < /dev/null`
 
-Use force mode only for headless implementation, never for plan critique.
+Never use a bypass mode. Cursor headless implementation requires CLI
+Auto-review; stop with `cursor_auto_review_unavailable` if the installed CLI
+does not support it.
 
 ## Headless Preflight Additions
 

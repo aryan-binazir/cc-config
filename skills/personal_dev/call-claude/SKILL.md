@@ -9,17 +9,18 @@ Use this skill when the task is to ask Claude Code for a second opinion, plan cr
 
 ## Command
 
-Use Claude in print mode with the user's standard skip-permissions flag:
+Use Claude in print mode with Auto permission review:
 
 ```bash
 PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-claude --dangerously-skip-permissions -p "$PROMPT"
+claude --permission-mode auto -p "$PROMPT"
 ```
 
-This is the expected local convention for non-interactive Claude Code calls in these workflows.
+This is the expected local convention for non-interactive Claude Code calls in
+these workflows.
 
 ## Prompt Guidance
 

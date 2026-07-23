@@ -9,14 +9,15 @@ Use this skill when the task is to ask Codex for a second opinion, plan critique
 
 ## Command
 
-Use `codex exec` with the user's standard bypass flag:
+Use `codex exec` with workspace sandboxing and automatic approval review:
 
 ```bash
 PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT" < /dev/null
+codex exec --sandbox workspace-write --ask-for-approval on-request \
+  -c approvals_reviewer=auto_review "$PROMPT" < /dev/null
 ```
 
 Keep stdin redirected from `/dev/null`. Codex can otherwise wait on or infer behavior from standard input in ways that make detached/headless calls less reliable.

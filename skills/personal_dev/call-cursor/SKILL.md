@@ -9,17 +9,19 @@ Use this skill when the task is to ask Cursor/Composer for a second opinion, pla
 
 ## Command
 
-Use `cursor-agent` in print mode with the user's standard flags:
+Use `cursor-agent` in print mode with sandboxing and no force bypass:
 
 ```bash
 PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-cursor-agent -p -f --model composer-2.5 "$PROMPT"
+cursor-agent --print --trust --sandbox enabled --model composer-2.5 "$PROMPT"
 ```
 
-The flags `-p -f` are the expected local convention for headless Cursor/Composer calls in these workflows. Use `--model composer-2.5` by default when no model is specified.
+Cursor CLI Auto-review must be configured and supported by the installed CLI.
+Stop if it is unavailable; never fall back to a bypass mode. Use `--model
+composer-2.5` by default when no model is specified.
 
 ## Model Selection
 
@@ -28,14 +30,16 @@ Use `composer-2.5` unless the user explicitly specifies a different model.
 If the user specifies Opus, use the current pinned Claude Opus model:
 
 ```bash
-cursor-agent -p -f --model claude-opus-4-8-thinking-high "$PROMPT"
+cursor-agent --print --trust --sandbox enabled \
+  --model claude-opus-4-8-thinking-high "$PROMPT"
 ```
 
 If the user specifies Sonnet, use the current CLI-exposed Sonnet 5 Extra High
 alias:
 
 ```bash
-cursor-agent -p -f --model claude-sonnet-5-xhigh "$PROMPT"
+cursor-agent --print --trust --sandbox enabled \
+  --model claude-sonnet-5-xhigh "$PROMPT"
 ```
 
 `cursor-agent --list-models` currently labels that alias as `Sonnet 5 1M Extra

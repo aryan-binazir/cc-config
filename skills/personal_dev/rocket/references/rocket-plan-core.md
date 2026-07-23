@@ -44,14 +44,15 @@ Each plan profile provides `critic.name`, `critic.runner` (`claude`, `codex`, or
 `900000`, and `review_profile` for `$rocket-review`.
 
 Critic runner commands:
-- `claude`: `claude --dangerously-skip-permissions -p "$PROMPT"`
-- `codex`: `codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT" < /dev/null`
-- `cursor`: `cursor-agent --print --trust "$PROMPT"`
+- `claude`: `claude --permission-mode auto -p "$PROMPT"`
+- `codex`: `codex exec --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review "$PROMPT" < /dev/null`
+- `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag. Do not
-pass Cursor force mode for plan critique. These exact commands take precedence
+pass Cursor force mode. Cursor requires CLI Auto-review; stop if the installed
+CLI does not support it. These exact commands take precedence
 over the generic `call-cursor`/`call-codex`/`call-claude` skill conventions
-(for example, `call-cursor` defaults to `-f`; critics must not use force mode).
+and must never be replaced with a bypass mode.
 The configured critique is exactly one external round unless Ar asks for more
 in the current conversation.
 
