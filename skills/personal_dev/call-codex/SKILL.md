@@ -16,8 +16,8 @@ PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-codex exec --sandbox workspace-write --ask-for-approval on-request \
-  -c approvals_reviewer=auto_review "$PROMPT" < /dev/null
+codex --sandbox workspace-write --ask-for-approval on-request \
+  -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null
 ```
 
 Keep stdin redirected from `/dev/null`. Codex can otherwise wait on or infer behavior from standard input in ways that make detached/headless calls less reliable.

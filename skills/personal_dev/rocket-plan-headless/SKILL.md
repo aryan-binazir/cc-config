@@ -63,7 +63,7 @@ back to a hardcoded runner or model. When `model`, `reasoning_effort`, or
 Headless implementation commands:
 - `cursor` / `cursor-agent`: `cursor-agent --print --trust --sandbox enabled --model <model> "$PROMPT"`
 - `claude`: `claude --permission-mode auto -p --model <model> --effort <effort> "$PROMPT"`
-- `codex`: `codex exec --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review --model <model> -c model_reasoning_effort="<effort>" "$PROMPT" < /dev/null`
+- `codex`: `codex --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review --model <model> -c model_reasoning_effort="<effort>" exec "$PROMPT" < /dev/null`
 
 Never use a bypass mode. Cursor headless implementation requires CLI
 Auto-review; stop with `cursor_auto_review_unavailable` if the installed CLI

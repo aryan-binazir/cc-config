@@ -37,7 +37,7 @@ def build_command(worker: dict[str, Any], prompt: str) -> list[str]:
     model = worker.get("model")
     if runner == "codex":
         cmd = [
-            "codex", "exec",
+            "codex",
             "--sandbox", "workspace-write",
             "--ask-for-approval", "on-request",
             "-c", "approvals_reviewer=auto_review",
@@ -47,7 +47,7 @@ def build_command(worker: dict[str, Any], prompt: str) -> list[str]:
         effort = worker.get("reasoning_effort")
         if effort:
             cmd += ["-c", f'model_reasoning_effort="{effort}"']
-        cmd.append(prompt)
+        cmd += ["exec", prompt]
         return cmd
     if runner == "claude":
         cmd = ["claude", "--permission-mode", "auto"]

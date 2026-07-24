@@ -43,7 +43,7 @@ Each plan profile must provide:
 
 Runner invocation rules:
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
-- `codex`: `codex exec --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review "$PROMPT"`
+- `codex`: `codex --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review exec "$PROMPT"`
 - `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
 
 When `model` is set, pass it with the runner's supported `--model <model>` flag.
