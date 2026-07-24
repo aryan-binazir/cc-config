@@ -1,0 +1,6 @@
+interface:
+  display_name: "Add Auto Policy"
+  short_description: "Add matching Claude and Codex auto rules"
+  default_prompt: "Use $add-auto-policy to deny `docker system prune` in both Claude Code and Codex."
+policy:
+  allow_implicit_invocation: false
