@@ -43,7 +43,7 @@ optional Claude `effort`, optional Codex `reasoning_effort`, and `max_rounds`.
 
 Runner commands:
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
-- `codex`: `codex --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null`
+- `codex`: `codex --sandbox read-only --ask-for-approval on-request -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null`
 - `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag.
