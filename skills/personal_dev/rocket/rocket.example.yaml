@@ -8,19 +8,31 @@ defaults:
 
 plan_profiles:
   codex:
+    checkout: worktree
+    tracker: linear
     critic:
       name: Claude
       runner: claude
       model: opus
       effort: high
+    grill:
+      skill: grill-with-docs
+    review:
+      runner: rocket-review
     review_profile: standard
 
   claude:
+    checkout: worktree
+    tracker: linear
     critic:
       name: Codex
       runner: codex
       model: gpt-5.6-sol
       reasoning_effort: high
+    grill:
+      skill: grill-with-docs
+    review:
+      runner: rocket-review
     review_profile: standard
 
 review_profiles:

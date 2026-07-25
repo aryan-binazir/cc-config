@@ -1,39 +1,41 @@
 ---
-name: fast-rocket
+name: rocket
 description: >-
   Take a configured Linear or Jira issue or explicit no-ticket task plus an optional exact
   user-supplied branch through
   focused clarification, configured plan critique, test-driven implementation,
   verification, commit and push, draft PR creation, and configured review. Use this
-  whenever the user invokes fast-rocket or asks for the lighter, lower-friction
+  whenever the user invokes rocket, rocket codex, or rocket claude, or asks for the lighter, lower-friction
   alternative to rocket-plan for an end-to-end task.
 ---
 
-# Fast Rocket
+# Rocket
 
 Use this for a reasonably specified task that should move quickly from intake
 to a reviewed PR. The local config selects Linear or Jira; when the user
-explicitly says there is no ticket, accept a clear task description instead. It
-is separate from Rocket: do not persist a Rocket contract, resolve Rocket plan
-profiles, or wait for explicit approval of the implementation plan.
+explicitly says there is no ticket, accept a clear task description instead.
+This remains the lightweight workflow: do not persist a Rocket contract or wait
+for explicit approval of the implementation plan.
 
-Expect one required task input and up to three optional inputs:
+Expect one required task input and up to four optional inputs:
 
-1. An issue ID or URL for the configured tracker, or an explicit `no ticket`
+1. Optionally, the literal profile `codex` or `claude` immediately after
+   `$rocket`. Omit it to use the configured default profile.
+2. An issue ID or URL for the configured tracker, or an explicit `no ticket`
    task description.
-2. Optionally, the exact branch name to use.
-3. Optionally, the literal `implementer` modifier.
-4. Optionally, the literal `grill` modifier.
+3. Optionally, the exact branch name to use.
+4. Optionally, the literal `implementer` modifier.
+5. Optionally, the literal `grill` modifier.
 
 For example:
 
-`$fast-rocket BBA-359`
+`$rocket BBA-359`
 
-`$fast-rocket BBA-359 implementer`
+`$rocket codex BBA-359 implementer`
 
-`$fast-rocket BBA-359 grill`
+`$rocket claude BBA-359 grill`
 
-`$fast-rocket no ticket: fix stale cache invalidation`
+`$rocket no ticket: fix stale cache invalidation`
 
 If the branch is omitted, derive `aryan-binazir/<resolved-issue-key>` for tracked
 work or `aryan-binazir/<task-slug>` for explicit no-ticket work, using a
@@ -47,19 +49,29 @@ write production code before a driving test, or merge unless the user asks.
 
 ## Config
 
-Before interpreting the task input, resolve `<fast-rocket-skill-dir>` as the
+Before interpreting the task input, resolve `<rocket-skill-dir>` as the
 absolute directory containing this `SKILL.md`, then run:
 
 ```bash
-uv run --script "<fast-rocket-skill-dir>/scripts/resolve_config.py"
+uv run --script "<rocket-skill-dir>/scripts/resolve_config.py"
 ```
 
-The resolver reads the required ignored `fast-rocket.local.yaml` beside this
-skill. Stop on any resolver failure; do not choose a checkout mode, tracker,
-runner, or model from prose or machine availability. The flat config provides
-`checkout`, `tracker`, `critic`, optional `implementer`, optional `grill`, and
-`review`. `checkout` is either `worktree` or `branch`. Model and effort values
-come only from that resolved config.
+For `$rocket codex` or `$rocket claude`, pass the literal profile as the
+resolver's positional argument:
+
+```bash
+uv run --script "<rocket-skill-dir>/scripts/resolve_config.py" codex
+uv run --script "<rocket-skill-dir>/scripts/resolve_config.py" claude
+```
+
+The resolver merges `rocket.example.yaml` with the ignored
+`rocket.local.yaml`, then selects the requested `plan_profiles` entry or
+`defaults.plan_profile` when no profile was supplied. Stop on any resolver
+failure; do not choose a checkout mode, tracker, runner, or model from prose or
+machine availability. The resolved `plan_profile.config` provides `checkout`,
+`tracker`, `critic`, optional `implementer`, optional `grill`, `review`, and
+`review_profile`. `checkout` is either `worktree` or `branch`. Model and effort
+values come only from that resolved profile.
 
 For configured `cursor`, `claude`, or `codex` runners, read the matching
 `call-cursor`, `call-claude`, or `call-codex` skill before invocation. Pass the
@@ -75,7 +87,7 @@ maximum wait for the configured invocation, not as a runner CLI flag.
 ## 1. Prepare The Configured Checkout First
 
 Resolve the shared branch helper relative to this skill as
-`<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py`.
+`<rocket-skill-dir>/scripts/ensure_branch.py`.
 
 1. For ticketed work, use the available skill or connector for the configured
    tracker to verify the issue key and resolve the target repository. Read only
@@ -87,7 +99,7 @@ Resolve the shared branch helper relative to this skill as
    branch, run this verified helper with that exact branch:
 
    ```bash
-   uv run --script "<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py" \
+   uv run --script "<rocket-skill-dir>/scripts/ensure_branch.py" \
      --repo <absolute-repo-path> \
      --ticket-key <ISSUE-KEY-OR-SYNTHETIC-NO-TICKET-KEY> \
      --branch-name <exact-user-supplied-branch> \
@@ -99,7 +111,7 @@ Resolve the shared branch helper relative to this skill as
    `aryan-binazir/<ISSUE-KEY>` branch by omitting `--branch-name`:
 
    ```bash
-   uv run --script "<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py" \
+   uv run --script "<rocket-skill-dir>/scripts/ensure_branch.py" \
      --repo <absolute-repo-path> \
      --ticket-key <ISSUE-KEY> \
      --checkout-mode <resolved-checkout> \
@@ -110,7 +122,7 @@ Resolve the shared branch helper relative to this skill as
    `aryan-binazir/<task-slug>` rather than inheriting the synthetic helper key:
 
    ```bash
-   uv run --script "<fast-rocket-skill-dir>/../rocket/scripts/ensure_branch.py" \
+   uv run --script "<rocket-skill-dir>/scripts/ensure_branch.py" \
      --repo <absolute-repo-path> \
      --ticket-key NO-TICKET-<TASK-SLUG> \
      --branch-name aryan-binazir/<task-slug> \
@@ -135,7 +147,7 @@ Resolve the shared branch helper relative to this skill as
    checkout and stops if that branch is checked out elsewhere.
 4. Immediately tell the user the checkout mode, resolved branch, and checkout
    path so this run is easy to identify among other open work. Checkout setup is
-   Fast Rocket's first state-changing action and must finish before the full
+   Rocket's first state-changing action and must finish before the full
    issue read, task briefing, critique, planning, or code exploration.
 5. Stop and ask the user before proceeding if the target checkout is dirty, its
    path collides, `main` is unavailable, branch setup fails, the branch is
@@ -143,8 +155,8 @@ Resolve the shared branch helper relative to this skill as
    mismatches, or the returned checkout is not actually on the resolved branch.
    Do not silently switch or edit another checkout.
 
-This reuses Rocket's verified branch/worktree helper without invoking Rocket
-contracts or plan profiles. Review invokes Rocket Review only when configured.
+This uses Rocket's verified branch/worktree helper without invoking the old
+Rocket contract workflow. Review invokes Rocket Review only when configured.
 
 From this point forward, run every inspection, context update, plan critique,
 implementation action, validation, commit, push, PR action, and review only from
@@ -190,7 +202,7 @@ user confirms the direction or provides a correction. Incorporate corrections
 and re-inspect affected evidence when needed. This alignment gate does not count
 against the clarification-question limit below.
 
-After alignment, continue autonomously through the rest of Fast Rocket. Pause
+After alignment, continue autonomously through the rest of Rocket. Pause
 again only for the material decisions and blockers already required by this
 workflow; do not turn the implementation plan into another approval gate.
 
@@ -257,7 +269,7 @@ Immediately before committing, require the current branch to exactly match the
 resolved branch. Commit according to repo conventions, then push explicitly
 to that branch on `origin`, setting its upstream when needed. Verify the
 upstream branch is `origin/<resolved-branch>` and its commit matches
-local `HEAD`. Fast Rocket delivery always includes a commit and push; do not
+local `HEAD`. Rocket delivery always includes a commit and push; do not
 leave completed implementation only in the checkout.
 
 Then create or update the PR as a draft with fully explicit, non-interactive
@@ -274,9 +286,8 @@ implementation branch.
 ## 6. Run Configured Review
 
 If `review.runner` is `rocket-review`, read and follow the `rocket-review` skill
-with no explicit profile so that workflow uses its own local default. Supply the
-tracked issue or no-ticket task description as its spec source. Do not also run
-the verdict loop below.
+with the resolved `review_profile.name`. Supply the tracked issue or no-ticket
+task description as its spec source. Do not also run the verdict loop below.
 
 Otherwise, use the resolved `review` runner and its exact non-interactive
 conventions to review the actual PR diff. Supply the full tracked issue or

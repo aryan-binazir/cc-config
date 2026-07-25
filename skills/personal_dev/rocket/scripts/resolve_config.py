@@ -11,6 +11,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+RUNNERS = {"claude", "codex", "cursor"}
+REVIEW_RUNNERS = RUNNERS | {"rocket-review"}
+TRACKERS = {"jira", "linear"}
+CHECKOUTS = {"branch", "worktree"}
+GRILL_SKILLS = {"grill-with-docs"}
+
 
 def emit(payload: dict[str, Any], pretty: bool = False) -> None:
     print(json.dumps(payload, indent=2 if pretty else None, sort_keys=pretty))
@@ -23,13 +31,12 @@ def read_text(path: Path) -> str:
 def load_yaml_file(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
-    import yaml
 
     data = yaml.safe_load(read_text(path))
     if data is None:
         return {}
     if not isinstance(data, dict):
-        raise ValueError(f"{path} must contain a YAML object")
+        raise TypeError(f"{path} must contain a YAML object")
     return data
 
 
@@ -43,7 +50,49 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
     return merged
 
 
-def resolve_profiles(rocket_dir: Path, plan_profile: str | None, review_profile: str | None) -> dict[str, Any]:
+def validate_runner(
+    config: dict[str, Any],
+    key: str,
+    allowed: set[str],
+    errors: list[str],
+    *,
+    optional: bool = False,
+) -> None:
+    value = config.get(key)
+    if value is None and optional:
+        return
+    if not isinstance(value, dict):
+        errors.append(f"{key} must be a YAML object")
+        return
+    if value.get("runner") not in allowed:
+        errors.append(f"{key}.runner must be one of: {', '.join(sorted(allowed))}")
+
+
+def validate_plan_profile(config: dict[str, Any], errors: list[str]) -> None:
+    if config.get("checkout") not in CHECKOUTS:
+        errors.append(f"checkout must be one of: {', '.join(sorted(CHECKOUTS))}")
+    if config.get("tracker") not in TRACKERS:
+        errors.append(f"tracker must be one of: {', '.join(sorted(TRACKERS))}")
+
+    validate_runner(config, "critic", RUNNERS, errors)
+    validate_runner(config, "implementer", RUNNERS, errors, optional=True)
+    validate_runner(config, "review", REVIEW_RUNNERS, errors)
+
+    grill = config.get("grill")
+    if grill is not None:
+        if not isinstance(grill, dict):
+            errors.append("grill must be a YAML object")
+        elif grill.get("skill") not in GRILL_SKILLS:
+            errors.append(
+                f"grill.skill must be one of: {', '.join(sorted(GRILL_SKILLS))}"
+            )
+
+
+def resolve_profiles(
+    rocket_dir: Path,
+    plan_profile: str | None,
+    review_profile: str | None,
+) -> dict[str, Any]:
     example = rocket_dir / "rocket.example.yaml"
     local = rocket_dir / "rocket.local.yaml"
     config = deep_merge(load_yaml_file(example), load_yaml_file(local))
@@ -60,6 +109,7 @@ def resolve_profiles(rocket_dir: Path, plan_profile: str | None, review_profile:
         if plan is None:
             errors.append(f"missing plan profile: {plan_name}")
         else:
+            validate_plan_profile(plan, errors)
             review_name = review_profile or plan.get("review_profile") or review_name
 
     review = None
@@ -81,16 +131,38 @@ def resolve_profiles(rocket_dir: Path, plan_profile: str | None, review_profile:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Resolve rocket plan/review profiles.")
-    parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
-    parser.add_argument("--rocket-dir", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--plan-profile")
+    parser.add_argument(
+        "profile",
+        nargs="?",
+        help="Optional plan profile selected by `$rocket <profile>`.",
+    )
+    parser.add_argument(
+        "--pretty", action="store_true", help="Pretty-print JSON output."
+    )
+    parser.add_argument(
+        "--rocket-dir", type=Path, default=Path(__file__).resolve().parents[1]
+    )
+    parser.add_argument(
+        "--plan-profile",
+        help="Legacy named form of the optional plan profile.",
+    )
     parser.add_argument("--review-profile")
     args = parser.parse_args()
     try:
-        emit(resolve_profiles(args.rocket_dir, args.plan_profile, args.review_profile), pretty=args.pretty)
-        return 0
+        if args.profile and args.plan_profile:
+            parser.error("profile and --plan-profile are mutually exclusive")
+        payload = resolve_profiles(
+            args.rocket_dir,
+            args.profile or args.plan_profile,
+            args.review_profile,
+        )
+        emit(payload, pretty=args.pretty)
+        return 0 if payload["ok"] else 1
     except Exception as exc:  # noqa: BLE001 - CLI boundary.
-        emit({"ok": False, "failure_mode": "script_error", "error": str(exc)}, pretty=args.pretty)
+        emit(
+            {"ok": False, "failure_mode": "script_error", "error": str(exc)},
+            pretty=args.pretty,
+        )
         return 1
 
 
