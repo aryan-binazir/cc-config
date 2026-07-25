@@ -18,6 +18,7 @@ skills/personal_dev/fast-rocket/fast-rocket.local.yaml
 skills/personal_dev/call-codex/call-codex.local.yaml
 skills/personal_dev/call-claude/call-claude.local.yaml
 skills/personal_dev/call-cursor/call-cursor.local.yaml
+skills/personal_dev/ask-adversary-in-block/ask-adversary-in-block.local.yaml
 skills/sym_linked/*
 !skills/sym_linked/.gitkeep
 

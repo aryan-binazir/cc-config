@@ -1,0 +1,7 @@
+# Copy this file to ask-adversary-in-block.local.yaml to override these defaults.
+# ask-adversary-in-block.local.yaml is ignored by git.
+
+runner: claude
+model: claude-opus-5
+effort: high
+timeout_ms: 900000
