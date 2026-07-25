@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rocket Plan Sub"
+  short_description: "Turn specs into reviewed PRs via an implementer sub-agent"
+  default_prompt: "Use $rocket_plan_sub to take a ticket or raw spec from intake to a reviewed PR with delegated implementation."
