@@ -39,7 +39,7 @@ profile from a hyphenated tool list.
 
 Each review profile provides `slash_command`, `summary_title`, `diary_name`, and
 ordered `reviewers`. Each reviewer provides `name`, `runner`, optional `model`,
-optional Codex `reasoning_effort`, and `max_rounds`.
+optional Claude `effort`, optional Codex `reasoning_effort`, and `max_rounds`.
 
 Runner commands:
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
@@ -47,6 +47,9 @@ Runner commands:
 - `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag.
+When a Claude reviewer sets `effort`, pass `--effort <effort>`. Stop if
+`effort` is configured for a non-Claude reviewer instead of silently ignoring
+it.
 When a Codex reviewer sets `reasoning_effort`, pass
 `-c model_reasoning_effort="<reasoning_effort>"`. Stop if
 `reasoning_effort` is configured for a non-Codex reviewer instead of silently

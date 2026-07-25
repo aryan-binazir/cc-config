@@ -1,40 +1,30 @@
 # Copy this file to rocket.local.yaml on a machine that needs different defaults.
-# rocket.local.yaml is ignored by git. Keep profile names semantic and boring:
-# standard, claude, cursor, fast, strict, etc.
+# rocket.local.yaml is ignored by git. Name plan profiles after their executor,
+# such as `codex` or `claude`.
 
 defaults:
-  plan_profile: standard
+  plan_profile: codex
   review_profile: standard
 
 plan_profiles:
   codex:
     critic:
-      name: Cursor
-      runner: cursor
-      model: null
-      timeout_ms: 900000
-    headless:
-      runner: codex
-      model: gpt-5.6-sol
-      reasoning_effort: medium
-      timeout_ms: 900000
+      name: Claude
+      runner: claude
+      model: opus
+      effort: high
     review_profile: standard
 
   claude:
     critic:
-      name: Claude
-      runner: claude
-      model: null
-      timeout_ms: 900000
-    headless:
-      runner: claude
-      model: sonnet
-      effort: high
-      timeout_ms: 900000
-    review_profile: claude
+      name: Codex
+      runner: codex
+      model: gpt-5.6-sol
+      reasoning_effort: high
+    review_profile: standard
 
 review_profiles:
-  codex:
+  standard:
     slash_command: /code-review
     summary_title: Rocket Review Summary
     diary_name: rocket_review
@@ -43,35 +33,8 @@ review_profiles:
         runner: cursor
         model: cursor-grok-4.5-high-fast
         max_rounds: 2
-      - name: Codex
-        runner: codex
-        model: null
-        max_rounds: 2
-
-  claude:
-    slash_command: /code-review
-    summary_title: Rocket Review Summary
-    diary_name: rocket_review
-    reviewers:
-      - name: Codex
-        runner: codex
-        model: null
-        max_rounds: 2
       - name: Claude
         runner: claude
-        model: null
-        max_rounds: 2
-
-  cursor:
-    slash_command: /code-review
-    summary_title: Rocket Review Summary
-    diary_name: rocket_review
-    reviewers:
-      - name: Codex
-        runner: codex
-        model: null
-        max_rounds: 2
-      - name: Cursor
-        runner: cursor
-        model: null
+        model: opus
+        effort: high
         max_rounds: 2

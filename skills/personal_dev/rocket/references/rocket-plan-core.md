@@ -40,7 +40,8 @@ Use `<skill> <profile>` when provided; otherwise use `defaults.plan_profile`.
 Stop if `plan_profiles.<profile>` is missing.
 
 Each plan profile provides `critic.name`, `critic.runner` (`claude`, `codex`, or
-`cursor`), optional `critic.model`, optional `critic.timeout_ms` defaulting to
+`cursor`), optional `critic.model`, optional Claude `critic.effort`, optional
+Codex `critic.reasoning_effort`, optional `critic.timeout_ms` defaulting to
 `900000`, and `review_profile` for `$rocket-review`.
 
 Critic runner commands:
@@ -49,8 +50,12 @@ Critic runner commands:
 - `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag. Do not
-pass Cursor force mode. Cursor requires CLI Auto-review; stop if the installed
-CLI does not support it. These exact commands take precedence
+pass Cursor force mode. When a Claude critic sets `effort`, pass
+`--effort <effort>`. Stop if `effort` is configured for a non-Claude critic.
+When a Codex critic sets `reasoning_effort`, pass
+`-c model_reasoning_effort="<reasoning_effort>"`. Stop if `reasoning_effort` is
+configured for a non-Codex critic. Cursor requires CLI Auto-review; stop if the
+installed CLI does not support it. These exact commands take precedence
 over the generic `call-cursor`/`call-codex`/`call-claude` skill conventions
 and must never be replaced with a bypass mode.
 The configured critique is exactly one external round unless Ar asks for more
