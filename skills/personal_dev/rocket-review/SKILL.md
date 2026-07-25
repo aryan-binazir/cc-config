@@ -98,12 +98,14 @@ Before round 1:
 After every push, verify the upstream branch exists and local `HEAD` matches it.
 Stop if upstream is stale or missing.
 
-Between rounds:
+After a review round:
 - If you patch findings, make one follow-up commit for that round and push it.
 - Do not amend unless the user asks.
 - Do not create bookkeeping commits.
 - Do not rerun the same reviewer against unchanged `HEAD`; record unresolved
   findings and move on after that round.
+- An approval verdict ends that reviewer phase even if an accepted patch changes
+  `HEAD`; patching does not reopen an approved review.
 
 ## Spec Source
 
@@ -229,13 +231,19 @@ The `Verdict` section must end with exactly one token: `APPROVE`,
 
 Run configured reviewers in strict order. Never run more than two rounds for one
 reviewer, even if configuration requests more. Round 1 is the one full,
-exhaustive review of the current pushed branch. If round 1 findings are patched,
-pushed, and the reviewer has a second round remaining, round 2 is a focused
-follow-up: give the reviewer its complete round 1 output plus the patch decisions
-and commit, then ask whether the fixes are satisfactory. Round 2 must verify the
-round 1 findings and flag unresolved findings or regressions caused by the
-patches; it is not another from-scratch full review. If round 1 produced no
-patch, do not rerun the reviewer against unchanged `HEAD`.
+exhaustive review of the current pushed branch. `APPROVE` and
+`APPROVE WITH FIXES` are approval verdicts and end that reviewer's rounds.
+Apply any accepted fixes, commit, push, and record them as post-round branch
+state, but do not ask an approving reviewer for a second round.
+
+Only a non-approval round 1 verdict can trigger round 2. If its accepted fixes
+are patched and pushed and the reviewer has a second round remaining, run one
+focused follow-up: give the reviewer its complete round 1 output plus the patch
+decisions and commit, then ask whether the fixes are satisfactory. Round 2 must
+verify the round 1 findings and flag unresolved findings or regressions caused
+by the patches; it is not another from-scratch full review. If no patch was
+pushed, or the reviewer's `max_rounds` is `1`, end that reviewer phase after
+round 1; never rerun a reviewer against unchanged `HEAD`.
 
 Never tell a round 2 reviewer to "inspect the entire branch independently" or
 otherwise repeat round 1 discovery; use only the focused follow-up scope. When
@@ -261,10 +269,11 @@ do not re-rank findings or rewrite a reviewer's verdict.
 Every user-facing review report and artifact must display every executed round
 and that round's exact reviewer verdict token. Never collapse the rounds into a
 per-reviewer final verdict, and never derive or display an overall Rocket
-verdict. If accepted findings are patched after a reviewer's final allowed
-round, report the patch and validation separately as post-round branch state.
-That work does not change the reviewer's recorded verdict and must not be
-presented as reviewer approval.
+verdict. If accepted findings are patched after an approval verdict or after a
+reviewer's final allowed round, report the patch and validation separately as
+post-round branch state and say it was not re-reviewed. That work does not
+change the reviewer's recorded verdict and must not be presented as reviewer
+approval of the patch.
 
 ## Runner Failures
 

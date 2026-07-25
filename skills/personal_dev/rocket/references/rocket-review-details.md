@@ -87,13 +87,18 @@ You are a reviewer only. Do not modify, create, or delete any files, do not
 commit, and do not push. Report findings; the implementing agent applies fixes.
 ```
 
-When patched findings qualify for round 2, use a focused follow-up prompt. Give
-the reviewer its complete round 1 output, the disposition of every finding, the
-patch commit, and a concise patch summary. If the configured slash command is
-`/code-review`, label this follow-up `/code-review single`; the default command's
-parallel discovery passes are appropriate for round 1 but not fix verification.
-Do not persist that substitution back to config. Begin the follow-up request
-with:
+Only patched findings from a non-approval round 1 verdict qualify for round 2.
+Approval verdicts (`APPROVE` and `APPROVE WITH FIXES`) end that reviewer's
+rounds even when accepted findings are patched. Record those patches as
+post-round branch state and state that the approving reviewer did not re-review
+them.
+
+For a qualifying non-approval follow-up, give the reviewer its complete round 1
+output, the disposition of every finding, the patch commit, and a concise patch
+summary. If the configured slash command is `/code-review`, label this follow-up
+`/code-review single`; the default command's parallel discovery passes are
+appropriate for round 1 but not fix verification. Do not persist that
+substitution back to config. Begin the follow-up request with:
 
 ```text
 You gave me these findings in round 1. I patched the accepted findings. Are you
@@ -125,10 +130,13 @@ that section, uppercased with surrounding whitespace and trailing punctuation
 stripped. Approval requires exact `APPROVE` or `APPROVE WITH FIXES`. Any other
 token is non-approval; this includes `NEEDS FIXES` and foreign/legacy tokens
 such as `REJECT` from reviewers that ignore the requested format.
+Missing or malformed verdict output remains a runner failure under the failure
+rules below; never route it into the round-2 review branch.
 
 Do not collapse `APPROVE WITH FIXES` into `APPROVE`. Preserve the verdict token
-exactly. After round 1, pushed patches trigger the focused second round even when
-the token was `APPROVE` or `APPROVE WITH FIXES`.
+exactly. Both are approval verdicts for round control: patch accepted findings
+if appropriate, but do not run a second round. A pushed patch triggers a focused
+second round only when round 1 ended with a non-approval verdict.
 
 ## Review Loop
 
@@ -141,12 +149,17 @@ For each configured reviewer:
 4. If you patched anything, create one follow-up commit for that round and push it.
 5. Re-verify upstream matches local `HEAD`.
 6. Update the diary for that reviewer round.
-7. If round 1 findings were patched and pushed and a second round remains, run
-   the focused fix-verification prompt for that same reviewer regardless of the
-   round 1 verdict.
-8. If round 1 produced no patch, end that reviewer phase without rerunning the
-   same reviewer against unchanged `HEAD`.
-9. Stop that reviewer phase after round 2. Never turn round 2 into another full
+7. If round 1 returned `APPROVE` or `APPROVE WITH FIXES`, end that reviewer
+   phase. Record any pushed fixes as post-round branch state and explicitly say
+   they were not re-reviewed.
+8. If round 1 returned a non-approval verdict, fixes were patched and pushed,
+   and the reviewer's `max_rounds` allows a second round, run the focused
+   fix-verification prompt.
+9. Otherwise end that reviewer phase with the relevant open findings. Never
+   rerun a reviewer against unchanged `HEAD` and never exceed that reviewer's
+   configured `max_rounds`. Record any pushed fixes as post-round branch state
+   and explicitly say they were not re-reviewed.
+10. Stop that reviewer phase after round 2. Never turn round 2 into another full
    discovery pass and never run a third round.
 
 After all reviewer phases, mark any unresolved finding that still matters and is
@@ -217,7 +230,7 @@ Use reviewer-and-round sections and keep a compact ledger at the top:
 
 ## Post-Review Branch State
 ### Post-Round Patches
-- [file:line] - description [patched after Cursor round 2] (commit def456; validation: <command>)
+- [file:line] - description [patched after Cursor round 2; not re-reviewed] (commit def456; validation: <command>)
 
 ### Unresolved Blockers
 - (none)
@@ -239,6 +252,9 @@ Rules:
 - Display every executed round and its exact verdict in the ledger. Do not
   collapse the ledger to only each reviewer's final round.
 - Never derive or display an overall Rocket verdict.
+- A fix patched after an approving round 1 keeps its `[patched]` status in that
+  round's finding list and must also appear under `Post-Round Patches` as
+  `[patched after <reviewer> round 1; not re-reviewed]`.
 - End with `Post-Review Branch State` when there are post-round patches or
   unresolved blockers. Keep post-round patches separate from reviewer rounds;
   they do not alter any recorded reviewer verdict.
@@ -264,6 +280,7 @@ Shape:
 **Unresolved blockers:** None.
 **Post-round branch state:** One accepted finding patched after Cursor round 2
 and validated at commit def456. Cursor round 2 remains `APPROVE WITH FIXES`.
+Not re-reviewed by Cursor.
 
 ### Cursor
 #### Critical
@@ -293,7 +310,8 @@ Rules:
 - Never add a per-reviewer final verdict that hides earlier rounds.
 - Never derive or display an overall Rocket verdict.
 - A post-round patch and validation note must name the round after which it was
-  made and explicitly state that the recorded reviewer verdict is unchanged.
+  made, explicitly state that the recorded reviewer verdict is unchanged, and
+  state that the patch was not re-reviewed by that reviewer.
 - Preserve severity headings and statuses exactly.
 - No padding. No compliments.
 
