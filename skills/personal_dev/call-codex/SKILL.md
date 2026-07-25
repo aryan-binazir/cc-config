@@ -9,18 +9,31 @@ Use this skill when the task is to ask Codex for a second opinion, plan critique
 
 ## Command
 
-Use `codex exec` with workspace sandboxing and automatic approval review:
+Use the bundled wrapper. It merges `call-codex.example.yaml` with the ignored
+`call-codex.local.yaml`, then applies the resolved model, reasoning effort, and
+timeout to the call:
 
 ```bash
 PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-codex --sandbox workspace-write --ask-for-approval on-request \
-  -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null
+uv run --script "<call-codex-skill-dir>/scripts/call.py" "$PROMPT"
 ```
 
-Keep stdin redirected from `/dev/null`. Codex can otherwise wait on or infer behavior from standard input in ways that make detached/headless calls less reliable.
+The wrapper invokes Codex with workspace sandboxing, automatic approval review,
+and stdin redirected from `/dev/null`. It defaults to `gpt-5.6-sol` with
+`high` reasoning effort.
+
+Inspect the effective config without calling Codex:
+
+```bash
+uv run --script "<call-codex-skill-dir>/scripts/call.py" --resolve --pretty
+```
+
+If the user explicitly requests a different model or reasoning effort, pass
+`--model` or `--reasoning-effort` to the wrapper for that call. Do not edit the
+config for a one-off override.
 
 ## Prompt Guidance
 
@@ -33,10 +46,5 @@ Do not make Codex infer the task from surrounding conversation. The CLI process 
 
 ## Waiting
 
-Allow up to 15 minutes for substantial work:
-
-```text
-900000 ms
-```
-
-Quiet periods are normal. Do not stop early just because there has been no output for a few minutes.
+The resolved `timeout_ms` defaults to 15 minutes. Quiet periods are normal. Do
+not stop early just because there has been no output for a few minutes.

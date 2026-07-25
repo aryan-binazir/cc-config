@@ -9,23 +9,35 @@ Use this skill when the task is to ask Cursor/Composer for a second opinion, pla
 
 ## Command
 
-Use `cursor-agent` in print mode with sandboxing and no force bypass:
+Use the bundled wrapper. It merges `call-cursor.example.yaml` with the ignored
+`call-cursor.local.yaml`, then applies the resolved model and timeout to the
+call:
 
 ```bash
 PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-cursor-agent --print --trust --sandbox enabled --model composer-2.5 "$PROMPT"
+uv run --script "<call-cursor-skill-dir>/scripts/call.py" "$PROMPT"
+```
+
+The wrapper invokes Cursor in print mode with sandboxing and no force bypass. It
+defaults to `cursor-grok-4.5-high-fast`; Cursor carries the effort/speed variant
+in the model ID rather than a separate effort option.
+
+Inspect the effective config without calling Cursor:
+
+```bash
+uv run --script "<call-cursor-skill-dir>/scripts/call.py" --resolve --pretty
 ```
 
 Cursor CLI Auto-review must be configured and supported by the installed CLI.
-Stop if it is unavailable; never fall back to a bypass mode. Use `--model
-composer-2.5` by default when no model is specified.
+Stop if it is unavailable; never fall back to a bypass mode.
 
 ## Model Selection
 
-Use `composer-2.5` unless the user explicitly specifies a different model.
+Use the configured model unless the user explicitly specifies a different
+model. Pass a one-off choice with `--model`; do not edit the config for it.
 
 If the user specifies Opus, use the current pinned Claude Opus model:
 
@@ -59,10 +71,5 @@ Do not rely on Cursor to infer the task from surrounding conversation. The CLI p
 
 ## Waiting
 
-Allow up to 15 minutes for substantial work:
-
-```text
-900000 ms
-```
-
-Quiet periods are normal. Do not stop early just because there has been no output for a few minutes.
+The resolved `timeout_ms` defaults to 15 minutes. Quiet periods are normal. Do
+not stop early just because there has been no output for a few minutes.

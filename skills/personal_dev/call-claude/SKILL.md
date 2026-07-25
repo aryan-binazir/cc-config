@@ -9,18 +9,30 @@ Use this skill when the task is to ask Claude Code for a second opinion, plan cr
 
 ## Command
 
-Use Claude in print mode with Auto permission review:
+Use the bundled wrapper. It merges `call-claude.example.yaml` with the ignored
+`call-claude.local.yaml`, then applies the resolved model, effort, and timeout
+to the call:
 
 ```bash
 PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-claude --permission-mode auto -p "$PROMPT"
+uv run --script "<call-claude-skill-dir>/scripts/call.py" "$PROMPT"
 ```
 
-This is the expected local convention for non-interactive Claude Code calls in
-these workflows.
+The wrapper invokes Claude in print mode with Auto permission review. It
+defaults to `claude-opus-5` with `high` effort.
+
+Inspect the effective config without calling Claude:
+
+```bash
+uv run --script "<call-claude-skill-dir>/scripts/call.py" --resolve --pretty
+```
+
+If the user explicitly requests a different model or effort, pass `--model` or
+`--effort` to the wrapper for that call. Do not edit the config for a one-off
+override.
 
 ## Prompt Guidance
 
@@ -33,10 +45,5 @@ Do not rely on Claude to infer the task from surrounding conversation. The CLI p
 
 ## Waiting
 
-Allow up to 15 minutes for substantial work:
-
-```text
-900000 ms
-```
-
-Quiet periods are normal. Do not stop early just because there has been no output for a few minutes.
+The resolved `timeout_ms` defaults to 15 minutes. Quiet periods are normal. Do
+not stop early just because there has been no output for a few minutes.

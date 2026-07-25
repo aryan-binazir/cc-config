@@ -1,0 +1,6 @@
+# Copy this file to call-claude.local.yaml to override these defaults.
+# call-claude.local.yaml is ignored by git.
+
+model: claude-opus-5
+effort: high
+timeout_ms: 900000
