@@ -297,6 +297,41 @@ Rules:
 - Preserve severity headings and statuses exactly.
 - No padding. No compliments.
 
+## User-Facing Completion Report
+
+The final assistant response is separate from the per-PR GitHub comment. It MUST
+group review status by numbered PR first, then list each configured reviewer and
+that reviewer's exact executed round verdicts.
+
+Use:
+
+```md
+PR 1 — <repo or service> #<number>: <url>
+- <reviewer name> — 1st round: `<verdict>`; 2nd round: `<verdict>`
+- <reviewer name> — 1st round: `<verdict>`; 2nd round: `<verdict>`
+- Post-review patch — <finding> patched after <reviewer name> 2nd round at
+  <commit>; not re-reviewed by <reviewer name>
+- Unresolved blockers — None
+
+PR 2 — <repo or service> #<number>: <url>
+- <reviewer name> — 1st round: `<verdict>`; 2nd round: `<verdict>`
+- <reviewer name> — 1st round: `<verdict>`; 2nd round: `<verdict>`
+- Unresolved blockers — None
+```
+
+Requirements:
+- Number every PR group in task order, including a single-PR task.
+- Never emit an unnamed phrase such as "final-round `NEEDS FIXES`".
+- Never blend results from multiple PRs into one reviewer ledger or one
+  post-review status.
+- Preserve every executed round's exact verdict. Omit only rounds that did not
+  run.
+- A post-round patch line must name the PR, reviewer, round, patch commit, and
+  whether that reviewer re-reviewed it.
+- Do not claim reviewer approval for a post-round patch that was not
+  re-reviewed.
+- Keep unresolved blockers scoped to the PR they affect.
+
 ## Linear Ticket Sync
 
 Skip if no Linear ticket exists.

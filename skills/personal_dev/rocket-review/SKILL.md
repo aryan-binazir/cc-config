@@ -185,6 +185,8 @@ wants a fresh review, Ar deletes the summary comment first.
    branch state. Never synthesize an overall Rocket verdict.
 10. Post one final PR comment derived from the diary.
 11. If a Linear ticket exists, sync the managed region.
+12. Return the final user-facing status grouped by numbered PR, with every
+    reviewer named beside that reviewer's exact round result.
 
 ## Review Rounds
 
@@ -296,6 +298,42 @@ absent from the diary.
 If a Linear ticket exists, update its description after the PR comment is posted.
 Use the marker-bounded managed region shared with `rocket-plan`; do not post a
 separate Linear comment.
+
+## User-Facing Completion Report
+
+The final assistant response MUST be PR-first and reviewer-explicit. Never use
+vague wording such as "the final round returned `NEEDS FIXES`" or combine
+different PRs into one blended review status.
+
+For every PR in the task, use this exact grouping:
+
+```text
+PR 1 — <repo or service> #<number>: <url>
+- Cursor — 1st round: `NEEDS FIXES`; 2nd round: `APPROVE WITH FIXES`
+- Codex — 1st round: `NEEDS FIXES`; 2nd round: `NEEDS FIXES`
+- Post-review patch — <what was patched after which named reviewer round>;
+  not re-reviewed by <reviewer>
+- Unresolved blockers — None
+
+PR 2 — <repo or service> #<number>: <url>
+- Cursor — 1st round: `NEEDS FIXES`; 2nd round: `APPROVE`
+- Codex — 1st round: `NEEDS FIXES`; 2nd round: `APPROVE`
+- Unresolved blockers — None
+```
+
+Rules:
+- Number PR groups in task order: `PR 1`, `PR 2`, and so on. Use `PR 1` even
+  when the task has only one PR.
+- Use the configured reviewer name on every result line. Never say only
+  "reviewer", "final round", or "the review".
+- Show every executed round and its exact verdict on that reviewer's line. If a
+  reviewer ran once, show only the 1st round.
+- Keep each post-round patch inside its PR group. Name the reviewer and round
+  after which it landed and state explicitly when that patch was not
+  re-reviewed.
+- Keep unresolved blockers inside their PR group.
+- Do not replace this structure with a prose summary. A short implementation
+  or testing summary may follow the PR groups.
 
 ## Stop Conditions
 
