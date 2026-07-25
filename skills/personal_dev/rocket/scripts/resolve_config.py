@@ -18,6 +18,7 @@ REVIEW_RUNNERS = RUNNERS | {"rocket-review"}
 TRACKERS = {"jira", "linear"}
 CHECKOUTS = {"branch", "worktree"}
 GRILL_SKILLS = {"grill-with-docs"}
+DEFAULT_TIMEOUT_MS = 1_500_000
 
 
 def emit(payload: dict[str, Any], pretty: bool = False) -> None:
@@ -48,6 +49,23 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
         else:
             merged[key] = value
     return merged
+
+
+def apply_timeout_defaults(config: dict[str, Any]) -> None:
+    for profile in (config.get("plan_profiles") or {}).values():
+        if not isinstance(profile, dict):
+            continue
+        for key in ("critic", "implementer", "review"):
+            runner = profile.get(key)
+            if isinstance(runner, dict) and runner.get("runner") in RUNNERS:
+                runner.setdefault("timeout_ms", DEFAULT_TIMEOUT_MS)
+
+    for profile in (config.get("review_profiles") or {}).values():
+        if not isinstance(profile, dict):
+            continue
+        for reviewer in profile.get("reviewers") or []:
+            if isinstance(reviewer, dict) and reviewer.get("runner") in RUNNERS:
+                reviewer.setdefault("timeout_ms", DEFAULT_TIMEOUT_MS)
 
 
 def validate_runner(
@@ -96,6 +114,7 @@ def resolve_profiles(
     example = rocket_dir / "rocket.example.yaml"
     local = rocket_dir / "rocket.local.yaml"
     config = deep_merge(load_yaml_file(example), load_yaml_file(local))
+    apply_timeout_defaults(config)
     defaults = config.get("defaults") or {}
     plan_name = plan_profile or defaults.get("plan_profile")
     review_name = review_profile or defaults.get("review_profile")

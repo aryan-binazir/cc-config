@@ -39,7 +39,8 @@ profile from a hyphenated tool list.
 
 Each review profile provides `slash_command`, `summary_title`, `diary_name`, and
 ordered `reviewers`. Each reviewer provides `name`, `runner`, optional `model`,
-optional Claude `effort`, optional Codex `reasoning_effort`, and `max_rounds`.
+optional Claude `effort`, optional Codex `reasoning_effort`, optional
+`timeout_ms`, and `max_rounds`.
 
 Runner commands:
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
