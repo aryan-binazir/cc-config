@@ -68,6 +68,16 @@ def apply_timeout_defaults(config: dict[str, Any]) -> None:
                 reviewer.setdefault("timeout_ms", DEFAULT_TIMEOUT_MS)
 
 
+def validate_timeout(config: dict[str, Any], key: str, errors: list[str]) -> None:
+    timeout_ms = config.get("timeout_ms")
+    if (
+        not isinstance(timeout_ms, int)
+        or isinstance(timeout_ms, bool)
+        or timeout_ms <= 0
+    ):
+        errors.append(f"{key}.timeout_ms must be a positive integer")
+
+
 def validate_runner(
     config: dict[str, Any],
     key: str,
@@ -84,6 +94,8 @@ def validate_runner(
         return
     if value.get("runner") not in allowed:
         errors.append(f"{key}.runner must be one of: {', '.join(sorted(allowed))}")
+    elif value["runner"] in RUNNERS:
+        validate_timeout(value, key, errors)
 
 
 def validate_plan_profile(config: dict[str, Any], errors: list[str]) -> None:
@@ -104,6 +116,13 @@ def validate_plan_profile(config: dict[str, Any], errors: list[str]) -> None:
             errors.append(
                 f"grill.skill must be one of: {', '.join(sorted(GRILL_SKILLS))}"
             )
+
+
+def validate_review_profile(config: dict[str, Any], errors: list[str]) -> None:
+    reviewers = config.get("reviewers") or []
+    for index, reviewer in enumerate(reviewers):
+        if isinstance(reviewer, dict) and reviewer.get("runner") in RUNNERS:
+            validate_timeout(reviewer, f"reviewers[{index}]", errors)
 
 
 def resolve_profiles(
@@ -136,6 +155,8 @@ def resolve_profiles(
         review = review_profiles.get(review_name)
         if review is None:
             errors.append(f"missing review profile: {review_name}")
+        else:
+            validate_review_profile(review, errors)
 
     return {
         "ok": not errors,
