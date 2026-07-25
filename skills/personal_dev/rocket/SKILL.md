@@ -17,21 +17,20 @@ explicitly says there is no ticket, accept a clear task description instead.
 This remains the lightweight workflow: do not persist a Rocket contract or wait
 for explicit approval of the implementation plan.
 
-Expect one required task input and up to four optional inputs:
+Expect one required task input and up to three optional inputs:
 
 1. Optionally, the literal profile `codex` or `claude` immediately after
    `$rocket`. Omit it to use the configured default profile.
 2. An issue ID or URL for the configured tracker, or an explicit `no ticket`
    task description.
 3. Optionally, the exact branch name to use.
-4. Optionally, the literal `implementer` modifier.
-5. Optionally, the literal `grill` modifier.
+4. Optionally, the literal `grill` modifier.
 
 For example:
 
 `$rocket BBA-359`
 
-`$rocket codex BBA-359 implementer`
+`$rocket codex BBA-359`
 
 `$rocket claude BBA-359 grill`
 
@@ -42,7 +41,7 @@ work or `aryan-binazir/<task-slug>` for explicit no-ticket work, using a
 reasonable short kebab-case slug. If the user supplies a branch, honor it
 exactly. Unless the user explicitly says there is no ticket, ask for an issue ID
 or URL from the configured tracker. Do not infer another tracker. Treat
-`implementer` and `grill` as modifiers, not as branch names.
+`grill` as a modifier, not as a branch name.
 
 Never guess past material ambiguity, skip the required external critiques,
 write production code before a driving test, or merge unless the user asks.
@@ -69,7 +68,7 @@ The resolver merges `rocket.example.yaml` with the ignored
 `defaults.plan_profile` when no profile was supplied. Stop on any resolver
 failure; do not choose a checkout mode, tracker, runner, or model from prose or
 machine availability. The resolved `plan_profile.config` provides `checkout`,
-`tracker`, `critic`, optional `implementer`, optional `grill`, `review`, and
+`tracker`, `critic`, optional `grill`, `review`, and
 `review_profile`. `checkout` is either `worktree` or `branch`. Model and effort
 values come only from that resolved profile.
 
@@ -247,15 +246,12 @@ Work in vertical red-green slices through the confirmed public seams: write one
 failing behavior test, run it to observe the expected failure, add only enough
 production code to pass, then repeat.
 
-Use the system `implementer` sub-agent by default when it is available. If the
-invocation includes the literal `implementer` modifier and the resolved config
-has an `implementer` block, use that configured runner as the code-changing
-implementer instead. If the block is absent, use the system `implementer`
-sub-agent when available. If the system sub-agent is unavailable, the main
-agent implements directly; its absence is not a blocker.
+Use the system `implementer` sub-agent when it is available. If the system
+sub-agent is unavailable, the main agent implements directly; its absence is
+not a blocker.
 
-Give either implementer the full task, repository, authoritative checkout,
-plan, test seam, and repo-instruction context. Require it to work only in that
+Give the implementer the full task, repository, authoritative checkout, plan,
+test seam, and repo-instruction context. Require it to work only in that
 checkout, follow the TDD workflow and repository instructions, and not commit,
 push, or open a PR. The main agent must inspect status and diff after handoff and
 owns validation, commits, pushes, PR creation, and review. Keep changes within

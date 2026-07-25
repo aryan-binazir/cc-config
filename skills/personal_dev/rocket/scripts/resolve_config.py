@@ -55,7 +55,7 @@ def apply_timeout_defaults(config: dict[str, Any]) -> None:
     for profile in (config.get("plan_profiles") or {}).values():
         if not isinstance(profile, dict):
             continue
-        for key in ("critic", "implementer", "review"):
+        for key in ("critic", "review"):
             runner = profile.get(key)
             if isinstance(runner, dict) and runner.get("runner") in RUNNERS:
                 runner.setdefault("timeout_ms", DEFAULT_TIMEOUT_MS)
@@ -83,12 +83,8 @@ def validate_runner(
     key: str,
     allowed: set[str],
     errors: list[str],
-    *,
-    optional: bool = False,
 ) -> None:
     value = config.get(key)
-    if value is None and optional:
-        return
     if not isinstance(value, dict):
         errors.append(f"{key} must be a YAML object")
         return
@@ -105,7 +101,6 @@ def validate_plan_profile(config: dict[str, Any], errors: list[str]) -> None:
         errors.append(f"tracker must be one of: {', '.join(sorted(TRACKERS))}")
 
     validate_runner(config, "critic", RUNNERS, errors)
-    validate_runner(config, "implementer", RUNNERS, errors, optional=True)
     validate_runner(config, "review", REVIEW_RUNNERS, errors)
 
     grill = config.get("grill")
