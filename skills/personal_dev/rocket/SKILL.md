@@ -247,10 +247,12 @@ Work in vertical red-green slices through the confirmed public seams: write one
 failing behavior test, run it to observe the expected failure, add only enough
 production code to pass, then repeat.
 
-Use the system `implementer` sub-agent by default. If the invocation includes
-the literal `implementer` modifier and the resolved config has an `implementer`
-block, use that configured runner as the code-changing implementer instead. If
-the block is absent, fall back to the system `implementer` sub-agent.
+Use the system `implementer` sub-agent by default when it is available. If the
+invocation includes the literal `implementer` modifier and the resolved config
+has an `implementer` block, use that configured runner as the code-changing
+implementer instead. If the block is absent, use the system `implementer`
+sub-agent when available. If the system sub-agent is unavailable, the main
+agent implements directly; its absence is not a blocker.
 
 Give either implementer the full task, repository, authoritative checkout,
 plan, test seam, and repo-instruction context. Require it to work only in that
@@ -258,6 +260,8 @@ checkout, follow the TDD workflow and repository instructions, and not commit,
 push, or open a PR. The main agent must inspect status and diff after handoff and
 owns validation, commits, pushes, PR creation, and review. Keep changes within
 the task's scope and stop if implementation reveals a new material ambiguity.
+When implementing directly, the main agent follows the same plan, test seam,
+TDD workflow, repository instructions, and scope constraints.
 
 ## 5. Verify, Commit, Push, And Open A Draft PR
 
