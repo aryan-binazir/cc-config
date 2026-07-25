@@ -54,3 +54,9 @@ review_profiles:
         effort: high
         timeout_ms: 1500000
         max_rounds: 2
+      - name: Codex
+        runner: codex
+        model: gpt-5.6-sol
+        reasoning_effort: high
+        timeout_ms: 1500000
+        max_rounds: 2
