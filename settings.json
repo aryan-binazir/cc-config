@@ -66,6 +66,7 @@
     ],
     "defaultMode": "auto"
   },
+  "remoteControlAtStartup": true,
   "model": "opus",
   "hooks": {
     "SessionStart": [
@@ -115,5 +116,11 @@
   "skipDangerousModePermissionPrompt": true,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Rocket External Critique and Review: When the user invokes Rocket, allow its configured external critic and reviewer runners to receive the tracked task and relevant repository, branch, diff, and test context required for read-only plan critique and PR review, provided credentials, secrets, personal data, and unrelated sensitive data are excluded."
+    ]
+  }
 }
