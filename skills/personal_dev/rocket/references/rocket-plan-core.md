@@ -76,7 +76,7 @@ preflight sub-agent. If the retry also returns no valid JSON, stop with
 If the returned JSON identifies a ticket key, run the exact command from
 `context.branch_setup_command` before codebase exploration. Do not reconstruct
 the command from memory. This command must fetch the latest `origin/main`; new
-ticket worktrees must live under `~/repos/.worktrees/<repo-name>/<ticket-key>`,
+ticket worktrees must live under `<repo>/_scratch/worktrees/<ticket-key>`,
 and the caller does not need to be on `main`. Parse its JSON output and continue
 all exploration, context, contract, implementation, validation, commit, push,
 and review work from the returned `worktree_path`. If the command is missing, run
@@ -162,7 +162,8 @@ invoking skill, and `$rocket-review <review-profile>` as the final step.
   only the marker-bounded region.
 - Branch: if the safe preflight branch step did not already return a worktree,
   run `ensure_branch.py` to create or reuse
-  `aryan-binazir/<ticket-id-or-short-slug>` in `~/repos/.worktrees/<repo-name>/`
+  `aryan-binazir/<ticket-id-or-short-slug>` in
+  `<repo>/_scratch/worktrees/<ticket-id-or-short-slug>`
   from the latest `origin/main`; if already on a matching feature branch, use it.
   For raw specs, ask once for required ticket/branch naming during clarification.
 - Contract file: read `Contract Persistence` and persist the settled contract to

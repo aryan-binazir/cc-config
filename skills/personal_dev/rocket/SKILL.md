@@ -130,7 +130,7 @@ Resolve the shared branch helper relative to this skill as
    ```
 
    In `worktree` mode, keep the helper's default location for any worktree it
-   creates: `~/repos/.worktrees/<repo>/<ticket-key>`. Do not pass
+   creates: `<repo>/_scratch/worktrees/<ticket-key>`. Do not pass
    `--worktree-path` to redirect it. In `branch` mode, the helper uses the
    repository path as the checkout and creates or switches the local branch
    there without creating a linked worktree.
