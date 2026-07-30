@@ -4,7 +4,7 @@ description: >-
   Take a configured Linear or Jira issue or explicit no-ticket task plus an optional exact
   user-supplied branch through
   focused clarification, configured plan critique, test-driven implementation,
-  verification, commit and push, draft PR creation, and configured review. Use this
+  verification, commit and push, and configured review. Use this
   whenever the user invokes rocket, rocket codex, or rocket claude, or asks for the lighter, lower-friction
   alternative to rocket-plan for an end-to-end task.
 ---
@@ -17,7 +17,7 @@ explicitly says there is no ticket, accept a clear task description instead.
 This remains the lightweight workflow: do not persist a Rocket contract or wait
 for explicit approval of the implementation plan.
 
-Expect one required task input and up to three optional inputs:
+Expect one required task input and up to four optional inputs:
 
 1. Optionally, the literal profile `codex` or `claude` immediately after
    `$rocket`. Omit it to use the configured default profile.
@@ -25,6 +25,7 @@ Expect one required task input and up to three optional inputs:
    task description.
 3. Optionally, the exact branch name to use.
 4. Optionally, the literal `grill` modifier.
+5. Optionally, the literal `hunk-review` modifier.
 
 For example:
 
@@ -34,6 +35,8 @@ For example:
 
 `$rocket claude BBA-359 grill`
 
+`$rocket BBA-359 hunk-review`
+
 `$rocket no ticket: fix stale cache invalidation`
 
 If the branch is omitted, derive `aryan-binazir/<resolved-issue-key>` for tracked
@@ -41,7 +44,7 @@ work or `aryan-binazir/<task-slug>` for explicit no-ticket work, using a
 reasonable short kebab-case slug. If the user supplies a branch, honor it
 exactly. Unless the user explicitly says there is no ticket, ask for an issue ID
 or URL from the configured tracker. Do not infer another tracker. Treat
-`grill` as a modifier, not as a branch name.
+`grill` and `hunk-review` as modifiers, not as branch names or task text.
 
 Never guess past material ambiguity, skip the required external critiques,
 write production code before a driving test, or merge unless the user asks.
@@ -148,6 +151,9 @@ Resolve the shared branch helper relative to this skill as
    path so this run is easy to identify among other open work. Checkout setup is
    Rocket's first state-changing action and must finish before the full
    issue read, task briefing, critique, planning, or code exploration.
+   If the invocation includes `hunk-review`, also say without blocking:
+   `Hunk Review requested. Please ensure the Hunk TUI is running for this
+   checkout: cd <checkout_path> && hunk diff origin/main...HEAD --watch`.
 5. Stop and ask the user before proceeding if the target checkout is dirty, its
    path collides, `main` is unavailable, branch setup fails, the branch is
    checked out elsewhere in `branch` mode, the returned mode or branch
@@ -254,12 +260,12 @@ Give the implementer the full task, repository, authoritative checkout, plan,
 test seam, and repo-instruction context. Require it to work only in that
 checkout, follow the TDD workflow and repository instructions, and not commit,
 push, or open a PR. The main agent must inspect status and diff after handoff and
-owns validation, commits, pushes, PR creation, and review. Keep changes within
+owns validation, commits, pushes, and review. Keep changes within
 the task's scope and stop if implementation reveals a new material ambiguity.
 When implementing directly, the main agent follows the same plan, test seam,
 TDD workflow, repository instructions, and scope constraints.
 
-## 5. Verify, Commit, Push, And Open A Draft PR
+## 5. Verify, Commit, And Push
 
 Run targeted tests plus every typecheck, lint, test, or other validation required
 by the repository. Fix relevant failures; report unrelated or pre-existing
@@ -272,29 +278,43 @@ upstream branch is `origin/<resolved-branch>` and its commit matches
 local `HEAD`. Rocket delivery always includes a commit and push; do not
 leave completed implementation only in the checkout.
 
-Then create or update the PR as a draft with fully explicit, non-interactive
-`gh` commands. Pass `--draft`, `--head`, `--title`, and `--body-file` when
-creating it. If a PR already exists and is not a draft, convert it with
-`gh pr ready --undo <PR-number-or-URL>` before continuing. Do not use `--fill`,
-editor prompts, or implicit fork or push behavior. Follow the repository's PR
-title, body, ticket-linking, and assignment rules. For no-ticket work, use the
-repository's no-ticket convention for the commit and PR title, such as
-`type(no-ticket): description`, and omit ticket linking. Confirm the PR remains
-a draft, targets the intended base branch, and its head is the resolved, pushed
-implementation branch.
+Do not create or update a PR. Rocket Review owns PR creation when configured;
+other review runners require an existing PR.
 
-## 6. Run Configured Review
+## 6. Interactive Hunk Review
+
+Skip this section unless the invocation includes `hunk-review`.
+
+Run `hunk skill path`, then read and follow the returned Hunk Review skill; do
+not hardcode its installed path. Require a live session for the authoritative
+checkout. Inspect what it has loaded and reload it to
+`diff origin/main...HEAD` when it is not already showing that branch diff.
+
+Review the diff against the task and seed one small batch of focused agent
+comments before handing the session to the user. Each time the user asks to
+process their comments, read and account for every current user comment before
+patching or committing because `--watch` may reload automatically. Treat the
+conversation as the durable comment ledger. Answer questions, patch agreed
+changes, verify, commit and push, and reload the session as needed. Repeat
+without a fixed round limit.
+
+Continue only when the user explicitly asks to proceed to review, for example
+`Rocket Review it now`. Before continuing, account for every user comment and
+verify that local `HEAD` matches its upstream branch.
+
+## 7. Run Configured Review
 
 If `review.runner` is `rocket-review`, read and follow the `rocket-review` skill
-with the resolved `review_profile.name`. Supply the tracked issue or no-ticket
-task description as its spec source. Do not also run the verdict loop below.
+with the resolved `review_profile.name`. Rocket Review owns PR creation and
+resolution. Supply the tracked issue or no-ticket task description as its spec
+source. Do not also run the verdict loop below.
 
-Otherwise, use the resolved `review` runner and its exact non-interactive
-conventions to review the actual PR diff. Supply the full tracked issue or
-no-ticket task description, repo path, base and head commits, PR URL, repo
-instructions, changed files, and verification results. Tell the reviewer to
-remain read-only, list only concrete actionable findings, and end with exactly
-one of:
+Otherwise, require an existing PR and stop if none exists; do not create one.
+Use the resolved `review` runner and its exact non-interactive conventions to
+review the actual PR diff. Supply the full tracked issue or no-ticket task
+description, repo path, base and head commits, PR URL, repo instructions,
+changed files, and verification results. Tell the reviewer to remain read-only,
+list only concrete actionable findings, and end with exactly one of:
 
 - `APPROVED`
 - `APPROVED WITH FIXES`
