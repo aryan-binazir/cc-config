@@ -27,7 +27,7 @@
 
 ## Git conventions
 - Branches for Jira-backed work should be named `aryan-binazir/XXXX-XXX`, where `XXXX-XXX` is the Jira issue key.
-- Commit message format: `type(TICKET): description` (e.g. `fix(BBA-9): Added logging package`). Types: `feat`, `fix`, `chore`, `refactor`. If there is no ticket, use `type(no-ticket): description` — never invent a plausible-looking ticket key.
+- Commit message format: `type(PROJECT): description` (e.g. `fix(BBA): Added logging package`). Use only the Jira project key, not the full ticket key. Types: `feat`, `fix`, `chore`, `refactor`. If there is no ticket, use `type(no-ticket): description` — never invent a plausible-looking ticket key.
   - The type is determined by the ticket's overall purpose and MUST stay consistent across ALL commits and the PR title for that ticket (CI depends on this). A stack is one larger change split for review, so a `refactor` commit inside a `feat` ticket is still `feat`. Check existing commits on the branch before committing.
 - PR descriptions use this structure. Testing is optional — omit if not applicable:
   ### Problem
