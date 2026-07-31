@@ -8,6 +8,7 @@ defaults:
 
 plan_profiles:
   codex:
+    # Git: branch or worktree. Jujutsu: bookmark or workspace.
     checkout: worktree
     tracker: linear
     critic:
@@ -23,6 +24,7 @@ plan_profiles:
     review_profile: standard
 
   claude:
+    # Git: branch or worktree. Jujutsu: bookmark or workspace.
     checkout: worktree
     tracker: linear
     critic:

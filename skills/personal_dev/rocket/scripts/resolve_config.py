@@ -16,7 +16,7 @@ import yaml
 RUNNERS = {"claude", "codex", "cursor"}
 REVIEW_RUNNERS = RUNNERS | {"rocket-review"}
 TRACKERS = {"jira", "linear"}
-CHECKOUTS = {"branch", "worktree"}
+CHECKOUTS = {"bookmark", "branch", "workspace", "worktree"}
 GRILL_SKILLS = {"grill-with-docs"}
 DEFAULT_TIMEOUT_MS = 1_500_000
 
