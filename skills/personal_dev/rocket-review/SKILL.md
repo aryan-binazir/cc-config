@@ -154,7 +154,7 @@ head branch is not the checked-out branch.
 
 If no PR exists:
 - Push and freshness-check the branch first.
-- Create the PR with `gh pr create --head <current-branch> --title ... --body-file ...`
+- Create the draft PR with `gh pr create --draft --head <current-branch> --title ... --body-file ...`
   or an equivalent fully explicit non-interactive command.
 - Do not use prompts, editors, `--fill`, or implicit push/fork behavior.
 - Prefer `--body-file` over inline shell quoting for multi-section bodies. Do
