@@ -17,14 +17,6 @@
 - Prefer few deep modules over many shallow ones: simple interfaces hiding complex implementations. If a wrapper, helper, or layer barely simplifies what it wraps, inline it.
 - Don't extract code just to make it testable, and don't add an abstraction for a single caller — test through the module's real interface, and add the layer when a second consumer actually exists.
 
-# Version Control
-
-- Use `git` directly. Prefer a separate Git worktree for isolated work.
-- Prefer a stack of small changes over one large change or PR: each change has one clear purpose, is independently reviewable, and is created explicitly in stack order.
-- Keep stacked pull requests in draft until the full stack is reviewed and stable. Before publishing, inspect the stack, verify parent relationships, run relevant tests, and ensure each change has a clear description.
-- Do not rewrite, squash, reorder, or abandon pushed changes without explaining the impact first.
-- When uncertain about repository state, stop and show `git status` and `git log --oneline --decorate --graph -20` rather than attempting speculative recovery.
-
 ## Git conventions
 - Branches for Jira-backed work should be named `aryan-binazir/XXXX-XXX`, where `XXXX-XXX` is the Jira issue key.
 - Commit message format: `type(PROJECT): description` (e.g. `fix(BBA): Added logging package`). Use only the Jira project key, not the full ticket key. Types: `feat`, `fix`, `chore`, `refactor`. If there is no ticket, use `type(no-ticket): description` — never invent a plausible-looking ticket key.
