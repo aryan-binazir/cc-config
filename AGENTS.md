@@ -19,11 +19,11 @@
 
 # Version Control
 
-- Use `jj` instead of direct `git` commands unless interoperability requires Git. If a repo isn't jj-initialized, run `jj git init --colocate` in it first.
+- Use `git` directly. Prefer a separate Git worktree for isolated work.
 - Prefer a stack of small changes over one large change or PR: each change has one clear purpose, is independently reviewable, and is created explicitly in stack order.
 - Keep stacked pull requests in draft until the full stack is reviewed and stable. Before publishing, inspect the stack, verify parent relationships, run relevant tests, and ensure each change has a clear description.
 - Do not rewrite, squash, reorder, or abandon pushed changes without explaining the impact first.
-- When uncertain about repository state, stop and show `jj status` and `jj log` rather than attempting speculative recovery.
+- When uncertain about repository state, stop and show `git status` and `git log --oneline --decorate --graph -20` rather than attempting speculative recovery.
 
 ## Git conventions
 - Branches for Jira-backed work should be named `aryan-binazir/XXXX-XXX`, where `XXXX-XXX` is the Jira issue key.

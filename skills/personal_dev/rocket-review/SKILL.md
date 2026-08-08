@@ -20,20 +20,6 @@ This skill does not define implementation work, alter reviewer-reported severity
 or verdict tokens, merge the PR, run retired CodeRabbit workflows, or silently
 switch review profiles.
 
-## Jujutsu Compatibility
-
-When Rocket supplies `workspace` or `bookmark` checkout mode, use Jujutsu
-natively throughout this skill. Treat the resolved publication bookmark as the
-PR branch, the intended delivery tip as `HEAD`, and its matching remote bookmark
-as the upstream branch. Use `jj status`, `jj log`, bookmark inspection, and
-`jj git push` in place of Git commands that assume a checked-out branch. Do not
-treat detached Git `HEAD` or the absence of a current Git branch as a blocker.
-For GitHub CLI calls from a non-Git Jujutsu workspace, resolve the repository
-explicitly and pass `--repo`.
-
-When Rocket supplies `worktree` or `branch`, retain the existing Git workflow
-below unchanged.
-
 ## Config
 
 Resolve this `SKILL.md` to its real path first, then resolve `../rocket` relative

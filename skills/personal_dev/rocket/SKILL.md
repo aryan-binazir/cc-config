@@ -72,10 +72,8 @@ The resolver merges `rocket.example.yaml` with the ignored
 failure; do not choose a checkout mode, tracker, runner, or model from prose or
 machine availability. The resolved `plan_profile.config` provides `checkout`,
 `tracker`, `critic`, optional `grill`, `review`, and
-`review_profile`. `checkout` is one of `worktree`, `branch`, `workspace`, or
-`bookmark`. `worktree` and `branch` select the existing Git workflow;
-`workspace` and `bookmark` select the Jujutsu workflow. Model and effort values
-come only from that resolved profile.
+`review_profile`. `checkout` is one of `worktree` or `branch`. Model and effort
+values come only from that resolved profile.
 
 For configured `cursor`, `claude`, or `codex` runners, read the matching
 `call-cursor`, `call-claude`, or `call-codex` skill before invocation. Pass the
@@ -105,30 +103,6 @@ Use the checkout mode literally:
   separate Git worktree.
 - `branch`: use the existing Git helper flow below to create or switch the
   branch in the repository checkout.
-- `workspace`: use native `jj` commands to create or reuse a separate Jujutsu
-  workspace. Default its path to
-  `<repo>/_scratch/workspaces/<ticket-key>` and use the resolved branch name as
-  the publication bookmark.
-- `bookmark`: use the repository's current Jujutsu workspace and create or
-  resume work for the resolved publication bookmark without creating another
-  workspace.
-
-For `workspace` and `bookmark`, do not call `ensure_branch.py`. Initialize the
-repository with `jj git init --colocate` when needed, fetch `origin`, and use
-native Jujutsu status, log, workspace, bookmark, commit, and Git-interop
-commands. Start new work from the existing local or remote publication bookmark
-when it exists, otherwise from the latest remote `main`. Stop on ambiguous
-existing changes, workspace collisions, missing `main`, or a bookmark that
-cannot be resolved safely. Announce the checkout mode, resolved bookmark, and
-authoritative workspace path before continuing.
-
-In Jujutsu modes, interpret later Git-shaped delivery language by meaning rather
-than spelling: "branch" means the publication bookmark, "current branch" means
-the bookmark selected for publication, `HEAD` means the intended delivery tip,
-and "upstream" means the matching remote bookmark. Use the corresponding `jj`
-commands. GitHub still receives the publication bookmark as a normal branch.
-
-For `worktree` and `branch`, continue with the existing helper flow:
 
 2. Extract the issue key. For no-ticket work, derive `<TASK-SLUG>` and use
    `NO-TICKET-<TASK-SLUG>` as the synthetic helper key. If the user supplied a
@@ -305,16 +279,10 @@ Run targeted tests plus every typecheck, lint, test, or other validation require
 by the repository. Fix relevant failures; report unrelated or pre-existing
 failures honestly.
 
-In `worktree` or `branch` mode, immediately before committing, require the
-current branch to exactly match the resolved branch. Commit according to repo
-conventions, then push explicitly to that branch on `origin`, setting its
-upstream when needed. Verify the upstream branch is
-`origin/<resolved-branch>` and its commit matches local `HEAD`.
-
-In `workspace` or `bookmark` mode, create the intended Jujutsu changes according
-to repo conventions, move the resolved publication bookmark to the delivery
-tip, and push that bookmark to `origin`. Verify the local and remote bookmarks
-resolve to the same commit.
+Immediately before committing, require the current branch to exactly match the
+resolved branch. Commit according to repo conventions, then push explicitly to
+that branch on `origin`, setting its upstream when needed. Verify the upstream
+branch is `origin/<resolved-branch>` and its commit matches local `HEAD`.
 
 Rocket delivery always includes committed changes and a push; do not leave
 completed implementation only in the checkout.
