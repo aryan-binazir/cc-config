@@ -22,8 +22,10 @@ uv run --script "<call-cursor-skill-dir>/scripts/call.py" "$PROMPT"
 ```
 
 The wrapper invokes Cursor in print mode with sandboxing and no force bypass. It
-defaults to `cursor-grok-4.5-high-fast`; Cursor carries the effort/speed variant
-in the model ID rather than a separate effort option.
+defaults to `cursor-grok-4.6-xhigh` (Grok 4.6 Extra High); Cursor carries the
+effort/speed variant in the model ID rather than a separate effort option, so
+the `xhigh` suffix *is* the reasoning effort. Always call Grok 4.6 at extra-high
+effort — never `cursor-grok-4.6-high`, `-medium`, `-low`, or any 4.5 variant.
 
 Inspect the effective config without calling Cursor:
 
@@ -36,29 +38,24 @@ Stop if it is unavailable; never fall back to a bypass mode.
 
 ## Model Selection
 
-Use the configured model unless the user explicitly specifies a different
-model. Pass a one-off choice with `--model`; do not edit the config for it.
+Default to the configured model, `cursor-grok-4.6-xhigh`, unless the user
+explicitly specifies a different model. Pass a one-off choice with `--model`; do
+not edit the config for it.
 
-If the user specifies Opus, use the current pinned Claude Opus model:
-
-```bash
-cursor-agent --print --trust --sandbox enabled \
-  --model claude-opus-4-8-thinking-high "$PROMPT"
-```
-
-If the user specifies Sonnet, use the current CLI-exposed Sonnet 5 Extra High
-alias:
+If the user asks for Grok without naming a version or effort, that means
+`cursor-grok-4.6-xhigh`. To pass it explicitly:
 
 ```bash
 cursor-agent --print --trust --sandbox enabled \
-  --model claude-sonnet-5-xhigh "$PROMPT"
+  --model cursor-grok-4.6-xhigh "$PROMPT"
 ```
 
-`cursor-agent --list-models` currently labels that alias as `Sonnet 5 1M Extra
-High`. Do not use it when the user explicitly asks for a non-1M Sonnet model;
-no accepted 300K Sonnet 5 Extra High tag has been found in the local CLI.
+Use `cursor-grok-4.6-xhigh-fast` only when the user explicitly asks for the fast
+variant.
 
 If the user specifies an exact model name, pass that exact model with `--model`.
+If they name a model family without an exact tag, resolve it against
+`cursor-agent --list-models` rather than guessing a tag.
 
 ## Prompt Guidance
 
