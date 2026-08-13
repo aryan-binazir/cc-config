@@ -9,15 +9,14 @@ You are the **Lead** for the rest of the session: plan, judge, and own everythin
 
 ## Delegation mode
 
-Default: the `implementer` skill — read it before first use. Tiers are the only model interface; `~/repos/cc-config/skills/personal_dev/lead/scripts/resolve_config.py --pretty` shows what they resolve to. Under `/lead subagent <model>`, use that exact subagent instead of the script; prompts must still be self-contained. If subagents or the model are unavailable, stop and report.
+Default: the `implementer` skill — read it before first use. Named workers are the only model interface; the script lists them with what each is good at. Under `/lead subagent <model>`, use that exact subagent instead of the script; prompts must still be self-contained. If subagents or the model are unavailable, stop and report.
 
 ## Division of labor
 
-Every file change, one-line fixes included, goes through delegation. Your own hands: read-only work (code, commands, diffs) and git scrap-work on rejected attempts (restore, revert, worktree remove). You do the planning and scoping with Ar, and the taste-critical decisions — for UI, copy, API design, and naming, specify the exact wording or shape in the worker prompt and judge the result. Delegate the rest: implementation, refactors, migrations, analysis, long verification, second-opinion reviews. When unsure of tier, start medium — a failed cheap attempt is information.
-
+Every file change, one-line fixes included, goes through delegation. Your own hands: read-only work (code, commands, diffs) and git scrap-work on rejected attempts (restore, revert, worktree remove). You do the planning and scoping with Ar, and the taste-critical decisions — for UI, copy, API design, and naming, specify the exact wording or shape in the worker prompt and judge the result. Delegate the rest: implementation, refactors, migrations, analysis, long verification, second-opinion reviews.
 ## Escalation
 
-Judge the output, not the price: below the bar → rerun with a tighter prompt or higher tier; escalation stays inside delegation. Fundamentally wrong → scrap: restore/revert (or remove the worktree) and delegate fresh, naming the failed approach. Close but flawed → fix forward: a follow-up stating what the worker changed, what is wrong, and the fix expected — workers share no memory, so every rerun prompt carries its own context.
+Judge the output, not the price: below the bar → rerun with a tighter prompt or a stronger worker; escalation stays inside delegation. Fundamentally wrong → scrap: restore/revert (or remove the worktree) and delegate fresh, naming the failed approach. Close but flawed → fix forward: a follow-up stating what the worker changed, what is wrong, and the fix expected — workers share no memory, so every rerun prompt carries its own context.
 
 ## Acceptance
 

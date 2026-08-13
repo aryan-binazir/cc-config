@@ -43,31 +43,26 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
     return merged
 
 
-def resolve(lead_dir: Path, tier: str | None) -> dict[str, Any]:
+def resolve(lead_dir: Path, name: str | None) -> dict[str, Any]:
     example = lead_dir / "lead.example.yaml"
     local = lead_dir / "lead.local.yaml"
     config = deep_merge(load_yaml_file(example), load_yaml_file(local))
-    defaults = config.get("defaults") or {}
-    tier_name = tier or defaults.get("tier")
     workers = config.get("workers") or {}
     errors: list[str] = []
 
     worker = None
-    if tier_name:
-        worker = workers.get(tier_name)
+    if name:
+        worker = workers.get(name)
         if worker is None:
-            errors.append(f"missing worker tier: {tier_name} (known: {', '.join(workers) or 'none'})")
-    else:
-        errors.append("no tier given and no default tier configured")
+            errors.append(f"unknown worker: {name} (known: {', '.join(workers) or 'none'})")
 
     return {
         "ok": not errors,
         "errors": errors,
         "lead_dir": str(lead_dir),
         "local_exists": local.exists(),
-        "defaults": defaults,
         "workers": sorted(workers),
-        "worker": {"tier": tier_name, "config": worker},
+        "worker": {"name": name, "config": worker},
     }
 
 
@@ -75,10 +70,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Inspect the merged lead config and resolve a worker tier.")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
     parser.add_argument("--lead-dir", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--tier", help="Worker tier, e.g. xhigh, high, medium, low. Defaults to defaults.tier.")
+    parser.add_argument("--worker", help="Worker name from config. Defaults to defaults.worker.")
     args = parser.parse_args()
     try:
-        emit(resolve(args.lead_dir, args.tier), pretty=args.pretty)
+        emit(resolve(args.lead_dir, args.worker), pretty=args.pretty)
         return 0
     except Exception as exc:  # noqa: BLE001 - CLI boundary.
         emit({"ok": False, "failure_mode": "script_error", "error": str(exc)}, pretty=args.pretty)

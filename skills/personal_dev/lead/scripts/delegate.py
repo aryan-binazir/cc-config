@@ -97,6 +97,9 @@ def build_command(worker: dict[str, Any], prompt: str) -> list[str]:
         cmd = ["claude", "--permission-mode", "auto"]
         if model:
             cmd += ["--model", str(model)]
+        effort = worker.get("reasoning_effort")
+        if effort:
+            cmd += ["--effort", str(effort)]
         cmd += ["-p", prompt]
         return cmd
     if runner == "cursor":
@@ -220,7 +223,8 @@ def run_with_heartbeat(cmd: list[str], cwd: Path, timeout_s: float, report: Path
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Delegate a task to the configured worker model.")
-    parser.add_argument("--tier", help="Worker tier (xhigh, high, medium, low). Defaults to defaults.tier.")
+    parser.add_argument("--worker", help="Worker name from config (--list shows them).")
+    parser.add_argument("--list", action="store_true", help="List configured workers and what each is good at.")
     parser.add_argument("--prompt", help="Inline prompt text.")
     parser.add_argument("--prompt-file", type=Path, help="File containing the self-contained prompt.")
     parser.add_argument("--cwd", type=Path, default=Path.cwd(), help="Directory to run the worker in.")
@@ -234,20 +238,26 @@ def main() -> int:
         print(json.dumps({"ok": False, "error": msg}, indent=2))
         return 1
 
-    if bool(args.prompt) == bool(args.prompt_file) and not args.dry_run:
-        return fail("provide exactly one of --prompt or --prompt-file")
-    prompt = args.prompt or (args.prompt_file.read_text(encoding="utf-8") if args.prompt_file else "<dry-run>")
-
     lead_dir = Path(__file__).resolve().parents[1]
     config = deep_merge(
         load_yaml_file(lead_dir / "lead.example.yaml"),
         load_yaml_file(lead_dir / "lead.local.yaml"),
     )
-    tier = args.tier or (config.get("defaults") or {}).get("tier")
-    worker = (config.get("workers") or {}).get(tier)
+    workers = config.get("workers") or {}
+    if args.list:
+        print(json.dumps({n: (w or {}).get("description") for n, w in workers.items()}, indent=2))
+        return 0
+
+    if bool(args.prompt) == bool(args.prompt_file) and not args.dry_run:
+        return fail("provide exactly one of --prompt or --prompt-file")
+    prompt = args.prompt or (args.prompt_file.read_text(encoding="utf-8") if args.prompt_file else "<dry-run>")
+
+    name = args.worker
+    if not name:
+        return fail(f"provide --worker (known: {', '.join(workers) or 'none'}; --list for descriptions)")
+    worker = workers.get(name)
     if worker is None:
-        known = ", ".join(config.get("workers") or {}) or "none"
-        return fail(f"missing worker tier: {tier} (known: {known})")
+        return fail(f"unknown worker: {name} (known: {', '.join(workers) or 'none'})")
 
     try:
         cmd = build_command(worker, prompt)
@@ -256,8 +266,7 @@ def main() -> int:
 
     timeout_s = (args.timeout_ms or worker.get("timeout_ms") or DEFAULT_TIMEOUT_MS) / 1000
     result: dict[str, Any] = {
-        "tier": tier,
-        "worker": {k: v for k, v in worker.items() if k != "timeout_ms"},
+        "worker": {"name": name, **{k: v for k, v in worker.items() if k not in ("timeout_ms", "description")}},
         "command": cmd[:-1] + ["<prompt>"],  # keep stdout readable; inline prompt lands in the report
         "timeout_s": timeout_s,
     }
@@ -288,7 +297,7 @@ def main() -> int:
         if removed:
             result.pop("worktree", None)
 
-    report = args.report_file or Path(tempfile.gettempdir()) / f"delegate-{int(time.time())}-{os.getpid()}-{tier}.md"
+    report = args.report_file or Path(tempfile.gettempdir()) / f"delegate-{int(time.time())}-{os.getpid()}-{name}.md"
     started = time.monotonic()
     try:
         exit_code, stdout, stderr = run_with_heartbeat(cmd, cwd, timeout_s, report)
@@ -305,7 +314,7 @@ def main() -> int:
     parts = [
         "# delegate report",
         "",
-        f"tier: {tier}",
+        f"worker: {name}",
         f"runner: {worker.get('runner')}",
         f"model: {worker.get('model')}",
         f"cwd: {cwd}",

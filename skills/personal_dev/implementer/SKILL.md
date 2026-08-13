@@ -13,10 +13,10 @@ The script is the whole interface — it owns config, models, runner flags, time
 
 ```bash
 uv run ~/repos/cc-config/skills/personal_dev/lead/scripts/delegate.py \
-  --tier <xhigh|high|medium|low> --prompt-file <file> [--worktree]
+  --worker <name> --prompt-file <file> [--worktree]
 ```
 
-Tier: `low` simple mechanical, `medium` bulk with a clear spec, `high` hard or subtle, `xhigh` hardest. Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anything workers must see (the JSON includes the path).
+`--list` shows the workers and what each is good at; pick by fit. Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anything workers must see (the JSON includes the path).
 
 3. **Accept from the JSON.** Check the summary and diff stat; open changed files selectively, and the full report when the summary is missing or suspicious. Risky diffs: delegate an independent review (prompt in the lead skill). Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — ending with the same `## SUMMARY` instruction.
 
