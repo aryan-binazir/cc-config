@@ -5,7 +5,7 @@ description: Explain the current pull request in concise, plain language. Use wh
 
 # PR Explainer
 
-Explain the current pull request to someone unfamiliar with the change.
+Explain the current pull request to someone unfamiliar with the change. **Important** -- Ensure you include where the ticket sits in the larger Epic or set of changes being implemented to give the user context, do not assume the user understands this.
 
 ## Workflow
 
