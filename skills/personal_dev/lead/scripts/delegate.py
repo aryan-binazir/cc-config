@@ -157,8 +157,9 @@ def extract_summary(text: str) -> str | None:
     return body[:SUMMARY_CAP_CHARS] or None
 
 
-def diff_stat(cwd: Path, start_commit: str | None) -> str | None:
-    """Changes from the starting commit, including untracked files."""
+def diff_stat(cwd: Path, snapshot: GitSnapshot) -> str | None:
+    """Changes from the starting commit, including untracked files the worker added."""
+    start_commit = snapshot.commit
     baseline = start_commit or git_output(
         cwd, "hash-object", "-t", "tree", "-w", "--stdin", input_text="",
     )
@@ -167,8 +168,14 @@ def diff_stat(cwd: Path, start_commit: str | None) -> str | None:
         diff = git_output(cwd, "diff", "--stat", "HEAD") or git_output(cwd, "diff", "--stat") or ""
     untracked = git_output(cwd, "ls-files", "--others", "--exclude-standard") or ""
     lines = diff.strip().splitlines()
-    # _scratch/ holds prompt files and scratch state by local convention; not signal.
-    lines += [f"untracked: {p}" for p in untracked.strip().splitlines() if not p.startswith("_scratch/")]
+    # _scratch/ holds prompt files and scratch state by local convention; files
+    # untracked before the worker started are the caller's, not the worker's.
+    preexisting = set(snapshot.preexisting_changes)
+    lines += [
+        f"untracked: {p}"
+        for p in untracked.strip().splitlines()
+        if not p.startswith("_scratch/") and p not in preexisting
+    ]
     if not lines:
         return None
     if len(lines) > DIFF_STAT_CAP_LINES:
@@ -334,7 +341,7 @@ def main() -> int:
     result["ok"] = exit_code == 0
     result["exit_code"] = exit_code
     result["summary"] = extract_summary(stdout)
-    result["diff_stat"] = diff_stat(cwd, snapshot.commit)
+    result["diff_stat"] = diff_stat(cwd, snapshot)
     result["report_file"] = str(report)
     result["duration_s"] = round(time.monotonic() - started, 1)
     clean_up_worktree()
