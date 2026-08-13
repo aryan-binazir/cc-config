@@ -16,7 +16,15 @@ uv run ~/repos/cc-config/skills/personal_dev/lead/scripts/delegate.py \
   --worker <name> --prompt-file <file> [--worktree]
 ```
 
-`--list` shows the workers and what each is good at; pick by fit. Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anything workers must see (the JSON includes the path).
+Pick `--worker` by fit:
+
+- `xhigh`: The hardest problems — subtle bugs, architecture, gnarly debugging.
+- `high`: Hard or subtle implementation work.
+- `medium`: Bulk implementation with a clear spec.
+- `low`: Targeted, near-deterministic edits from an exact spec.
+- `frontend`: Frontend and UI work.
+
+Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anything workers must see (the JSON includes the path).
 
 3. **Accept from the JSON.** Check the summary and diff stat; open changed files selectively, and the full report when the summary is missing or suspicious. Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — ending with the same `## SUMMARY` instruction.
 
