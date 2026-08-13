@@ -11,7 +11,7 @@ Review only the changes introduced on the current branch since merge-base. Use p
 
 Review only commits between merge-base and `HEAD`, and only files this branch intentionally modified. Ignore unrelated pre-existing code, upstream changes brought in by merges or rebases, and rebase-noise files.
 
-Ground every finding in the diff; put anything you are unsure about under `## Uncertain` rather than asserting it.
+Use only the diff as evidence; put anything you are unsure about under `## Uncertain`.
 
 ## Get Changes
 

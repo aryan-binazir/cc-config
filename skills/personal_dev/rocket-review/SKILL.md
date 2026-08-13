@@ -48,7 +48,7 @@ Claude `effort` as `--effort <effort>` and Codex `reasoning_effort` as
 `-c model_reasoning_effort="<reasoning_effort>"`; stop if either option is
 configured for a mismatched runner.
 
-Reviewers are read-only, always in the sandboxed modes above. Cursor requires
+Reviewers are read-only, invoked through exactly the commands above. Cursor requires
 CLI Auto-review; stop if the installed CLI lacks it. The reviewer prompt must
 state that the review is read-only and files stay unmodified — patching
 findings is the main agent's job.
@@ -198,8 +198,8 @@ ticket: broken goal or acceptance behavior, a concrete realistic in-scope edge
 case with plainly incorrect behavior, or a credible security, data-loss,
 data-corruption, or required-path concurrency failure. Distant or speculative
 edge cases, defense-in-depth, maintainability, simplification, performance
-outside expected scale, and out-of-scope improvements are non-blocking; report
-and patch them freely.
+outside expected scale, and out-of-scope improvements are non-blocking; they
+may still be reported and patched.
 
 Required reviewer output sections: `Critical`, `High`, `Low`, `Uncertain`,
 `Verdict`. The `Verdict` section ends with exactly one token: `APPROVE`,

@@ -19,7 +19,7 @@ Turn Ar's `agent:` PR comments into a local patch, commit it, and reply with the
 4. Persist handled state in the shared PR state file `_scratch/_pr_reviews/pr-<number>.json` — the same store the `pr-comments` skill maintains. Create the file and directory if missing.
    - Keep agent-handling data under an `agent` object on each item in `itemsById`, keyed by source id: source type, body fingerprint, URL, status, commit hash, reply id or URL, and timestamps.
    - Preserve existing item numbering and every field written by `pr-comments`.
-   - If an old `_scratch/_pr_address_comments/pr-<number>.json` exists, migrate its entries into the shared file once and retire it.
+   - If an old `_scratch/_pr_address_comments/pr-<number>.json` exists, migrate its entries into the shared file once, then read and write only the shared file.
    - Reopen a handled item when its body or `updated_at` changes.
 5. Implement all open actionable comments that can safely be handled together. Non-Ar comments, parent comments, file paths, diff hunks, and nearby code are context only.
 6. Run focused tests or checks appropriate to the patch.

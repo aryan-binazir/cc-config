@@ -29,8 +29,8 @@ when the user asks.
 3. Compare semantically and classify every cross-harness mapping as `exact`,
    `approximate`, or `no native equivalent`.
 4. Add missing intent in native form. Approximation is acceptable only when it
-   preserves strength: a hard deny or mandatory prompt maps only to an equally
-   binding rule.
+   preserves strength: map hard denies to hard-deny primitives and mandatory
+   prompts to mandatory-prompt primitives.
 5. Stop only for conflict, ambiguous intent, or weakening. Otherwise edit.
 
 ## Preserve Defaults

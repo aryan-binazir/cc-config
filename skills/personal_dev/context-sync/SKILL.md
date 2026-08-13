@@ -9,7 +9,7 @@ Post a concise final status comment to the external ticket that owns the work.
 
 ## Scope
 
-The whole deliverable is exactly one final status comment in Jira or Linear. Everything else stays untouched: ticket descriptions, labels, fields, assignees, priorities, workflow status, `_scratch/_context` files, PRs, commits, and code. Edit ticket metadata only when the user explicitly asks.
+The whole deliverable is exactly one final status comment in Jira or Linear. Everything else — ticket descriptions, labels, fields, assignees, priorities, workflow status, `_scratch/_context` files, PRs, commits, and code — stays untouched, with one exception: edit ticket metadata when the user explicitly asks for it.
 
 Claim only what the conversation or verified repo state supports. Stop and ask for the issue URL or key when the target can't be determined confidently.
 
