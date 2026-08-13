@@ -53,6 +53,7 @@ def command(config: dict[str, Any], prompt: str) -> list[str]:
         "cursor-agent",
         "--print",
         "--trust",
+        "--auto-review",
         "--sandbox",
         "enabled",
         "--model",

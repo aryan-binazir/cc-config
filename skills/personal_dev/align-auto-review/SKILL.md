@@ -13,8 +13,10 @@ Mirror intent, not syntax.
   `permissions.ask` and `permissions.deny`.
 - Codex: `~/.codex/config.toml` → `[auto_review].policy`; inspect root
   `approvals_reviewer` and `approval_policy`. Ignore `.rules` files.
-- Cursor: `~/.cursor/permissions.json` → `autoRun.allow_instructions` and
-  `autoRun.block_instructions`. Ignore Cursor CLI permissions.
+- Cursor activation: `~/.cursor/cli-config.json` → `approvalMode`; policy:
+  `~/.cursor/permissions.json` → `autoRun.allow_instructions` and
+  `autoRun.block_instructions`. Ignore deterministic Cursor CLI
+  `permissions.allow` and `permissions.deny`.
 
 Activation and policy are separate. Report activation state; change it only
 when the user asks.

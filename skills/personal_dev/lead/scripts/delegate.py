@@ -118,7 +118,10 @@ def build_command(worker: dict[str, Any], prompt: str) -> list[str]:
         cmd += ["-p", prompt]
         return cmd
     if runner == "cursor":
-        cmd = ["cursor-agent", "--print", "--trust", "--sandbox", "enabled"]
+        cmd = [
+            "cursor-agent", "--print", "--trust", "--auto-review",
+            "--sandbox", "enabled",
+        ]
         if model:
             cmd += ["--model", str(model)]
         cmd.append(prompt)

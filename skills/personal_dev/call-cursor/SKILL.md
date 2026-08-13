@@ -28,9 +28,9 @@ Inspect the effective config without calling Cursor:
 uv run --script "<call-cursor-skill-dir>/scripts/call.py" --resolve --pretty
 ```
 
-Cursor CLI Auto-review must be configured and supported by the installed CLI;
-stop and report if it is unavailable. Run only in the sandboxed,
-approval-reviewed mode shown here.
+The wrapper passes `--auto-review` explicitly. Run only in the sandboxed,
+approval-reviewed mode shown here; an older CLI that lacks Auto-review must fail
+rather than falling back to another approval mode.
 
 ## Model Selection
 
@@ -39,7 +39,7 @@ effort. Call Grok only as 4.6 at extra-high: `cursor-grok-4.6-xhigh`. That is
 also what a bare "use Grok" request means. To pass it explicitly:
 
 ```bash
-cursor-agent --print --trust --sandbox enabled \
+cursor-agent --print --trust --auto-review --sandbox enabled \
   --model cursor-grok-4.6-xhigh "$PROMPT"
 ```
 

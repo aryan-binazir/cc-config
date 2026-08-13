@@ -39,17 +39,22 @@ and ordered `reviewers`. Each reviewer provides `name`, `runner`, optional
 `timeout_ms`, and `max_rounds`.
 
 Runner commands:
+- For Cursor, resolve the `call-cursor` skill's `SKILL.md` to its real path;
+  `<call-cursor-skill-dir>` is that file's directory.
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
 - `codex`: `codex --sandbox read-only --ask-for-approval on-request -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null`
-- `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
+- `cursor`: `uv run --script "<call-cursor-skill-dir>/scripts/call.py" "$PROMPT"`
 
-When `model` is set, pass the runner's supported `--model <model>` flag. Pass
-Claude `effort` as `--effort <effort>` and Codex `reasoning_effort` as
+When `model` is set, pass the runner's supported `--model <model>` flag; for
+Cursor pass it to the wrapper. Pass Cursor `timeout_ms` to the wrapper as
+`--timeout-ms <timeout_ms>`. Pass Claude `effort` as `--effort <effort>` and
+Codex `reasoning_effort` as
 `-c model_reasoning_effort="<reasoning_effort>"`; stop if either option is
 configured for a mismatched runner.
 
-Reviewers are read-only, invoked through exactly the commands above. Cursor requires
-CLI Auto-review; stop if the installed CLI lacks it. The reviewer prompt must
+Reviewers are read-only, invoked through exactly the commands above. The Cursor
+wrapper fails closed unless CLI Auto-review is active; stop if the installed CLI
+lacks it. The reviewer prompt must
 state that the review is read-only and files stay unmodified — patching
 findings is the main agent's job.
 

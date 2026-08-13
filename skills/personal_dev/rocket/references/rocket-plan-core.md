@@ -45,18 +45,22 @@ Codex `critic.reasoning_effort`, optional `critic.timeout_ms` defaulting to
 `900000`, and `review_profile` for `$rocket-review`.
 
 Critic runner commands:
+- For Cursor, resolve the `call-cursor` skill's `SKILL.md` to its real path;
+  `<call-cursor-skill-dir>` is that file's directory.
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
 - `codex`: `codex --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null`
-- `cursor`: `cursor-agent --print --trust --sandbox enabled "$PROMPT"`
+- `cursor`: `uv run --script "<call-cursor-skill-dir>/scripts/call.py" "$PROMPT"`
 
-When `model` is set, pass the runner's supported `--model <model>` flag. Do not
-pass Cursor force mode. When a Claude critic sets `effort`, pass
+When `model` is set, pass the runner's supported `--model <model>` flag; for
+Cursor pass it to the wrapper. Pass Cursor `timeout_ms` to the wrapper as
+`--timeout-ms <timeout_ms>`. Do not pass Cursor force mode. When a Claude
+critic sets `effort`, pass
 `--effort <effort>`. Stop if `effort` is configured for a non-Claude critic.
 When a Codex critic sets `reasoning_effort`, pass
 `-c model_reasoning_effort="<reasoning_effort>"`. Stop if `reasoning_effort` is
 configured for a non-Codex critic. Cursor requires CLI Auto-review; stop if the
 installed CLI does not support it. These exact commands take precedence
-over the generic `call-cursor`/`call-codex`/`call-claude` skill conventions
+over the generic `call-codex`/`call-claude` skill conventions
 and must never be replaced with a bypass mode.
 The configured critique is exactly one external round unless Ar asks for more
 in the current conversation.
