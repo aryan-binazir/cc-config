@@ -32,12 +32,27 @@ DEFAULT_TIMEOUT_MS = 1_500_000  # 25 minutes
 HEARTBEAT_S = 60
 SUMMARY_CAP_CHARS = 1500
 DIFF_STAT_CAP_LINES = 30
+PROMPT_TTL_DAYS = 30
 
 
 @dataclass(frozen=True)
 class GitSnapshot:
     commit: str | None
     preexisting_changes: tuple[str, ...]
+
+
+def sweep_stale_prompts(cwd: Path) -> None:
+    cutoff = time.time() - PROMPT_TTL_DAYS * 24 * 60 * 60
+    try:
+        prompt_files = list((cwd / "_scratch" / "prompts").glob("*.md"))
+    except OSError:
+        return
+    for prompt_file in prompt_files:
+        try:
+            if prompt_file.stat().st_mtime < cutoff:
+                prompt_file.unlink()
+        except OSError:
+            pass
 
 
 def git_output(cwd: Path, *argv: str, input_text: str | None = None) -> str | None:
@@ -240,6 +255,7 @@ def main() -> int:
     parser.add_argument("--timeout-ms", type=int, help="Override worker timeout from config.")
     parser.add_argument("--dry-run", action="store_true", help="Print the resolved command without executing.")
     args = parser.parse_args()
+    sweep_stale_prompts(args.cwd)
 
     def fail(msg: str) -> int:
         print(json.dumps({"ok": False, "error": msg}, indent=2))
