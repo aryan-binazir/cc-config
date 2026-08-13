@@ -17,7 +17,7 @@ explicitly says there is no ticket, accept a clear task description instead.
 This remains the lightweight workflow: do not persist a Rocket contract or wait
 for explicit approval of the implementation plan.
 
-Expect one required task input and up to four optional inputs:
+Expect one required task input and up to five optional inputs:
 
 1. Optionally, the literal profile `codex` or `claude` immediately after
    `$rocket`. Omit it to use the configured default profile.
@@ -26,12 +26,15 @@ Expect one required task input and up to four optional inputs:
 3. Optionally, the exact branch name to use.
 4. Optionally, the literal `grill` modifier.
 5. Optionally, the literal `hunk-review` modifier.
+6. Optionally, the literal `implementer` modifier.
 
 For example:
 
 `$rocket BBA-359`
 
 `$rocket codex BBA-359`
+
+`$rocket implementer BBA-359`
 
 `$rocket claude BBA-359 grill`
 
@@ -44,7 +47,7 @@ work or `aryan-binazir/<task-slug>` for explicit no-ticket work, using a
 reasonable short kebab-case slug. If the user supplies a branch, honor it
 exactly. Unless the user explicitly says there is no ticket, ask for an issue ID
 or URL from the configured tracker. Do not infer another tracker. Treat
-`grill` and `hunk-review` as modifiers, not as branch names or task text.
+`grill`, `hunk-review`, and `implementer` as modifiers.
 
 Never guess past material ambiguity, skip the required external critiques,
 write production code before a driving test, or merge unless the user asks.
@@ -174,7 +177,7 @@ Rocket contract workflow. Review invokes Rocket Review only when configured.
 From this point forward, run every inspection, context update, plan critique,
 implementation action, validation, commit, push, PR action, and review only from
 the helper-returned authoritative git `checkout_path`. When delegating, give the
-sub-agent that exact path and require it to work only there.
+worker that exact path and require it to work only there.
 
 Now read the complete tracked issue; do not rely on its title alone. For
 explicit no-ticket work, use the user's task description as the source of
@@ -260,18 +263,16 @@ Work in vertical red-green slices through the confirmed public seams: write one
 failing behavior test, run it to observe the expected failure, add only enough
 production code to pass, then repeat.
 
-Use the system `implementer` sub-agent when it is available. If the system
-sub-agent is unavailable, the main agent implements directly; its absence is
-not a blocker.
+The main agent implements directly. With the `implementer` modifier, read the
+`implementer` skill and delegate through its workers from the authoritative
+checkout — prompts carry the plan, test seam, and repo instructions, and
+workers stay in that checkout. Commits, pushes, PRs, and validation stay with
+the main agent; inspect status and diff after each handoff. If the skill or
+its workers are unavailable, stop and report.
 
-Give the implementer the full task, repository, authoritative checkout, plan,
-test seam, and repo-instruction context. Require it to work only in that
-checkout, follow the TDD workflow and repository instructions, and not commit,
-push, or open a PR. The main agent must inspect status and diff after handoff and
-owns validation, commits, pushes, and review. Keep changes within
-the task's scope and stop if implementation reveals a new material ambiguity.
-When implementing directly, the main agent follows the same plan, test seam,
-TDD workflow, repository instructions, and scope constraints.
+In both modes, follow the plan, test seam, TDD workflow, repository
+instructions, and scope; stop when implementation reveals a new material
+ambiguity.
 
 ## 5. Verify, Commit, And Push
 
