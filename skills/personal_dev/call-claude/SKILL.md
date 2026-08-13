@@ -5,13 +5,14 @@ description: Use this whenever the user asks to call Claude, run Claude Code hea
 
 # Call Claude
 
-Use this skill when the task is to ask Claude Code for a second opinion, plan critique, implementation critique, or independent read on a prompt.
+Ask Claude Code for a second opinion, plan critique, implementation critique, or independent read on a prompt.
 
 ## Command
 
 Use the bundled wrapper. It merges `call-claude.example.yaml` with the ignored
-`call-claude.local.yaml`, then applies the resolved model, effort, and timeout
-to the call:
+`call-claude.local.yaml`, then applies the resolved model, effort, and timeout.
+It runs Claude in print mode with Auto permission review, defaulting to
+`claude-opus-5` with `high` effort:
 
 ```bash
 PROMPT=$(cat <<'EOF'
@@ -21,29 +22,18 @@ EOF
 uv run --script "<call-claude-skill-dir>/scripts/call.py" "$PROMPT"
 ```
 
-The wrapper invokes Claude in print mode with Auto permission review. It
-defaults to `claude-opus-5` with `high` effort.
-
 Inspect the effective config without calling Claude:
 
 ```bash
 uv run --script "<call-claude-skill-dir>/scripts/call.py" --resolve --pretty
 ```
 
-If the user explicitly requests a different model or effort, pass `--model` or
-`--effort` to the wrapper for that call. Do not edit the config for a one-off
-override.
+When the user explicitly requests a different model or effort, pass `--model`
+or `--effort` for that call and leave the config untouched.
 
-## Prompt Guidance
+`PROMPT` is the worker's entire context — make it self-contained: the question
+or critique target, relevant files and repo context, and the output format you
+want.
 
-Put the full task in `PROMPT`. Include:
-- the question or critique target
-- any relevant files, paths, or repo context
-- the output format you want
-
-Do not rely on Claude to infer the task from surrounding conversation. The CLI process should receive enough context to complete the job on its own.
-
-## Waiting
-
-The resolved `timeout_ms` defaults to 15 minutes. Quiet periods are normal. Do
-not stop early just because there has been no output for a few minutes.
+The resolved `timeout_ms` defaults to 15 minutes. Quiet periods are normal —
+keep waiting.

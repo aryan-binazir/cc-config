@@ -18,9 +18,11 @@ Mirror intent, not syntax.
      deliberate sentinel choice.
    - Codex: append a local `[auto_review].policy` `Outcome rule: allow ...` or
      `Outcome rule: deny ... regardless of user authorization`. This policy is
-     supplemental; preserve its text and do not copy the built-in policy.
+     supplemental: append only the new rule, preserving its existing text and
+     leaving the built-in policy where it lives.
 4. Use Claude `soft_deny` or an overridable Codex denial only when explicitly
-   requested. Never substitute `permissions`, `.rules`, or activation settings.
+   requested. Write only to `autoMode` and `[auto_review].policy`;
+   `permissions`, `.rules`, and activation settings stay untouched.
 5. Stop on malformed config, conflict, unverifiable defaults, or weaker mapping.
    Validate both prospective JSON/JSONC and TOML documents before writing either,
    roll back both on any write or reread failure, then report exact additions,

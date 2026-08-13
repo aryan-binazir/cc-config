@@ -16,20 +16,21 @@ Mirror intent, not syntax.
 - Cursor: `~/.cursor/permissions.json` → `autoRun.allow_instructions` and
   `autoRun.block_instructions`. Ignore Cursor CLI permissions.
 
-Activation and policy are separate. Report activation state; do not change it
-unless the user asks.
+Activation and policy are separate. Report activation state; change it only
+when the user asks.
 
 ## Reconcile
 
-1. Read and parse all three files before editing. A missing file or section
-   means no local override, not disabled. Stop on malformed input.
+1. Read and parse all three files before editing. Treat a missing file or
+   section as "no local override" — the feature may still be active. Stop on
+   malformed input.
 2. Reduce user-authored entries to intent plus strength: allow, advisory block,
    mandatory prompt, or hard deny. Exclude vendor defaults.
 3. Compare semantically and classify every cross-harness mapping as `exact`,
    `approximate`, or `no native equivalent`.
 4. Add missing intent in native form. Approximation is acceptable only when it
-   preserves strength. Never turn a hard deny or mandatory prompt into
-   classifier advice.
+   preserves strength: a hard deny or mandatory prompt maps only to an equally
+   binding rule.
 5. Stop only for conflict, ambiguous intent, or weakening. Otherwise edit.
 
 ## Preserve Defaults
@@ -38,8 +39,8 @@ unless the user asks.
   creating one.
 - Codex: local policy replaces its default. Before the first override, obtain
   the current official default policy, copy it intact into `policy`, then add a
-  clearly delimited local-rules section. If the exact default cannot be
-  verified, stop. Never rewrite the default portion.
+  clearly delimited local-rules section — the default portion stays verbatim.
+  If the exact default cannot be verified, stop.
 - Cursor: `autoRun` augments built-in review behavior; preserve unrelated keys.
 
 ## Finish

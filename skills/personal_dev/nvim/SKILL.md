@@ -9,10 +9,9 @@ Open the current code/document reference in a new tmux window with `nvim`.
 
 ## Behavior
 
-- Treat explicit `$nvim` and `/nvim` invocations as navigation commands, not as prompts for more explanation.
-- Use the invocation text after `$nvim` or `/nvim` as the requested navigation target, such as `the skill`, `the failing test`, or `end of file`.
-- Resolve the best concrete location from recent context, then open it.
-- Prefer exact evidence over inference. If the target is ambiguous, ask one short question instead of guessing.
+- `$nvim` and `/nvim` are navigation commands: resolve the location and open it.
+- The text after the invocation names the target, such as `the skill`, `the failing test`, or `end of file`.
+- Prefer exact evidence over inference; when the target is ambiguous, ask one short question.
 
 ## Resolution Order
 
@@ -20,15 +19,15 @@ Open the current code/document reference in a new tmux window with `nvim`.
 2. The last file and line range the agent read, quoted, reviewed, or discussed.
 3. Failing test, compiler, linter, stack trace, or review output containing a file and line.
 4. Symbol, function, type, route, config key, test name, or text snippet found with `rg -n`.
-5. Paired files by repo convention, such as implementation/test or handler/spec, only when the intended target is clear.
+5. Paired files by repo convention (implementation/test, handler/spec), only when the intended target is clear.
 
-When using search, run focused commands such as:
+When searching, run focused commands such as:
 
 ```bash
 rg -n --hidden -g '!vendor' -g '!node_modules' -g '!.git' 'SymbolOrSnippet'
 ```
 
-If there are multiple plausible matches, show the short list and ask which one.
+With multiple plausible matches, show the short list and ask which one.
 
 ## Open Command
 
@@ -53,10 +52,8 @@ tmux new-window -c "$repo_root" "nvim +150 -- 'path/to/file.go'"
 
 ## Reporting
 
-After opening, respond briefly:
+Respond with only the opened location; add explanation only when Ar asks.
 
 ```text
 Opened internal/api/server/routes.go at line 84.
 ```
-
-Do not include extra conceptual explanation unless Ar asks for it.

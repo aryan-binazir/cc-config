@@ -5,18 +5,13 @@ description: Review committed changes on the current branch since it diverged fr
 
 # Code Review
 
-Review only the changes introduced on the current branch since merge-base. Use parallel sub-agents by default, and only use single-pass review when the user explicitly asks for `code-review single`.
+Review only the changes introduced on the current branch since merge-base. Use parallel sub-agents by default; use single-pass review only when the user or a calling skill explicitly requests `code-review single`.
 
 ## Scope
 
-Review only:
-- commits between merge-base and `HEAD`
-- files actually modified by this branch
+Review only commits between merge-base and `HEAD`, and only files this branch intentionally modified. Ignore unrelated pre-existing code, upstream changes brought in by merges or rebases, and rebase-noise files.
 
-Do not review:
-- unrelated pre-existing code
-- upstream changes brought in by merges or rebases
-- files that appear only due to rebase noise and were not intentionally changed on the branch
+Ground every finding in the diff; put anything you are unsure about under `## Uncertain` rather than asserting it.
 
 ## Get Changes
 
@@ -34,29 +29,19 @@ git log --oneline --no-merges $BASE..HEAD
 git diff --stat $BASE..HEAD
 ```
 
-If a file appears in the diff that wasn't intentionally modified on this branch, ignore it -- it's likely a rebase artifact.
-
 ## Parallel Review
 
-Use this mode by default.
+Default mode. Run sub-agents in parallel, each working independently from the same diff.
 
-Use parallel sub-agents only when they can work independently from the same diff.
+If an implementation contract (Goal, Accepted scope, Assumptions, Out of scope, Validation approach) is provided in the caller's prompt, include it in each sub-agent's prompt so they review against the contract too. Treat Out of scope items as deliberate, settled exclusions.
 
-If an implementation contract (Goal, Accepted scope, Assumptions, Out of scope, Validation approach) is provided in the caller's prompt, include it in each sub-agent's prompt so they review against the contract too. Respect Out of scope items — do not treat them as missing work.
-
-- **Agent 1: Correctness & Regressions** -- Does this code actually work? Logic errors, broken algorithms, wrong assumptions. Will merging break existing functionality? Removed behavior, changed contracts, broken integrations.
-- **Agent 2: Security & Performance** -- Injection risks, auth issues, data exposure, secrets in code. N+1 queries, unnecessary loops, memory leaks, expensive operations.
-- **Agent 3: Maintainability & Edge Cases** -- Naming, complexity, duplication, missing error handling, test coverage gaps. What inputs would break this? Null handling, empty arrays, boundary conditions, race conditions.
-
-Be specific. Point out exactly what's wrong and where. No padding.
-
-Only use information from the diff. If you're unsure whether something is an issue, say so rather than guessing.
+- **Agent 1: Correctness & Regressions** — Does this code actually work? Logic errors, broken algorithms, wrong assumptions. Will merging break existing functionality? Removed behavior, changed contracts, broken integrations.
+- **Agent 2: Security & Performance** — Injection risks, auth issues, data exposure, secrets in code. N+1 queries, unnecessary loops, memory leaks, expensive operations.
+- **Agent 3: Maintainability & Edge Cases** — Naming, complexity, duplication, missing error handling, test coverage gaps. What inputs would break this? Null handling, empty arrays, boundary conditions, race conditions.
 
 ## Single Review
 
-Use this mode only when the user explicitly asks for `code-review single` or a caller explicitly requests single-pass review.
-
-Review focus:
+Only when explicitly requested. Review focus:
 
 1. **Correctness**: Logic errors, broken algorithms, wrong assumptions.
 2. **Regressions**: Removed behavior, changed contracts, broken integrations.
@@ -65,11 +50,9 @@ Review focus:
 5. **Maintainability**: Naming, complexity, duplication, missing error handling, test coverage gaps.
 6. **Edge Cases**: Null handling, empty arrays, boundary conditions, race conditions.
 
-Only use information from the diff. If you're unsure whether something is an issue, say so rather than guessing.
-
 ## Output
 
-List only issues that need fixing. No compliments. No padding.
+List only issues that need fixing, each pointing at exactly what is wrong and where.
 
 ```
 ## Critical
@@ -92,17 +75,13 @@ Consider fixing.
 APPROVE | APPROVE WITH FIXES | NEEDS FIXES
 ```
 
-The `## Verdict` section must end with exactly one of these tokens on its own
-line: `APPROVE`, `APPROVE WITH FIXES`, or `NEEDS FIXES`. Use `APPROVE` when the
-branch is ready to merge as-is, `APPROVE WITH FIXES` when it is acceptable but
-specific fixes should land before merge, and `NEEDS FIXES` when it is not yet
-acceptable.
+End `## Verdict` with exactly one token on its own line: `APPROVE` (ready to merge as-is), `APPROVE WITH FIXES` (acceptable, specific fixes should land before merge), or `NEEDS FIXES` (still short of acceptable).
 
 If no issues are found, say so plainly.
 
 ## Save Review
 
-Also save a concise artifact to `_scratch/_reviews/{branchname}-review.md` using this format:
+Also save a concise artifact. Branch name from `git branch --show-current`, replace `/` with `-`, `mkdir -p _scratch/_reviews`, then write `_scratch/_reviews/{branchname}-review.md`:
 
 ```
 ## Verdict
@@ -115,20 +94,4 @@ Also save a concise artifact to `_scratch/_reviews/{branchname}-review.md` using
 - [Critical | High | Low | Uncertain] [file:line] - [what is wrong and why it matters]
 ```
 
-If there are no findings, write:
-
-```
-## Verdict
-APPROVE
-
-## Blocking
-NON-BLOCKING - No findings worth blocking over.
-
-## Findings
-- None.
-```
-
-1. Determine the current branch name with `git branch --show-current`.
-2. Replace any `/` characters with `-` so the filename stays flat.
-3. Run `mkdir -p _scratch/_reviews`.
-4. Write the review to `_scratch/_reviews/{branchname}-review.md`.
+With no findings: Verdict `APPROVE`, Blocking `NON-BLOCKING - No findings worth blocking over.`, Findings `- None.`

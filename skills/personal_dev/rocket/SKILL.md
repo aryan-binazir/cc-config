@@ -11,16 +11,15 @@ description: >-
 
 # Rocket
 
-Use this for a reasonably specified task that should move quickly from intake
-to a reviewed PR. The local config selects Linear or Jira; when the user
-explicitly says there is no ticket, accept a clear task description instead.
-This remains the lightweight workflow: do not persist a Rocket contract or wait
-for explicit approval of the implementation plan.
+The lightweight end-to-end workflow: a reasonably specified task moves from
+intake to a reviewed PR without a persisted Rocket contract or a plan-approval
+gate. The local config selects Linear or Jira; when the user explicitly says
+there is no ticket, accept a clear task description instead.
 
-Expect one required task input and up to five optional inputs:
+Inputs — one required, five optional:
 
 1. Optionally, the literal profile `codex` or `claude` immediately after
-   `$rocket`. Omit it to use the configured default profile.
+   `$rocket`; omitted means the configured default profile.
 2. An issue ID or URL for the configured tracker, or an explicit `no ticket`
    task description.
 3. Optionally, the exact branch name to use.
@@ -42,15 +41,16 @@ For example:
 
 `$rocket no ticket: fix stale cache invalidation`
 
-If the branch is omitted, derive `aryan-binazir/<resolved-issue-key>` for tracked
-work or `aryan-binazir/<task-slug>` for explicit no-ticket work, using a
-reasonable short kebab-case slug. If the user supplies a branch, honor it
-exactly. Unless the user explicitly says there is no ticket, ask for an issue ID
-or URL from the configured tracker. Do not infer another tracker. Treat
-`grill`, `hunk-review`, and `implementer` as modifiers.
+Honor a user-supplied branch exactly. When the branch is omitted, derive
+`aryan-binazir/<resolved-issue-key>` for tracked work or
+`aryan-binazir/<task-slug>` (a reasonable short kebab-case slug) for explicit
+no-ticket work. Unless the user explicitly says there is no ticket, ask for an
+issue ID or URL from the configured tracker — the configured tracker only.
+Treat `grill`, `hunk-review`, and `implementer` as modifiers.
 
-Never guess past material ambiguity, skip the required external critiques,
-write production code before a driving test, or merge unless the user asks.
+Hold these throughout: resolve material ambiguity before acting, run every
+configured critique, write the driving test before production code, and merge
+only on the user's explicit request.
 
 ## Config
 
@@ -62,178 +62,137 @@ uv run --script "<rocket-skill-dir>/scripts/resolve_config.py"
 ```
 
 For `$rocket codex` or `$rocket claude`, pass the literal profile as the
-resolver's positional argument:
-
-```bash
-uv run --script "<rocket-skill-dir>/scripts/resolve_config.py" codex
-uv run --script "<rocket-skill-dir>/scripts/resolve_config.py" claude
-```
+resolver's positional argument.
 
 The resolver merges `rocket.example.yaml` with the ignored
 `rocket.local.yaml`, then selects the requested `plan_profiles` entry or
 `defaults.plan_profile` when no profile was supplied. Stop on any resolver
-failure; do not choose a checkout mode, tracker, runner, or model from prose or
-machine availability. The resolved `plan_profile.config` provides `checkout`,
-`tracker`, `critic`, optional `grill`, `review`, and
-`review_profile`. `checkout` is one of `worktree` or `branch`. Model and effort
-values come only from that resolved profile.
+failure. Checkout mode, tracker, runner, model, and effort come only from the
+resolved `plan_profile.config`: `checkout` (one of `worktree` or `branch`),
+`tracker`, `critic`, optional `grill`, `review`, and `review_profile`.
 
 For configured `cursor`, `claude`, or `codex` runners, read the matching
 `call-cursor`, `call-claude`, or `call-codex` skill before invocation. Pass the
 configured `model`, `effort`, `reasoning_effort`, and `timeout_ms` when present;
 omit absent options so the runner uses its own defaults. Stop if a configured
-runner or model is unavailable instead of silently substituting another.
+runner or model is unavailable — the configured one is the only acceptable
+choice.
 
-Pass runner options using their native flags: Cursor `--model`, Claude
-`--model` and `--effort`, and Codex `--model` plus
+Pass runner options using their native flags: Cursor `--model`; Claude
+`--model` and `--effort`; Codex `--model` plus
 `-c model_reasoning_effort="<reasoning_effort>"`. Treat `timeout_ms` as the
-maximum wait for the configured invocation, not as a runner CLI flag.
+maximum wait for the configured invocation, separate from runner CLI flags.
 
 ## 1. Prepare The Configured Checkout First
 
-Resolve the shared branch helper relative to this skill as
-`<rocket-skill-dir>/scripts/ensure_branch.py`.
+Checkout setup is Rocket's first state-changing action and completes before the
+full issue read, task briefing, critique, planning, or code exploration. The
+verified branch helper lives at `<rocket-skill-dir>/scripts/ensure_branch.py`.
 
 1. For ticketed work, use the available skill or connector for the configured
-   tracker to verify the issue key and resolve the target repository. Read only
-   the issue context needed for that routing; do not begin the full task brief,
-   planning, critique, or code exploration yet. For explicit no-ticket work,
-   resolve the repository from the user's task context.
-
-Use the checkout mode literally:
-
-- `worktree`: use the existing Git helper flow below to create or reuse a
-  separate Git worktree.
-- `branch`: use the existing Git helper flow below to create or switch the
-  branch in the repository checkout.
-
-2. Extract the issue key. For no-ticket work, derive `<TASK-SLUG>` and use
-   `NO-TICKET-<TASK-SLUG>` as the synthetic helper key. If the user supplied a
-   branch, run this verified helper with that exact branch:
+   tracker to verify the issue key and resolve the target repository, reading
+   only the issue context needed for that routing — the full brief comes after
+   checkout. For explicit no-ticket work, resolve the repository from the
+   user's task context.
+2. Extract the issue key; for no-ticket work, derive `<TASK-SLUG>` and use
+   `NO-TICKET-<TASK-SLUG>` as the synthetic helper key. Run the helper with the
+   resolved checkout mode taken literally (`worktree` creates or reuses a
+   separate Git worktree; `branch` creates or switches the branch in the
+   repository checkout):
 
    ```bash
    uv run --script "<rocket-skill-dir>/scripts/ensure_branch.py" \
      --repo <absolute-repo-path> \
      --ticket-key <ISSUE-KEY-OR-SYNTHETIC-NO-TICKET-KEY> \
-     --branch-name <exact-user-supplied-branch> \
+     --branch-name <branch> \
      --checkout-mode <resolved-checkout> \
      --base-branch main
    ```
 
-   If the branch was omitted for tracked work, let the helper derive its default
-   `aryan-binazir/<ISSUE-KEY>` branch by omitting `--branch-name`:
-
-   ```bash
-   uv run --script "<rocket-skill-dir>/scripts/ensure_branch.py" \
-     --repo <absolute-repo-path> \
-     --ticket-key <ISSUE-KEY> \
-     --checkout-mode <resolved-checkout> \
-     --base-branch main
-   ```
-
-   For no-ticket work, always supply the derived branch explicitly so it stays
-   `aryan-binazir/<task-slug>` rather than inheriting the synthetic helper key:
-
-   ```bash
-   uv run --script "<rocket-skill-dir>/scripts/ensure_branch.py" \
-     --repo <absolute-repo-path> \
-     --ticket-key NO-TICKET-<TASK-SLUG> \
-     --branch-name aryan-binazir/<task-slug> \
-     --checkout-mode <resolved-checkout> \
-     --base-branch main
-   ```
+   `--branch-name` handling:
+   - User-supplied branch: pass it exactly.
+   - Tracked work with the branch omitted: omit `--branch-name`; the helper
+     derives its default `aryan-binazir/<ISSUE-KEY>`.
+   - No-ticket work: always pass `aryan-binazir/<task-slug>` explicitly so the
+     branch stays clear of the synthetic helper key.
 
    In `worktree` mode, keep the helper's default location for any worktree it
-   creates: `<repo>/_scratch/worktrees/<ticket-key>`. Do not pass
-   `--worktree-path` to redirect it. In `branch` mode, the helper uses the
-   repository path as the checkout and creates or switches the local branch
-   there without creating a linked worktree.
-3. Parse the helper's JSON. Require `ok: true`, require `checkout_mode` to match
-   the resolved config, require `branch` to exactly equal the supplied branch or
-   derived default, and use the returned absolute `checkout_path` as the
-   authoritative checkout. Call that expected branch the resolved branch. In
-   `worktree` mode, the helper may reuse a current or registered worktree or
-   create one from an existing local branch, existing remote branch, or latest
-   `origin/main`. If it returns a registered matching worktree outside the
-   default location, keep using that returned path; do not move or recreate it.
-   In `branch` mode, it reuses, creates, or switches the branch in the repository
-   checkout and stops if that branch is checked out elsewhere.
+   creates: `<repo>/_scratch/worktrees/<ticket-key>`. In `branch` mode, the
+   helper uses the repository path as the checkout and creates or switches the
+   local branch there, stopping if that branch is checked out elsewhere.
+3. Parse the helper's JSON. Require `ok: true`, `checkout_mode` matching the
+   resolved config, and `branch` exactly equal to the supplied or derived
+   branch — call that the resolved branch. The returned absolute
+   `checkout_path` is the authoritative checkout. In `worktree` mode the helper
+   may reuse a current or registered worktree or create one from an existing
+   local branch, existing remote branch, or latest `origin/main`; when it
+   returns a registered matching worktree outside the default location, keep
+   using that returned path as-is.
 4. Immediately tell the user the checkout mode, resolved branch, and checkout
-   path so this run is easy to identify among other open work. Checkout setup is
-   Rocket's first state-changing action and must finish before the full
-   issue read, task briefing, critique, planning, or code exploration.
-   If the invocation includes `hunk-review`, also say without blocking:
+   path so this run is easy to identify among other open work. If the
+   invocation includes `hunk-review`, also say without blocking:
    `Hunk Review requested. Please ensure the Hunk TUI is running for this
    checkout: cd <checkout_path> && hunk diff origin/main...HEAD --watch`.
 5. Stop and ask the user before proceeding if the target checkout is dirty, its
    path collides, `main` is unavailable, branch setup fails, the branch is
    checked out elsewhere in `branch` mode, the returned mode or branch
-   mismatches, or the returned checkout is not actually on the resolved branch.
-   Do not silently switch or edit another checkout.
-
-This uses Rocket's verified branch/worktree helper without invoking the old
-Rocket contract workflow. Review invokes Rocket Review only when configured.
+   mismatches, or the returned checkout is off the resolved branch.
 
 From this point forward, run every inspection, context update, plan critique,
-implementation action, validation, commit, push, PR action, and review only from
-the helper-returned authoritative git `checkout_path`. When delegating, give the
-worker that exact path and require it to work only there.
+implementation action, validation, commit, push, PR action, and review only
+from the helper-returned authoritative `checkout_path`. When delegating, give
+the worker that exact path and require it to work only there.
 
-Now read the complete tracked issue; do not rely on its title alone. For
-explicit no-ticket work, use the user's task description as the source of
-truth. Read the target repository's instructions, relevant code, tests,
-documentation, and git state from that checkout. Make sure the goal, accepted
-behavior, boundaries, and validation target are understood.
+Now read the complete tracked issue — the full body, beyond its title. For
+explicit no-ticket work, the user's task description is the source of truth.
+Read the target repository's instructions, relevant code, tests, documentation,
+and git state from that checkout until the goal, accepted behavior, boundaries,
+and validation target are understood.
 
 When repository rules require `_scratch/_context/<ticket-key>.md`, resolve the
-key from the supplied issue or, for no-ticket work, the task slug resolved from
-the intended branch. Never derive it from the currently checked-out branch.
+key from the supplied issue or, for no-ticket work, from the task slug of the
+intended branch — independent of whatever branch is currently checked out.
 Keep that file current as plans, assumptions, or decisions change, and delete
-stale notes instead of accumulating them.
+stale notes rather than accumulating them.
 
 ## 2. Brief, Align, And Clarify
 
-If the invocation includes `grill`, require a resolved `grill` block and read
-and follow its configured skill from the authoritative checkout. Stop if the
-block or skill is unavailable. The grilling session replaces the normal brief
-and limited clarification flow below; do not continue to planning or
-implementation until the user confirms shared understanding, and skip the
-remainder of this section after that confirmation.
+If the invocation includes `grill`: require a resolved `grill` block, then read
+and follow its configured skill from the authoritative checkout (stop if either
+is unavailable). The grilling session replaces this section's brief and
+clarification flow; continue to planning only after the user confirms shared
+understanding, then skip the rest of this section.
 
-Without `grill`, use the normal flow below. This path assumes the task is
-reasonably defined and asks only the alignment or validation questions that
-materially affect the work.
-
-Before asking any clarification question, give the user a compact task briefing
-based on the tracked issue or no-ticket task description and repository evidence:
+Otherwise, give the user a compact task briefing based on the tracked issue or
+no-ticket task description and repository evidence:
 
 - **Problem:** what is currently wrong or missing.
 - **Outcome:** what the task intends to make true.
 - **Scope and constraints:** the important boundaries, acceptance criteria, and
   repo-native constraints that shape the likely implementation.
 
-Then ask one explicit alignment question: whether this is the right direction
-or anything should be corrected before proceeding. Do not continue until the
-user confirms the direction or provides a correction. Incorporate corrections
-and re-inspect affected evidence when needed. This alignment gate does not count
-against the clarification-question limit below.
+Then ask one explicit alignment question: is this the right direction, or
+should anything be corrected first? Continue only once the user confirms or
+corrects the direction, incorporating corrections and re-inspecting affected
+evidence as needed. This alignment gate sits outside the
+clarification-question limit below.
 
-After alignment, continue autonomously through the rest of Rocket. Pause
-again only for the material decisions and blockers already required by this
-workflow; do not turn the implementation plan into another approval gate.
+After alignment, continue autonomously through the rest of Rocket — the
+implementation plan needs no separate approval. Pause again only for the
+material decisions and blockers this workflow already requires.
 
 Ask only questions whose answers could materially change scope, acceptance
 criteria, user-facing behavior, API or data contracts, the public test seam, or
-hard-to-reverse architecture.
+hard-to-reverse architecture:
 
-- Ask one question at a time, with a default maximum of three questions.
-- Do not ask anything that repository inspection can answer.
+- One question at a time, with a default maximum of three.
+- Answer repository-inspectable questions by inspection.
 - State reversible implementation assumptions and proceed with them.
 - Include confirmation of the proposed public test seam required by the `tdd`
   skill; fold it into another material question when practical.
-- If the task is clear, proceed immediately apart from any seam confirmation
-  still required by `tdd`.
-- If material ambiguity remains after three questions, say the task is not
+- A clear task proceeds immediately, apart from any seam confirmation still
+  required by `tdd`.
+- If material ambiguity remains after three questions, say the task is short of
   implementation-ready and ask whether to continue clarifying or proceed with
   explicit assumptions.
 
@@ -246,14 +205,14 @@ Write a concise implementation plan covering the intended behavior, affected
 areas, confirmed test seams, red-green slices, and required verification.
 
 Use the resolved `critic` runner and its exact non-interactive conventions to
-critique the plan against the resolved task, repository evidence, and repo-local
-instructions. Give the critic the complete task and request concrete gaps,
-risks, unnecessary complexity, and simpler repo-native alternatives. Keep the
-critic read-only.
+critique the plan against the resolved task, repository evidence, and
+repo-local instructions. Give the critic the complete task and request concrete
+gaps, risks, unnecessary complexity, and simpler repo-native alternatives. Keep
+the critic read-only.
 
 Incorporate actionable feedback. Ask the user only when the critique exposes a
-material decision; otherwise state any reversible assumption and continue.
-This is one critique round unless the run fails or the user asks for more.
+material decision; otherwise state any reversible assumption and continue. One
+critique round, unless the run fails or the user asks for more.
 
 ## 4. Implement Test-First
 
@@ -276,8 +235,8 @@ ambiguity.
 
 ## 5. Verify, Commit, And Push
 
-Run targeted tests plus every typecheck, lint, test, or other validation required
-by the repository. Fix relevant failures; report unrelated or pre-existing
+Run targeted tests plus every typecheck, lint, test, or other validation the
+repository requires. Fix relevant failures; report unrelated or pre-existing
 failures honestly.
 
 Immediately before committing, require the current branch to exactly match the
@@ -285,27 +244,25 @@ resolved branch. Commit according to repo conventions, then push explicitly to
 that branch on `origin`, setting its upstream when needed. Verify the upstream
 branch is `origin/<resolved-branch>` and its commit matches local `HEAD`.
 
-Rocket delivery always includes committed changes and a push; do not leave
-completed implementation only in the checkout.
-
-Do not create or update a PR. Rocket Review owns PR creation when configured;
+Rocket delivery always includes committed changes and a push. Rocket itself
+leaves PRs untouched: creation belongs to Rocket Review when configured, and
 other review runners require an existing PR.
 
 ## 6. Interactive Hunk Review
 
-Skip this section unless the invocation includes `hunk-review`.
+Runs only when the invocation includes `hunk-review`.
 
-Run `hunk skill path`, then read and follow the returned Hunk Review skill; do
-not hardcode its installed path. Require a live session for the authoritative
-checkout. Inspect what it has loaded and reload it to
-`diff origin/main...HEAD` when it is not already showing that branch diff.
+Run `hunk skill path`, then read and follow the skill at the returned path.
+Require a live session for the authoritative checkout; inspect what it has
+loaded and reload it to `diff origin/main...HEAD` when it is showing anything
+else.
 
 Review the diff against the task and seed one small batch of focused agent
 comments before handing the session to the user. Each time the user asks to
 process their comments, read and account for every current user comment before
-patching or committing because `--watch` may reload automatically. Treat the
-conversation as the durable comment ledger. Answer questions, patch agreed
-changes, verify, commit and push, and reload the session as needed. Repeat
+patching or committing, because `--watch` may reload automatically; the
+conversation is the durable comment ledger. Answer questions, patch agreed
+changes, verify, commit and push, and reload the session as needed, repeating
 without a fixed round limit.
 
 Continue only when the user explicitly asks to proceed to review, for example
@@ -314,46 +271,42 @@ verify that local `HEAD` matches its upstream branch.
 
 ## 7. Run Configured Review
 
-If `review.runner` is `rocket-review`, read and follow the `rocket-review` skill
-with the resolved `review_profile.name`. Rocket Review owns PR creation and
-resolution. Supply the tracked issue or no-ticket task description as its spec
-source. Do not also run the verdict loop below.
+If `review.runner` is `rocket-review`: read and follow the `rocket-review`
+skill with the resolved `review_profile.name`, supplying the tracked issue or
+no-ticket task description as its spec source. Rocket Review owns PR creation
+and resolution, and replaces the verdict loop below.
 
-Otherwise, require an existing PR and stop if none exists; do not create one.
-Use the resolved `review` runner and its exact non-interactive conventions to
-review the actual PR diff. Supply the full tracked issue or no-ticket task
+For any other runner, require an existing PR — stop if none exists. Use the
+resolved `review` runner and its exact non-interactive conventions to review
+the actual PR diff. Supply the full tracked issue or no-ticket task
 description, repo path, base and head commits, PR URL, repo instructions,
 changed files, and verification results. Tell the reviewer to remain read-only,
 list only concrete actionable findings, and end with exactly one of:
 
-- `APPROVED`
-- `APPROVED WITH FIXES`
-- `NO ACTIONABLE FEEDBACK`
-- `CHANGES REQUESTED`
+- `APPROVED` or `NO ACTIONABLE FEEDBACK` — no fixes needed
+- `APPROVED WITH FIXES` — only for a complete, enumerated fix list that needs
+  no re-review
+- `CHANGES REQUESTED` — the reviewer must inspect the result of the fixes
 
-Define the choices in the reviewer prompt: use `APPROVED` or
-`NO ACTIONABLE FEEDBACK` when no fixes are needed; use `APPROVED WITH FIXES`
-only for a complete, enumerated fix list that does not need re-review; use
-`CHANGES REQUESTED` when the reviewer must inspect the result of the fixes.
-
-Handle the verdict literally:
+Define those choices in the reviewer prompt, and handle the verdict literally:
 
 - `APPROVED` or `NO ACTIONABLE FEEDBACK`: finish.
 - `APPROVED WITH FIXES`: apply every listed fix, rerun relevant verification,
-  commit and push the fixes to the resolved branch, and confirm its upstream
-  matches local `HEAD`. Then finish without requiring another review.
+  commit and push the fixes to the resolved branch, confirm its upstream
+  matches local `HEAD`, then finish.
 - `CHANGES REQUESTED`: apply the requested fixes, rerun relevant verification,
   commit and push to the resolved branch, confirm its upstream matches local
   `HEAD`, and ask the same configured reviewer to review the new PR diff again.
   Repeat until it returns a terminal verdict.
 
-Do not infer approval from friendly prose or the absence of high-severity
-findings. A malformed or missing verdict is not approval; retry once with the
-required format, then stop and report the blocker if it remains malformed.
+Approval is only ever one of the exact tokens — friendly prose and an absence
+of high-severity findings are neither. A malformed or missing verdict gets one
+retry with the required format; if it stays malformed, stop and report the
+blocker.
 
 ## Completion
 
-Before completion, verify once more that the resolved branch's upstream commit
-matches local `HEAD`. Report the checkout mode and path, branch, PR URL, delivered
-behavior, commits, verification performed, the configured review result, and any
-remaining caveats. Never merge the PR without the user's explicit consent.
+Verify once more that the resolved branch's upstream commit matches local
+`HEAD`. Report the checkout mode and path, branch, PR URL, delivered behavior,
+commits, verification performed, the configured review result, and any
+remaining caveats. Merge only on the user's explicit request.

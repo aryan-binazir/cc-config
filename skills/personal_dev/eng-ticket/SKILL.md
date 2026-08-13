@@ -5,53 +5,43 @@ description: Generate or review engineering tickets that are ready for automated
 
 # Eng Ticket
 
-Generate and review engineering tickets with `rocket-plan` consumability as the primary quality bar.
+Generate and review engineering tickets with `rocket-plan` consumability as the quality bar: tickets that let an implementation agent move with minimal clarification and minimal invention.
 
-The goal is not just readable tickets. The goal is tickets that let an implementation agent move with minimal clarification and minimal invention.
+The deliverable is the ticket text itself — Linear updates and implementation stay outside this skill.
 
 ## Modes
 
 Choose one mode:
-- `Generate` when the user has an idea, rough spec, or partial notes and wants a finished ticket.
-- `Review` when the user already has a ticket and wants a hard critique against the template and downstream automation needs.
+- `Generate`: the user has an idea, rough spec, or partial notes and wants a finished ticket.
+- `Review`: the user has a ticket and wants a hard critique against the template and downstream automation needs.
 
 Choose one ticket type:
-- `Implementation` for code-producing work that should map cleanly into `$rocket-plan`.
-- `Spike / ADR` for investigation or decision-record work that does not directly feed into `$rocket-plan`.
+- `Implementation`: code-producing work that maps cleanly into `$rocket-plan`.
+- `Spike / ADR`: investigation or decision-record work, outside the `$rocket-plan` pipeline.
 
 Default to `Implementation` unless the deliverable is clearly a design artifact, research outcome, or decision document.
 
 ## Repo Context
 
-If you are inside a repo, ground the ticket in the actual codebase before writing:
-- read `CLAUDE.md`, `AGENTS.md`, and similar local workflow rules if present
-- inspect the relevant project structure
-- inspect existing packages, modules, and patterns related to the requested work
+Inside a repo, ground the ticket in the actual codebase before writing: read `CLAUDE.md`, `AGENTS.md`, and similar local rules; inspect the relevant project structure and the existing packages, modules, and patterns related to the work. Name real directories, services, packages, APIs, config patterns, and validation commands whenever the repo context supports them.
 
-This should change the ticket from abstract to concrete. Prefer naming real directories, services, packages, APIs, config patterns, and validation commands when the repo context supports them.
-
-If you are not inside a repo, work from the user's description only and say assumptions plainly.
+Outside a repo, work from the user's description and state assumptions plainly.
 
 ## Generate Workflow
 
-1. Decide whether the ticket is `Implementation` or `Spike / ADR`.
-2. If needed, gather repo context first.
+1. Decide `Implementation` or `Spike / ADR`.
+2. Gather repo context if needed.
 3. Ask at most one consolidated clarification round.
-4. Push for resolution on structural decisions that affect:
-   - scope
-   - architecture
-   - integration boundaries
-   - rollout or migration behavior
-   - validation expectations
-5. Allow unresolved cosmetic details to remain as `[DECIDE: ...]`.
+4. Push for resolution on structural decisions.
+5. Leave unresolved cosmetic details as `[DECIDE: ...]`.
 6. Write the ticket in the required structure.
-7. Keep it scannable. If the ticket turns into a long design doc, it is the wrong artifact.
+7. Keep it scannable — a ticket that turns into a long design doc is the wrong artifact.
 
-Use `[DECIDE: ...]` only for low-impact unresolved choices such as naming, minor defaults, or presentation details. Do not use `[DECIDE: ...]` as a substitute for missing scope or architecture.
+Structural decisions — scope, architecture, integration boundaries, rollout or migration behavior, validation expectations — get resolved in the clarification round. Cosmetic ones — naming, formatting, minor defaults, presentation — may remain as `[DECIDE: ...]`. When in doubt, treat a decision as structural.
 
 ## Implementation Ticket Contract
 
-Every implementation ticket must use these headings:
+Every implementation ticket uses these headings (`## Notes` optional, all others required):
 
 ```md
 # Title
@@ -69,63 +59,41 @@ Every implementation ticket must use these headings:
 ## Notes
 ```
 
-`## Notes` is optional. All other sections are required.
-
 ### Section Rules
 
 `# Title`
-- imperative and specific
-- name the concrete surface area when possible
+- imperative and specific; name the concrete surface area when possible
 
 `## Goal`
-- explain why the work matters now
-- explain what it unlocks or fixes
+- why the work matters now and what it unlocks or fixes
 - make completion legible to an implementation agent
 
 `## Accepted scope`
-- list the concrete things that will actually be built
-- use named files, packages, services, endpoints, commands, schemas, or interfaces when known
-- when work spans multiple packages or services, explicitly state the integration boundaries and ownership split
-- include already-made decisions directly here when they materially shape the implementation
+- the concrete things that will actually be built, using named files, packages, services, endpoints, commands, schemas, or interfaces when known
+- when work spans packages or services, state the integration boundaries and ownership split
+- include already-made decisions that materially shape the implementation
 
 Good: `Create internal/redis/client.go with a Client wrapper around go-redis/v9, plus config loading in internal/config and a Ping health check used by startup validation.`
 Bad: `Set up Redis with standard connection handling.`
 
 `## Assumptions`
-- surface behavior the implementer would otherwise have to invent
-- include inferred defaults, operational expectations, error-handling assumptions, and boundary assumptions
-- if an assumption feels too risky, it is probably a clarification question instead
+- surface behavior the implementer would otherwise have to invent: inferred defaults, operational expectations, error-handling and boundary assumptions
+- an assumption that feels too risky is probably a clarification question instead
 
 `## Out of scope`
-- be explicit and concrete
-- prevent retroactive scope expansion during implementation or review
-- prefer named exclusions over vague phrases like "advanced features"
+- explicit, named exclusions that prevent retroactive scope expansion during implementation or review
 
 `## Validation approach`
-- include runnable checks and concrete manual verification
-- prefer exact commands when known
-- validation should prove the accepted scope, not restate it
+- runnable checks and concrete manual verification, with exact commands when known
+- validation proves the accepted scope rather than restating it
 
 Good: `make lint`, `go test ./internal/redis/...`, and a manual `PING` against the local Redis instance all succeed.
 Bad: `Tests pass and the package works correctly.`
 
 `## Notes`
-- keep brief
-- use for hints, background, or follow-on considerations that do not belong in scope
-- if this becomes longer than the contract itself, the ticket is underspecified
-
-### Structural vs Cosmetic Decisions
-
-Treat unresolved decisions in two buckets:
-
-- Structural: affects scope, architecture, migration, integration, or validation. Push to resolve these in the clarification round.
-- Cosmetic: affects naming, formatting, minor defaults, or other low-risk details. These may remain as `[DECIDE: ...]`.
-
-When in doubt, treat the decision as structural.
+- brief hints, background, or follow-on considerations; if this outgrows the contract, the ticket is underspecified
 
 ## Spike / ADR Ticket Contract
-
-Use this shape for non-implementation investigation tickets:
 
 ```md
 # Title
@@ -141,16 +109,13 @@ Use this shape for non-implementation investigation tickets:
 ## Out of scope
 ```
 
-Rules:
-- `Goal` explains the decision or uncertainty being addressed
-- `Context` explains why the investigation matters now
-- `Questions to answer` must be specific and bounded
-- `Deliverable` names the actual output artifact
-- `Out of scope` prevents the spike from becoming stealth implementation work
+- `Goal`: the decision or uncertainty being addressed
+- `Context`: why the investigation matters now
+- `Questions to answer`: specific and bounded
+- `Deliverable`: the actual output artifact
+- `Out of scope`: keeps the spike from becoming stealth implementation work
 
 ## Review Workflow
-
-When reviewing a ticket:
 
 1. Verify the ticket type.
 2. Check every required section exists.
@@ -160,9 +125,8 @@ When reviewing a ticket:
 6. Check whether `Out of scope` is strong enough to stop review creep.
 7. Check whether `Validation approach` contains runnable verification rather than generic claims.
 8. If the ticket is oversized, suggest a split.
-9. Be direct. No fluff.
 
-Pay special attention to these smells:
+Smells to hunt:
 - goals that explain only what, not why
 - accepted scope that is really a task list with no boundary definition
 - "basic" handling with no definition
@@ -172,8 +136,6 @@ Pay special attention to these smells:
 - named files or directories with no purpose or contents
 
 ## Review Output
-
-For review mode, prefer this structure:
 
 ```md
 ## Verdict
@@ -190,24 +152,10 @@ If the user asks for a full rewrite, provide the rewritten ticket after the find
 
 ## Generation Output
 
-For generation mode, output the finished ticket directly in markdown. Do not wrap it in commentary unless the user asked for analysis first.
+Output the finished ticket directly in markdown; add commentary only when the user asked for analysis first.
 
-Optimize for clean mapping into `$rocket-plan`:
-- `Goal` should map directly to `Goal`
-- `Accepted scope` should map directly to `Accepted scope`
-- `Assumptions` should minimize what `rocket-plan` has to invent
-- `Out of scope` should protect review from expanding the work
-- `Validation approach` should tell the implementer how to prove completion
+Optimize for clean mapping into `$rocket-plan`: `Goal` and `Accepted scope` map directly to their contract sections, `Assumptions` minimizes invention, `Out of scope` protects review from expanding the work, and `Validation approach` tells the implementer how to prove completion.
 
-## What This Skill Does Not Do
+## Quality Bar
 
-- It does not create or update Linear tickets directly.
-- It does not implement code.
-- It does not replace `$rocket-plan` clarification entirely.
-- It does not defer structural ambiguity by normalizing everything into `[DECIDE: ...]`.
-
-## Output Quality Bar
-
-A strong ticket should let another engineer or agent produce roughly the same implementation without a long planning session.
-
-If you can already see multiple materially different implementations that would all satisfy the ticket, the ticket is still too vague.
+A strong ticket lets another engineer or agent produce roughly the same implementation without a long planning session. If multiple materially different implementations would all satisfy the ticket, keep tightening.
