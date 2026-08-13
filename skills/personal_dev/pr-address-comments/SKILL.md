@@ -53,8 +53,6 @@ Use GraphQL only when REST output lacks necessary thread context, such as review
 
 ## Reply Format
 
-Infer the agent label from the running environment: `Codex`, `ChatGPT`, `Claude`, or `Cursor`. If uncertain, use `Agent`.
-
 Default reply:
 
 ```md
