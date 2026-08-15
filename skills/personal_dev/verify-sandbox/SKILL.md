@@ -29,6 +29,9 @@ Prove the code works against real infrastructure, then vanish without a trace.
   scratchpad; a gap worth keeping becomes a proper test in the repo's suite.
 - One lowercase key per task (ticket key or slug, e.g. `abc-42`) names the
   containers and is the unit of teardown.
+- Temporary localhost services under test belong to the sandbox: start them,
+  drive them, and end them within the run. The machine's long-lived dev
+  servers keep running as found.
 
 ## Workflow
 
@@ -37,8 +40,8 @@ Prove the code works against real infrastructure, then vanish without a trace.
    vars or flags, keeping committed config untouched.
 2. **Migrate and seed.** The repo's real migrations, then synthetic data
    sized to the behavior under test.
-3. **Exercise.** Drive the claimed behavior — happy path plus at least one
-   failure or edge path — via the real binary, the repo's integration tests,
+3. **Exercise.** Drive each of the task's acceptance claims — happy path plus
+   at least one failure or edge path — via the real binary, integration tests,
    or a throwaway harness. A real harness beats a thin probe: delegate
    harness construction through the `implementer` skill (`medium` fits most
    harness builds; pick the tier by fit). The main agent then runs that

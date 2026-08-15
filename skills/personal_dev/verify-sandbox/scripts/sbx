@@ -39,59 +39,67 @@ check_key() {
   [[ "${1:-}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "key must be lowercase [a-z0-9-], got '${1:-}'"
 }
 
-free_port() {
-  python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
+ensure_create() {
+  [ "$(podman info --format '{{.Host.Security.Rootless}}')" = "true" ] \
+    || die "podman is rootful here; sandboxes require rootless podman"
+  if podman container exists "$1" 2>/dev/null; then
+    die "$1 already exists — inspect it or 'sbx down' its key first"
+  fi
+}
+
+host_port() { # container internal-port -> podman-assigned host port
+  local mapped; mapped=$(podman port "$1" "$2" | head -1)
+  [ -n "$mapped" ] || die "no host port mapped for $1 port $2"
+  echo "${mapped##*:}"
+}
+
+wait_or_remove() { # container tries check-cmd... ; removes container on timeout
+  local name=$1 tries=$2; shift 2
+  local i
+  for i in $(seq 1 "$tries"); do
+    podman exec "$name" "$@" >/dev/null 2>&1 && return 0
+    sleep 0.5
+  done
+  podman logs --tail 20 "$name" >&2 || true
+  podman rm -f -v -t 0 "$name" >/dev/null
+  die "${name} did not become ready; container removed"
 }
 
 cmd_pg() {
   check_key "${1:-}"
   local key=$1 ver=${2:-$DEFAULT_PG_VERSION}
   local name="sbx-${key}-pg"
-  local port; port=$(free_port)
-  podman run -d --replace --name "$name" \
+  ensure_create "$name"
+  podman run -d --name "$name" \
     --label "$LABEL" --label "sbx.key=${key}" \
     -e POSTGRES_USER=sbx -e POSTGRES_PASSWORD=sbx -e POSTGRES_DB=sbx \
-    -p "127.0.0.1:${port}:5432" \
+    -p "127.0.0.1::5432" \
     "docker.io/library/postgres:${ver}" >/dev/null
-  local i
-  for i in $(seq 1 120); do
-    if podman exec "$name" pg_isready -U sbx -d sbx >/dev/null 2>&1; then
-      echo "container=${name}"
-      echo "DATABASE_URL=postgres://sbx:sbx@127.0.0.1:${port}/sbx?sslmode=disable"
-      return 0
-    fi
-    sleep 0.5
-  done
-  podman logs --tail 20 "$name" >&2 || true
-  die "postgres in ${name} did not become ready"
+  wait_or_remove "$name" 120 pg_isready -U sbx -d sbx
+  echo "container=${name}"
+  echo "DATABASE_URL=postgres://sbx:sbx@127.0.0.1:$(host_port "$name" 5432)/sbx?sslmode=disable"
 }
 
 cmd_redis() {
   check_key "${1:-}"
   local key=$1
   local name="sbx-${key}-redis"
-  local port; port=$(free_port)
-  podman run -d --replace --name "$name" \
+  ensure_create "$name"
+  podman run -d --name "$name" \
     --label "$LABEL" --label "sbx.key=${key}" \
-    -p "127.0.0.1:${port}:6379" \
+    -p "127.0.0.1::6379" \
     "docker.io/library/redis:7" >/dev/null
-  local i
-  for i in $(seq 1 60); do
-    if podman exec "$name" redis-cli ping >/dev/null 2>&1; then
-      echo "container=${name}"
-      echo "REDIS_URL=redis://127.0.0.1:${port}/0"
-      return 0
-    fi
-    sleep 0.5
-  done
-  die "redis in ${name} did not become ready"
+  wait_or_remove "$name" 60 redis-cli ping
+  echo "container=${name}"
+  echo "REDIS_URL=redis://127.0.0.1:$(host_port "$name" 6379)/0"
 }
 
 cmd_run() {
   check_key "${1:-}"
   [ $# -ge 3 ] || die "usage: sbx run <key> <name> <image> [command...]"
   local key=$1 name=$2 image=$3; shift 3
-  podman run -d --replace --name "sbx-${key}-${name}" \
+  ensure_create "sbx-${key}-${name}"
+  podman run -d --name "sbx-${key}-${name}" \
     --label "$LABEL" --label "sbx.key=${key}" \
     "$image" "$@" >/dev/null
   echo "container=sbx-${key}-${name}"
@@ -124,8 +132,8 @@ cmd_gc() {
   local cutoff=$(( $(date +%s) - hours * 3600 ))
   local removed=0 id created
   for id in $(podman ps -aq --filter "label=${LABEL}"); do
-    created=$(date -d "$(podman inspect -f '{{.Created}}' "$id")" +%s)
-    if [ "$created" -lt "$cutoff" ]; then
+    created=$(podman inspect -f '{{.Created.Unix}}' "$id")
+    if [ "$created" -le "$cutoff" ]; then
       podman rm -f -v -t 0 "$id" >/dev/null
       removed=$((removed + 1))
     fi
