@@ -1,5 +1,5 @@
 ---
-name: sandbox
+name: verify-sandbox
 description: >-
   Stand up an ephemeral verification stack (Postgres, Redis, arbitrary
   containers) in rootless podman, run throwaway harness code against it, and
@@ -9,12 +9,12 @@ description: >-
   or database.
 ---
 
-# Sandbox
+# Verify Sandbox
 
 Prove the code works against real infrastructure, then vanish without a trace.
 
-`<sandbox-skill-dir>` is the directory containing this file; the tool is
-`<sandbox-skill-dir>/scripts/sbx` (`sbx --help` lists every command).
+`<skill-dir>` is the directory containing this file; the tool is
+`<skill-dir>/scripts/sbx` (`sbx --help` lists every command).
 
 ## Lane
 
