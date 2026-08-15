@@ -54,6 +54,8 @@ Prove the code works against real infrastructure, then vanish without a trace.
 
 ## Report
 
+Start with `RESULT: PASS` only when every acceptance claim is evidenced and
+`sbx down` confirms clean teardown; otherwise start with `RESULT: FAIL`.
 In chat, evidence-first: each claim with its command and decisive output;
 open questions the sandbox left unanswered; the `sbx down` confirmation.
 Complete means evidenced and torn down.
