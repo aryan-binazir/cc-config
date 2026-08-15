@@ -18,8 +18,8 @@ uv run ~/repos/cc-config/skills/personal_dev/lead/scripts/delegate.py \
 
 Pick `--worker` by fit:
 
-- `xhigh`: The hardest problems — subtle bugs, architecture, gnarly debugging.
-- `high`: Hard or subtle implementation work.
+- `xhigh`: Escalation only — use after `high` fails, or when Ar explicitly requests maximum reasoning.
+- `high`: Default for difficult work, including subtle bugs, architecture, gnarly debugging, and complex implementation.
 - `medium`: Bulk implementation with a clear spec.
 - `low`: Targeted, near-deterministic edits from an exact spec.
 - `frontend`: Frontend and UI work.
