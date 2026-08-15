@@ -238,7 +238,9 @@ ambiguity.
 
 Run targeted tests plus every typecheck, lint, test, or other validation the
 repository requires. Fix relevant failures; report unrelated or pre-existing
-failures honestly.
+failures honestly. When the change is best proven against a real database or
+service stack, read and follow the `sandbox` skill for an ephemeral,
+evidence-backed verification pass.
 
 Immediately before committing, require the current branch to exactly match the
 resolved branch. Commit according to repo conventions, then push explicitly to

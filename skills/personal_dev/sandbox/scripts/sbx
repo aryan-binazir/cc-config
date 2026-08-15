@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# sbx — ephemeral verification sandboxes on rootless podman.
+#
+# Every container carries the labels sbx=1 and sbx.key=<key>, and every
+# destructive operation here filters on those labels. Containers without the
+# labels — long-lived dev databases, anything docker-side, clusters,
+# observability stacks — are structurally unreachable from this script.
+set -euo pipefail
+
+LABEL="sbx=1"
+DEFAULT_TTL_HOURS=4
+DEFAULT_PG_VERSION=18
+
+usage() {
+  cat <<'EOF'
+sbx — ephemeral verification sandboxes (podman-only, label-scoped)
+
+Usage:
+  sbx pg <key> [pg-version]   Start Postgres (default 18) on a random localhost
+                              port; waits until ready, prints DATABASE_URL.
+  sbx redis <key>             Start Redis on a random localhost port; prints REDIS_URL.
+  sbx run <key> <name> <image> [command...]
+                              Start any labeled container in the sandbox.
+  sbx ls [key]                List sandbox containers (all, or for one key).
+  sbx down <key>              Remove every container for <key>, volumes included;
+                              exits non-zero if anything is left behind.
+  sbx gc [hours]              Remove ALL sandbox containers older than [hours]
+                              (default 4). `sbx gc 0` removes every sandbox.
+
+Keys are lowercase [a-z0-9-], typically the ticket key: abc-42.
+For extra podman options (ports, env, mounts), run podman directly but ALWAYS
+include: --label sbx=1 --label sbx.key=<key>
+EOF
+}
+
+die() { echo "sbx: error: $*" >&2; exit 1; }
+
+check_key() {
+  [[ "${1:-}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "key must be lowercase [a-z0-9-], got '${1:-}'"
+}
+
+free_port() {
+  python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
+}
+
+cmd_pg() {
+  check_key "${1:-}"
+  local key=$1 ver=${2:-$DEFAULT_PG_VERSION}
+  local name="sbx-${key}-pg"
+  local port; port=$(free_port)
+  podman run -d --replace --name "$name" \
+    --label "$LABEL" --label "sbx.key=${key}" \
+    -e POSTGRES_USER=sbx -e POSTGRES_PASSWORD=sbx -e POSTGRES_DB=sbx \
+    -p "127.0.0.1:${port}:5432" \
+    "docker.io/library/postgres:${ver}" >/dev/null
+  local i
+  for i in $(seq 1 120); do
+    if podman exec "$name" pg_isready -U sbx -d sbx >/dev/null 2>&1; then
+      echo "container=${name}"
+      echo "DATABASE_URL=postgres://sbx:sbx@127.0.0.1:${port}/sbx?sslmode=disable"
+      return 0
+    fi
+    sleep 0.5
+  done
+  podman logs --tail 20 "$name" >&2 || true
+  die "postgres in ${name} did not become ready"
+}
+
+cmd_redis() {
+  check_key "${1:-}"
+  local key=$1
+  local name="sbx-${key}-redis"
+  local port; port=$(free_port)
+  podman run -d --replace --name "$name" \
+    --label "$LABEL" --label "sbx.key=${key}" \
+    -p "127.0.0.1:${port}:6379" \
+    "docker.io/library/redis:7" >/dev/null
+  local i
+  for i in $(seq 1 60); do
+    if podman exec "$name" redis-cli ping >/dev/null 2>&1; then
+      echo "container=${name}"
+      echo "REDIS_URL=redis://127.0.0.1:${port}/0"
+      return 0
+    fi
+    sleep 0.5
+  done
+  die "redis in ${name} did not become ready"
+}
+
+cmd_run() {
+  check_key "${1:-}"
+  [ $# -ge 3 ] || die "usage: sbx run <key> <name> <image> [command...]"
+  local key=$1 name=$2 image=$3; shift 3
+  podman run -d --replace --name "sbx-${key}-${name}" \
+    --label "$LABEL" --label "sbx.key=${key}" \
+    "$image" "$@" >/dev/null
+  echo "container=sbx-${key}-${name}"
+}
+
+cmd_ls() {
+  local -a filters=(--filter "label=${LABEL}")
+  if [ -n "${1:-}" ]; then check_key "$1"; filters+=(--filter "label=sbx.key=$1"); fi
+  podman ps -a "${filters[@]}" \
+    --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+}
+
+cmd_down() {
+  check_key "${1:-}"
+  local key=$1
+  local ids
+  ids=$(podman ps -aq --filter "label=${LABEL}" --filter "label=sbx.key=${key}")
+  if [ -n "$ids" ]; then
+    echo "$ids" | xargs podman rm -f -v -t 0 >/dev/null
+  fi
+  local leftovers
+  leftovers=$(podman ps -aq --filter "label=${LABEL}" --filter "label=sbx.key=${key}")
+  [ -z "$leftovers" ] || die "sandbox ${key} has leftovers: ${leftovers}"
+  echo "sandbox ${key}: clean"
+}
+
+cmd_gc() {
+  local hours=${1:-$DEFAULT_TTL_HOURS}
+  [[ "$hours" =~ ^[0-9]+$ ]] || die "gc takes an integer hour count, got '${hours}'"
+  local cutoff=$(( $(date +%s) - hours * 3600 ))
+  local removed=0 id created
+  for id in $(podman ps -aq --filter "label=${LABEL}"); do
+    created=$(date -d "$(podman inspect -f '{{.Created}}' "$id")" +%s)
+    if [ "$created" -lt "$cutoff" ]; then
+      podman rm -f -v -t 0 "$id" >/dev/null
+      removed=$((removed + 1))
+    fi
+  done
+  echo "gc: removed ${removed} container(s) older than ${hours}h"
+}
+
+case "${1:-}" in
+  pg)    shift; cmd_pg "$@" ;;
+  redis) shift; cmd_redis "$@" ;;
+  run)   shift; cmd_run "$@" ;;
+  ls)    shift; cmd_ls "$@" ;;
+  down)  shift; cmd_down "$@" ;;
+  gc)    shift; cmd_gc "$@" ;;
+  -h|--help|help|"") usage ;;
+  *) usage >&2; die "unknown command '${1}'" ;;
+esac
