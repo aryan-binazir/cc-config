@@ -39,7 +39,10 @@ Prove the code works against real infrastructure, then vanish without a trace.
    sized to the behavior under test.
 3. **Exercise.** Drive the claimed behavior — happy path plus at least one
    failure or edge path — via the real binary, the repo's integration tests,
-   or a throwaway harness.
+   or a throwaway harness. A real harness beats a thin probe: the
+   `implementer` skill's workers are there to build one properly (`medium`
+   fits most harness builds; pick the tier by fit). Sandbox lifecycle,
+   evidence, and the verdict stay with the main agent.
 4. **Evidence.** Capture the commands and their decisive output (query
    results, responses, exit codes) while the sandbox is still up.
 5. **Down.** `sbx down <key>`; its clean confirmation is the teardown proof.
