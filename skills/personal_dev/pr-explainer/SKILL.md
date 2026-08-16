@@ -38,6 +38,7 @@ Explain the current pull request to a reader who is starting cold. Orient them i
 - Trace what the code actually does rather than trusting names.
 - Group changes by purpose instead of listing every changed file.
 - Say when the available evidence falls short of a conclusion.
+- After pushing a fix based on a PR comment, reply directly to that comment with the commit hash, alone or in a sentence.
 
 ## `html` mode
 
