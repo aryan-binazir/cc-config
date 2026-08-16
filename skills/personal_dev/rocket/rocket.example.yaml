@@ -45,20 +45,15 @@ review_profiles:
     summary_title: Rocket Review Summary
     diary_name: rocket_review
     reviewers:
-      - name: Cursor
-        runner: cursor
-        model: cursor-grok-4.5-high-fast
-        timeout_ms: 1500000
-        max_rounds: 1
       - name: Claude
         runner: claude
         model: claude-opus-5
-        effort: high
-        timeout_ms: 1500000
+        effort: xhigh
+        timeout_ms: 2100000
         max_rounds: 1
       - name: Codex
         runner: codex
         model: gpt-5.6-sol
-        reasoning_effort: high
-        timeout_ms: 1500000
-        max_rounds: 2
+        reasoning_effort: xhigh
+        timeout_ms: 2100000
+        max_rounds: 1
