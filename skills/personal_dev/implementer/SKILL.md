@@ -24,6 +24,8 @@ Pick `--worker` by fit:
 - `low`: Targeted, near-deterministic edits from an exact spec.
 - `frontend`: Frontend and UI work.
 
+Match the handoff shape to the implementation plan. Use one worker for a contained change that can reasonably be implemented, tested, and summarized within its configured window. When the plan contains several substantial vertical slices or crosses a large implementation and verification surface, sequence focused worker handoffs in the same authoritative checkout. Give each worker a complete behavioral slice with clear acceptance criteria and targeted verification, then inspect its result before starting the next slice. The caller owns integration and final verification.
+
 Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anything workers must see (the JSON includes the path).
 
 3. **Accept from the JSON.** Check the summary and diff stat; open changed files selectively, and the full report when the summary is missing or suspicious. Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — ending with the same `## SUMMARY` instruction.
