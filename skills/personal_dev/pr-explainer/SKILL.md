@@ -36,3 +36,13 @@ Explain the current pull request to a reader who is starting cold. Orient them i
 - Trace what the code actually does rather than trusting names.
 - Group changes by purpose instead of listing every changed file.
 - Say when the available evidence falls short of a conclusion.
+
+## `html` mode
+
+When invoked with `html` (e.g. `/pr-explainer html`), produce a guided tour instead of prose:
+
+1. Copy `tour.html` from this skill's directory to `_scratch/pr-explainer/<branch>.html`.
+2. Fill the `<svg>` with a codebase map: boxes for the modules or directories involved, the touched files inside them with changed line ranges, and lines for the seams between modules. Give each region highlighted by a stop `class="hl" data-stop=<n>` (0-based).
+3. Add one `<article class="stop" data-title="…">` per stop, in the same order as the section list above. Interface and seam stops are required: for each changed module, show what its interface looks like (signature, CLI, inputs and outputs) in a `<pre>`, and name the seams it crosses.
+4. Keep every claim traceable to the diff or the surrounding code. Do not load anything external.
+5. Run `open <file>` and reply with the path only.

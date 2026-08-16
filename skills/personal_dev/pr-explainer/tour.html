@@ -1,0 +1,28 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><title>PR tour</title>
+<style>
+:root{--bg:#fff;--fg:#111;--mute:#666;--line:#ddd;--hl:#fde68a;--acc:#2563eb}
+@media(prefers-color-scheme:dark){:root{--bg:#111;--fg:#eee;--mute:#999;--line:#333;--hl:#854d0e;--acc:#60a5fa}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui;display:grid;grid-template-columns:minmax(0,1fr) 28rem;height:100vh}
+figure{margin:0;padding:1rem;overflow:auto;border-right:1px solid var(--line)}svg{width:100%;height:auto}
+.box{fill:none;stroke:var(--line)}.file{fill:var(--bg);stroke:var(--mute)}.hl.on{fill:var(--hl)}
+text{fill:var(--fg);font:12px ui-monospace,monospace}.mute{fill:var(--mute)}
+main{padding:1.5rem;overflow:auto}.stop{display:none}.stop.on{display:block}
+nav{display:flex;gap:.5rem;align-items:center;margin-top:1rem}button{font:inherit;padding:.3rem .8rem}
+ol{padding-left:1.2rem;color:var(--mute)}li.cur{color:var(--fg);font-weight:600}
+code,pre{font:13px ui-monospace,monospace}pre{background:var(--line);padding:.5rem;overflow:auto}
+</style>
+<figure><svg viewBox="0 0 800 500">
+<!-- SVG: codebase map. Boxes = modules/dirs (class=box), files (class=file), touched regions get class="hl" data-stop=N; annotate line ranges; draw seams as lines between boxes -->
+</svg></figure>
+<main><ol id=toc></ol><div id=stops>
+<!-- one <article class=stop data-title="…"> per stop; first stops = system context, then interfaces + seams, then code, then checks; numbers last -->
+</div><nav><button id=p>←</button><span id=c></span><button id=n>→</button></nav></main>
+<script>
+const s=[...document.querySelectorAll('.stop')],h=[...document.querySelectorAll('.hl')],t=toc;let i=0
+s.forEach((x,k)=>{const l=document.createElement('li');l.textContent=x.dataset.title;l.onclick=()=>go(k);t.append(l)})
+function go(k){i=Math.max(0,Math.min(s.length-1,k));s.forEach((x,j)=>x.classList.toggle('on',j==i))
+h.forEach(x=>x.classList.toggle('on',+x.dataset.stop==i));[...t.children].forEach((x,j)=>x.className=j==i?'cur':'')
+c.textContent=`${i+1} / ${s.length}`;location.hash='stop'+(i+1)}
+p.onclick=()=>go(i-1);n.onclick=()=>go(i+1);onkeydown=e=>e.key=='ArrowRight'?go(i+1):e.key=='ArrowLeft'?go(i-1):0
+go(+(location.hash.match(/\d+/)||[1])[0]-1)
+</script>
