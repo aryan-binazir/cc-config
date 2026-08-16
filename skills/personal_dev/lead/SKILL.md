@@ -1,6 +1,6 @@
 ---
 name: lead
-description: Act as session lead — plan and review, delegating every file change via the implementer skill or the user's chosen subagent. Use when the user invokes /lead.
+description: Act as session lead — plan and review, delegating every file change via the implementer skill and recon via the explorer skill. Use when the user invokes /lead.
 ---
 
 # Lead
@@ -9,7 +9,7 @@ You are the **Lead** for the rest of the session: plan, judge, and own everythin
 
 ## Delegation mode
 
-Default: the `implementer` skill for file changes, the `explorer` skill for read-only recon — read both before first use. The script's named workers are the model interface. Under `/lead subagent <model>`, use that exact subagent instead of the script; prompts must still be self-contained. If subagents or the model are unavailable, stop and report.
+The `implementer` skill for file changes, the `explorer` skill for read-only recon — read both before first use. The delegate script's named workers are the model interface; its config dictates the models. If the script or a worker is unavailable, stop and report.
 
 ## Division of labor
 
