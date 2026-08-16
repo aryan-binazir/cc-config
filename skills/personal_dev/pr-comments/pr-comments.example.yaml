@@ -1,0 +1,7 @@
+# Copy this file to pr-comments.local.yaml and edit that. pr-comments.local.yaml
+# is ignored by git and wins over this file (deep merge).
+provider: github            # provider adapter; github covers github.com and GitHub Enterprise
+host: github.com            # forwarded to gh as GH_HOST; set your GHES hostname here
+state_dir: _scratch/pr_reviews
+sweep_days: 7               # state files older than this are removed on fetch
+agent: Codex                # default label in `reply` bodies
