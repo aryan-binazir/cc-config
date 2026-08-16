@@ -321,6 +321,8 @@ def main() -> int:
         result["dry_run"] = True
         print(json.dumps(result, indent=2))
         return 0
+    result["worker"] = name  # config and command are for --dry-run
+    result.pop("command")
 
     base_cwd = args.cwd.resolve()
     cwd = base_cwd
