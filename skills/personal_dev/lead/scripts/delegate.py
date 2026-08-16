@@ -165,6 +165,9 @@ def build_command(worker: dict[str, Any], prompt: str, subagents: int, read_only
         effort = worker.get("reasoning_effort")
         if effort:
             cmd += ["-c", f'model_reasoning_effort="{effort}"']
+        tier = worker.get("service_tier")
+        if tier:
+            cmd += ["-c", f'service_tier="{tier}"']  # session-wide; spawned sub-agents inherit it
         if subagents:
             cmd += ["-c", f"agents.max_concurrent_threads_per_session={subagents}"]
             if sub.get("model"):

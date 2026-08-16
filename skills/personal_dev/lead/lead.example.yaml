@@ -6,6 +6,8 @@
 # Per-worker keys:
 #   runner            codex | claude | cursor
 #   model, reasoning_effort, timeout_ms
+#   service_tier      codex only: e.g. `priority` (Fast: 1.5x speed, more usage). Session-wide,
+#                     so the worker's spawned sub-agents inherit it.
 #   kind              implement (default) | explore. explore runs read-only
 #                     (codex sandbox / claude+cursor plan mode, inherited by
 #                     sub-agents) and returns findings as its final message,
@@ -55,6 +57,7 @@ workers:
     runner: codex
     model: gpt-5.6-sol
     reasoning_effort: medium
+    service_tier: priority
     kind: explore
     subagent:
       model: gpt-5.6-luna
