@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Delegate an implementation, analysis, or review task to the configured worker model via the delegate script. Use when Ar invokes /implementer or a /lead session delegates work.
+description: Delegate an implementation, analysis, or review task to the configured worker model via the delegate script. Use when the user invokes /implementer or a /lead session delegates work.
 ---
 
 # Implementer
@@ -18,7 +18,7 @@ uv run ~/repos/cc-config/skills/personal_dev/lead/scripts/delegate.py \
 
 Pick `--worker` by fit (`--list` prints the live roster):
 
-- `xhigh`: Escalation only — after `high` fails, or when Ar explicitly requests maximum reasoning.
+- `xhigh`: Escalation only — after `high` fails, or when the user explicitly requests maximum reasoning.
 - `high`: Default for difficult work, including subtle bugs, architecture, gnarly debugging, and complex implementation.
 - `medium`: Bulk implementation with a clear spec.
 - `low`: Targeted, near-deterministic edits from an exact spec.
@@ -33,7 +33,7 @@ Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anyt
 
 3. **Accept from the JSON.** Check `summary` (`summary_source` says whether it came from the worker's progress file, its stdout, or nowhere) and `diff_stat`; open changed files selectively. `report_file` is the raw runner transcript — every command, its output, echoed diffs — often megabytes; it is for diagnosis when the summary is missing, contradicts the diff, or the run failed, and rewards searching for the specific error, test name, or tail you need. A timed-out run still reports the last progress-file state, so judge what got done before deciding to revise or re-run. Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — the script appends the summary instruction again.
 
-On `ok: false`, surface the exact error and stop; Ar decides how to proceed.
+On `ok: false`, surface the exact error and stop; the user decides how to proceed.
 
 Risky diffs get an independent delegated review — this prompt plus task-specific context:
 

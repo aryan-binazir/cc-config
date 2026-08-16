@@ -1,6 +1,6 @@
 ---
 name: explorer
-description: Delegate read-only codebase exploration — mapping a subsystem, answering "where/how does X happen", surveying call sites — to the cheap fan-out explore worker via the delegate script. Use when Ar invokes /explorer, or when a /lead or /rocket session wants recon without spending its own context.
+description: Delegate read-only codebase exploration — mapping a subsystem, answering "where/how does X happen", surveying call sites — to the fan-out explore worker via the delegate script. Use when the user invokes /explorer, or when a /lead or /rocket session wants recon without spending its own context.
 ---
 
 # Explorer
@@ -16,7 +16,7 @@ uv run ~/repos/cc-config/skills/personal_dev/lead/scripts/delegate.py \
   --worker explore --prompt-file <file> [--subagents N]
 ```
 
-The explore worker runs read-only: a mid-effort orchestrator that fans the reading out to cheap sub-agents (default width in config; `--subagents N` sets it). Width follows breadth: `1` for a single pointed question, `3`+ for "map this subsystem" or several independent questions. Several explorers may run at once in the same checkout. A quiet worker is normal — heartbeats and timeouts are the script's job.
+The explore worker runs read-only: a mid-effort orchestrator that fans the reading out to sub-agents (default width in config; `--subagents N` sets it). Width follows breadth: `1` for a single pointed question, `3`+ for "map this subsystem" or several independent questions. Several explorers may run at once in the same checkout. A quiet worker is normal — heartbeats and timeouts are the script's job.
 
 3. **Read the findings.** The JSON `summary` is the `## SUMMARY` tail; `summary_file` holds the full findings and is the deliverable — cite it in the next handoff instead of re-transcribing. `report_file` is the raw runner transcript, for diagnosis when a run fails or the findings look wrong. On `ok: false`, surface the exact error and stop.
 

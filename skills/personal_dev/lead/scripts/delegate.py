@@ -51,18 +51,18 @@ SUMMARY_INSTRUCTIONS = {
 ---
 Progress file (required): {path}
 Create it as soon as you have a plan and overwrite it whenever your status
-changes; the caller reads this file, not your chat output, and it is what
-survives if you are stopped early. Final version, max 15 lines, under a
-`## SUMMARY` heading: what changed, what was not done, verification results
-(commands and outcomes), open questions.
+changes; the caller reads this file, and it is what survives if you are
+stopped early. Final version, max 15 lines, under a `## SUMMARY` heading:
+what changed, what remains open, verification results (commands and
+outcomes), open questions.
 """,
     "explore": """
 ---
 Read-only task; your final message is the deliverable and the caller persists
-it to {path}. Make it the complete findings, with no length cap: the answer,
-evidence as file:line references, relevant call paths and data flow,
-confidence, and gaps or open questions. End with a `## SUMMARY` section (max
-15 lines): the answer, key file pointers, confidence, gaps.
+it to {path}. Make it the complete findings, as long as they need to be: the
+answer, evidence as file:line references, relevant call paths and data flow,
+confidence, and open questions. End with a `## SUMMARY` section (max 15
+lines): the answer, key file pointers, confidence, open questions.
 """,
 }
 DEFAULT_KIND = "implement"
@@ -73,8 +73,8 @@ ROLE_INSTRUCTION = """
 ---
 You are the delegated worker: this run is the delegation. Do the work directly
 with your own tools, and fan out through your runtime's native sub-agents when
-asked to; the delegate script and the implementer/explorer skills are the
-caller's interface to you.
+asked to; the delegate script and the implementer/explorer skills belong to
+the caller.
 """
 
 FANOUT_INSTRUCTION = """
@@ -364,7 +364,7 @@ def main() -> int:
         return 1
 
     if os.environ.get(WORKER_ENV):
-        return fail("this process is already a delegated worker: do the work directly and fan out through your runtime's native sub-agents")
+        return fail("this process is the delegated worker: do the work directly and fan out through your runtime's native sub-agents")
     sweep_stale_files(args.cwd)
 
     lead_dir = Path(__file__).resolve().parents[1]

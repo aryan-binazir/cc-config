@@ -11,7 +11,7 @@
 #                     sub-agents) and returns findings as its final message,
 #                     which the script persists under _scratch/explorer/.
 #   subagent          {model, reasoning_effort} for the sub-agents the worker
-#                     spawns. Cheap-and-fast here (e.g. gpt-5.6-luna) is what
+#                     spawns. A fast, low-cost model here is what
 #                     makes fan-out affordable; the parent only decomposes and
 #                     synthesizes. codex pins model + effort; claude pins model;
 #                     cursor rejects this block (count only). Without it the
@@ -21,7 +21,7 @@
 
 workers:
   xhigh:
-    description: Escalation only — use after high fails, or when Ar explicitly requests maximum reasoning.
+    description: Escalation only — use after high fails, or when the user explicitly requests maximum reasoning.
     runner: codex
     model: gpt-5.6-sol
     reasoning_effort: xhigh
@@ -51,7 +51,7 @@ workers:
     reasoning_effort: high
     timeout_ms: 1500000
   explore:
-    description: Read-only exploration, codebase mapping, and question-answering; writes a findings file the next handoff can cite. Cheap — luna sub-agents do the reading, sol only orchestrates.
+    description: Read-only exploration, codebase mapping, and question-answering; returns a findings file the next handoff can cite. Sub-agents do the reading, the orchestrator synthesizes.
     runner: codex
     model: gpt-5.6-sol
     reasoning_effort: medium
