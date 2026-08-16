@@ -2,10 +2,26 @@
 # by git and wins over this file (deep merge). Workers are defined HERE and
 # only here — name them anything (a role, a specialty), give each a
 # description of what it is good at, and the agent picks by description.
+#
+# Per-worker keys:
+#   runner            codex | claude | cursor
+#   model, reasoning_effort, timeout_ms
+#   kind              implement (default) | explore. explore runs read-only
+#                     (codex sandbox / claude+cursor plan mode, inherited by
+#                     sub-agents) and returns findings as its final message,
+#                     which the script persists under _scratch/explorer/.
+#   subagent          {model, reasoning_effort} for the sub-agents the worker
+#                     spawns. A fast, low-cost model here is what
+#                     makes fan-out affordable; the parent only decomposes and
+#                     synthesizes. codex and claude pin model + effort;
+#                     cursor rejects this block (count only). Without it the
+#                     runner picks the sub-agent model itself.
+#   subagents         default sub-agent count (0 = no fan-out). `--subagents N`
+#                     on the command line overrides. Any runner.
 
 workers:
   xhigh:
-    description: Escalation only — use after high fails, or when Ar explicitly requests maximum reasoning.
+    description: Escalation only — use after high fails, or when the user explicitly requests maximum reasoning.
     runner: codex
     model: gpt-5.6-sol
     reasoning_effort: xhigh
@@ -17,7 +33,7 @@ workers:
     reasoning_effort: high
     timeout_ms: 1500000
   medium:
-    description: Bulk implementation with a clear spec.
+    description: Bulk implementation with a clear spec. Pass --subagents N to parallelize independent slices (disjoint files).
     runner: codex
     model: gpt-5.6-sol
     reasoning_effort: medium
@@ -34,3 +50,14 @@ workers:
     model: claude-opus-5
     reasoning_effort: high
     timeout_ms: 1500000
+  explore:
+    description: Read-only exploration, codebase mapping, and question-answering; returns a findings file the next handoff can cite. Sub-agents do the reading, the orchestrator synthesizes.
+    runner: codex
+    model: gpt-5.6-sol
+    reasoning_effort: medium
+    kind: explore
+    subagent:
+      model: gpt-5.6-luna
+      reasoning_effort: xhigh
+    subagents: 3
+    timeout_ms: 900000
