@@ -191,6 +191,8 @@ def build_command(worker: dict[str, Any], prompt: str, subagents: int, read_only
                     "model": str(sub["model"]),
                 }
             }
+            if sub.get("reasoning_effort"):
+                agent_def[SUBAGENT_NAME]["effort"] = str(sub["reasoning_effort"])
             cmd += ["--agents", json.dumps(agent_def)]
         cmd += ["-p", prompt]
         return cmd
@@ -214,10 +216,10 @@ def fanout_instruction(worker: dict[str, Any], subagents: int, read_only: bool) 
     sub = worker.get("subagent") or {}
     model_note = ""
     if sub.get("model"):
-        if worker.get("runner") == "claude":  # claude pins the model via --agents; effort is the runtime's choice
-            model_note = f" using the `{SUBAGENT_NAME}` subagent ({sub['model']}, preconfigured; it is the agent type for every spawn)"
+        effort = f" at {sub['reasoning_effort']} effort" if sub.get("reasoning_effort") else ""
+        if worker.get("runner") == "claude":
+            model_note = f" using the `{SUBAGENT_NAME}` subagent ({sub['model']}{effort}, preconfigured; it is the agent type for every spawn)"
         else:
-            effort = f" at {sub['reasoning_effort']} effort" if sub.get("reasoning_effort") else ""
             model_note = f" ({sub['model']}{effort}, preconfigured; spawn with that model)"
     return FANOUT_INSTRUCTION.format(
         n=subagents, plural="" if subagents == 1 else "s", model_note=model_note,
@@ -388,10 +390,10 @@ def main() -> int:
     if worker is None:
         return fail(f"unknown worker: {name} (known: {', '.join(workers) or 'none'})")
 
-    kind = worker.get("kind") or DEFAULT_KIND
+    kind = worker.get("kind", DEFAULT_KIND)
     if kind not in SUMMARY_INSTRUCTIONS:
         return fail(f"unknown kind: {kind!r} for worker {name} (known: {', '.join(SUMMARY_INSTRUCTIONS)})")
-    subagents = args.subagents if args.subagents is not None else worker.get("subagents") or 0
+    subagents = args.subagents if args.subagents is not None else worker.get("subagents", 0)
     if isinstance(subagents, bool) or not isinstance(subagents, int) or subagents < 0:
         return fail(f"subagents must be a non-negative integer, got {subagents!r}")
     if worker.get("subagent") is not None and not isinstance(worker.get("subagent"), dict):
@@ -472,6 +474,7 @@ def main() -> int:
     if not summary_text and read_only and stdout.strip():
         summary_file.write_text(stdout.strip() + "\n", encoding="utf-8")  # claude/cursor: final message arrives on stdout
         summary_text = stdout.strip()
+    summary_marker = "## SUMMARY" in summary_text
     if summary_text:
         summary, summary_source = extract_summary(summary_text) or summary_text[-SUMMARY_CAP_CHARS:], "file"
     elif extract_summary(stdout):
@@ -516,6 +519,7 @@ def main() -> int:
     result["exit_code"] = exit_code
     result["summary"] = summary
     result["summary_source"] = summary_source
+    result["summary_marker"] = summary_marker  # False: no `## SUMMARY` section; read summary_file in full
     result["summary_file"] = str(summary_file)
     if read_only:
         result["summary_file_note"] = "full findings; the JSON summary is only its ## SUMMARY tail"

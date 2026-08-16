@@ -13,7 +13,7 @@
 #   subagent          {model, reasoning_effort} for the sub-agents the worker
 #                     spawns. A fast, low-cost model here is what
 #                     makes fan-out affordable; the parent only decomposes and
-#                     synthesizes. codex pins model + effort; claude pins model;
+#                     synthesizes. codex and claude pin model + effort;
 #                     cursor rejects this block (count only). Without it the
 #                     runner picks the sub-agent model itself.
 #   subagents         default sub-agent count (0 = no fan-out). `--subagents N`
