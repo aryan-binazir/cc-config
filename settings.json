@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash",
       "WebFetch",
       "WebSearch",
       "Read",
@@ -15,8 +14,6 @@
       "MultiEdit",
       "Create",
       "Bash(go:*)",
-      "Bash(python:*)",
-      "Bash(node:*)",
       "Bash(npm:*)",
       "Bash(pip:*)",
       "Bash(docker:*)",
@@ -66,21 +63,7 @@
     ],
     "defaultMode": "auto"
   },
-  "remoteControlAtStartup": true,
-  "model": "opus",
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/load-context.sh"
-          }
-        ]
-      }
-    ]
-  },
+  "model": "claude-fable-5[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline-command.sh"
@@ -114,13 +97,43 @@
     "mode": "hold"
   },
   "skipDangerousModePermissionPrompt": true,
+  "remoteControlAtStartup": true,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
-  "voiceEnabled": true,
   "autoMode": {
     "allow": [
       "$defaults",
       "Rocket External Critique and Review: When the user invokes Rocket, allow its configured external critic and reviewer runners to receive the tracked task and relevant repository, branch, diff, and test context required for read-only plan critique and PR review, provided credentials, secrets, personal data, and unrelated sensitive data are excluded."
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Ember Railway Production DB Writes: any `psql`, `make restore`, `make railway-*` or `railway run` invocation that writes to, restores over, or drops data in the Ember production Postgres on Railway (`*-production-*.up.railway.app`) — reads/backups are fine, mutations require confirmation"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured — personal GitHub account `aryan-binazir` (solo project, no org)",
+      "**Cloud provider(s)**: Railway (hosting for the Ember Go service; hosts `ember-production-b5b7.up.railway.app`, `inspiring-amazement-production-3920.up.railway.app`; `railway` CLI and `railway-*` make targets in use)",
+      "**Repository visibility**: private (`github.com/aryan-binazir/ember`, confirmed via gh)",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured",
+      "**Default / protected branches**: default `main` on `aryan-binazir/ember`; classic branch protection none listed; rulesets not queryable here — treat pushes to `main` as landing on the deployed branch",
+      "**CI/CD deploy targets**: Railway production service for Ember (`ember-production-b5b7.up.railway.app`, `inspiring-amazement-production-3920.up.railway.app`) serving `emberpower.us` / `www.emberpower.us`",
+      "**Network posture**: None configured",
+      "**Source control**: `github.com/aryan-binazir/ember` (private) and its `origin` remote only — as scoped by the Trusted repo and Repository visibility entries",
+      "**Trusted internal domains**: `emberpower.us`, `www.emberpower.us` (this project's own production domain, contacted routinely in transcripts); `*.up.railway.app` hosts belonging to this project's Railway service; `app.basecamp.com` / `3.basecampapi.com` (project management, read via `basecamp` CLI)",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: Railway (deploy host and Postgres for Ember, via `railway` CLI and `make railway-*`), Basecamp (project management via `basecamp` CLI), local `podman` containers and Postgres for development",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: Ember production Postgres on Railway (homeowner addresses, quote/financing lead requests — personal data; `make railway-leads`, `railway-backup`, `restore`, `psql`); `docs/adrs/0006-explicit-pii-safe-analytics.md` describes the PII posture; share only with audiences cleared at the [named+specifics] bar",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: Railway production services `ember-production-b5b7.up.railway.app`, `inspiring-amazement-production-3920.up.railway.app`, the production database behind them, and `emberpower.us` / `www.emberpower.us`; plus any host or namespace carrying `prod`/`production` as a whole word or name segment",
+      "**Protected deployment namespaces / environments**: Railway `production` environment for the Ember project; fall back to the Sensitive remote targets heuristic elsewhere",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment; Railway service/environment configuration for Ember production",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development on Ember (Go backend, docs/specs/ADRs), personal/hobby posture",
+      "**Trusted repo**: `github.com/aryan-binazir/ember` (private) at `/Users/ar/repos/ember` and its `origin` remote; confidential material is fine here, secrets and personal data are never cleared into it by visibility",
+      "**Org-specific CLIs**: `basecamp`, `jj`, `podman`, `railway`, `uv` (routine under this project; `railway` and `psql` are read-routine only — production writes/restores still require confirmation)"
     ]
-  }
+  },
+  "voiceEnabled": true
 }
