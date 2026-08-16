@@ -6,12 +6,13 @@ description: >-
 
 # PR Address Comments
 
-Turn the user's `agent:` PR comments into a local patch, commit it, and reply with the commit hash. State lives in the same `_scratch/_pr_reviews/pr-<number>.json` the `pr-comments` skill maintains; its script does the fetching and replying.
+Turn the user's `agent:` PR comments into a local patch, commit it, and reply with the commit hash. State lives in the same `<state_dir>/pr-<number>.json` (default `_scratch/pr_reviews`) the `pr-comments` skill maintains; its script does the fetching and replying, and its config sets host, state dir, and the default `agent` label.
 
 ```bash
 PRC="<pr-comments-skill-dir>/scripts/pr_comments.py"   # sibling skill
 uv run --script "$PRC" --json                          # fetch + full state
-uv run --script "$PRC" reply <n> --commit <hash> [--agent Codex] [--testing "<cmd>"] [--body "<text>"]
+uv run --script "$PRC" show <n>                              # full text of one item
+uv run --script "$PRC" reply <n> --commit <hash> [--agent <label>] [--testing "<cmd>"] [--body "<text>"]
 ```
 
 ## Workflow
@@ -19,7 +20,7 @@ uv run --script "$PRC" reply <n> --commit <hash> [--agent Codex] [--testing "<cm
 1. `--json` (add `--pr <number>` when the branch has no PR). Actionable items: `author` is the user (`gh api user --jq .login`, `aryan-binazir`, `aryanbinazir`), `status` is `open`, and the first non-empty, non-quoted body line starts with `agent:` (case-insensitive). The instruction is that line's remainder plus the rest of the body. Everything else — other authors, the user's unprefixed comments, parent threads, paths, hunks — is context.
 2. Implement all open actionable comments that are safe to handle together. Run focused checks for the patch.
 3. Commit only the files changed for these instructions, following repository commit rules (fallback: `fix: address PR agent comments`).
-4. `reply <n> --commit <hash>` per handled comment, after the commit exists. The script targets the top-level thread comment for review comments (linking the instruction when it was a reply) and posts a PR comment linking back for issue comments and review summaries; it records commit, reply URL, and handled status.
+4. `reply <n> --commit <hash>` per handled comment, after the commit exists. The script targets the top-level thread comment for review comments (linking the instruction when it was a reply) and posts a PR comment linking back for issue comments and review summaries; it records commit, reply URL, and handled status. Failures exit 1 with `{"ok": false, "error", "hint"}` — relay both to the user.
 
 ## Rules
 
