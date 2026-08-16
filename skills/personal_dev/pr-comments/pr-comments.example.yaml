@@ -4,4 +4,4 @@ provider: github            # provider adapter; github covers github.com and Git
 host: github.com            # forwarded to gh as GH_HOST; set your GHES hostname here
 state_dir: _scratch/pr_reviews
 sweep_days: 7               # state files older than this are removed on fetch
-agent: Codex                # default label in `reply` bodies
+agent: Codex                # fallback label in `reply` bodies; runtimes pass --agent <their name>

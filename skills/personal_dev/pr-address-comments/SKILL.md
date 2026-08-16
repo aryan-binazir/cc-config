@@ -20,7 +20,7 @@ uv run --script "$PRC" reply <n> --commit <hash> [--agent <label>] [--testing "<
 1. `--json` (add `--pr <number>` when the branch has no PR). Actionable items: `author` exactly matches `gh api user --jq .login`, `status` is `open`, and the first non-empty, non-quoted body line starts with `agent:` (case-insensitive). The instruction is that line's remainder plus the rest of the body. Everything else — other authors, the user's unprefixed comments, parent threads, paths, hunks — is context.
 2. Implement all open actionable comments that are safe to handle together. Run focused checks for the patch.
 3. Commit only the files changed for these instructions, following repository commit rules (fallback: `fix: address PR agent comments`).
-4. `reply <n> --commit <hash>` per handled comment, after the commit exists. The script targets the top-level thread comment for review comments (linking the instruction when it was a reply) and posts a PR comment linking back for issue comments and review summaries; it records commit, reply URL, and handled status. Failures exit 1 with `{"ok": false, "error", "hint"}` — relay both to the user.
+4. `reply <n> --commit <hash> --agent <your name>` (Claude, Codex, Cursor…; config `agent` is the fallback) per handled comment, after the commit exists. The script targets the top-level thread comment for review comments (linking the instruction when it was a reply) and posts a PR comment linking back for issue comments and review summaries; it records commit, reply URL, and handled status. Failures exit 1 with `{"ok": false, "error", "hint"}` — relay both to the user.
 
 ## Rules
 
