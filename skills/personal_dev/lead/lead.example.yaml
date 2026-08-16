@@ -2,6 +2,22 @@
 # by git and wins over this file (deep merge). Workers are defined HERE and
 # only here — name them anything (a role, a specialty), give each a
 # description of what it is good at, and the agent picks by description.
+#
+# Per-worker keys:
+#   runner            codex | claude | cursor
+#   model, reasoning_effort, timeout_ms
+#   kind              implement (default) | explore | review — shapes the
+#                     summary/findings file the worker must write.
+#   sandbox           workspace-write (default) | read-only. codex: sandbox
+#                     flag; claude/cursor: plan mode. Sub-agents inherit it.
+#   subagent          {model, reasoning_effort} for the sub-agents the worker
+#                     spawns. Cheap-and-fast here (e.g. gpt-5.6-luna) is what
+#                     makes fan-out affordable; the parent only decomposes and
+#                     synthesizes. codex pins model + effort; claude pins model;
+#                     cursor takes the fan-out instruction only. Without this
+#                     block the runner picks the sub-agent model itself.
+#   subagents         default sub-agent count (0 = no fan-out). `--subagents N`
+#                     on the command line overrides. Any runner.
 
 workers:
   xhigh:
@@ -17,7 +33,7 @@ workers:
     reasoning_effort: high
     timeout_ms: 1500000
   medium:
-    description: Bulk implementation with a clear spec.
+    description: Bulk implementation with a clear spec. Pass --subagents N to parallelize independent slices (disjoint files).
     runner: codex
     model: gpt-5.6-sol
     reasoning_effort: medium
@@ -34,3 +50,27 @@ workers:
     model: claude-opus-5
     reasoning_effort: high
     timeout_ms: 1500000
+  explore:
+    description: Read-only exploration, codebase mapping, and question-answering; writes a findings file the next handoff can cite. Cheap — luna sub-agents do the reading, sol only orchestrates.
+    runner: codex
+    model: gpt-5.6-sol
+    reasoning_effort: medium
+    kind: explore
+    sandbox: read-only
+    subagent:
+      model: gpt-5.6-luna
+      reasoning_effort: xhigh
+    subagents: 3
+    timeout_ms: 900000
+  review:
+    description: Read-only independent review of a diff or branch; findings only. Cheap second pair of eyes from a different model family than the implementer — luna sub-agents review by lens, sol synthesizes.
+    runner: codex
+    model: gpt-5.6-sol
+    reasoning_effort: medium
+    kind: review
+    sandbox: read-only
+    subagent:
+      model: gpt-5.6-luna
+      reasoning_effort: xhigh
+    subagents: 3
+    timeout_ms: 900000

@@ -9,11 +9,11 @@ You are the **Lead** for the rest of the session: plan, judge, and own everythin
 
 ## Delegation mode
 
-Default: the `implementer` skill — read it before first use. The script's named workers are the model interface. Under `/lead subagent <model>`, use that exact subagent instead of the script; prompts must still be self-contained. If subagents or the model are unavailable, stop and report.
+Default: the `implementer` skill for file changes and reviews, the `explorer` skill for read-only recon — read both before first use. The script's named workers are the model interface. Under `/lead subagent <model>`, use that exact subagent instead of the script; prompts must still be self-contained. If subagents or the model are unavailable, stop and report.
 
 ## Division of labor
 
-Every file change, one-line fixes included, goes through delegation. Your own hands: read-only work (code, commands, diffs) and git scrap-work on rejected attempts (restore, revert, worktree remove). You do the planning and scoping with Ar, and the taste-critical decisions — for UI, copy, API design, and naming, specify the exact wording or shape in the worker prompt and judge the result. Delegate the rest: implementation, refactors, migrations, analysis, long verification, second-opinion reviews.
+Every file change, one-line fixes included, goes through delegation. Your own hands: targeted reads (code, commands, diffs) and git scrap-work on rejected attempts (restore, revert, worktree remove); broad recon goes to the explorer, which returns a findings file the next handoff can cite. You do the planning and scoping with Ar, and the taste-critical decisions — for UI, copy, API design, and naming, specify the exact wording or shape in the worker prompt and judge the result. Delegate the rest: implementation, refactors, migrations, analysis, long verification, second-opinion reviews.
 
 ## Escalation
 

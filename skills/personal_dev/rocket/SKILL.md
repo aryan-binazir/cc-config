@@ -223,9 +223,10 @@ failing behavior test, run it to observe the expected failure, add only enough
 production code to pass, then repeat.
 
 The main agent implements directly. With the `implementer` modifier, read the
-`implementer` skill and delegate through its workers from the authoritative
-checkout — prompts carry the plan, test seam, and repo instructions, and
-workers stay in that checkout. Commits, pushes, PRs, and validation stay with
+`implementer` and `explorer` skills: delegate file changes through the
+implementer workers from the authoritative checkout — prompts carry the plan,
+test seam, and repo instructions, and workers stay in that checkout — and send
+broad recon to the explore worker, citing its findings file in later prompts. Commits, pushes, PRs, and validation stay with
 the main agent; inspect status and diff after each handoff. Below the bar,
 rerun with a tighter prompt or a stronger worker. If the skill or its workers
 are unavailable, stop and report.

@@ -9,7 +9,11 @@ Resolves the worker from lead.example.yaml + lead.local.yaml (local wins),
 builds the runner command with the local flag conventions, executes it, and
 writes the worker's output to a report file under _scratch/implementer/.
 The worker is told to keep a summary file there too, so a summary survives even
-when the run is killed mid-turn. Prints a JSON result to stdout containing that
+when the run is killed mid-turn. A worker's `kind` (implement | explore |
+review) picks the shape of that file: implementers report what changed,
+explorers and reviewers write a full findings file. Workers may fan out to
+codex sub-agents (`subagent:` model/effort in config, `--subagents N` for the
+count); the parent then only decomposes and synthesizes. Prints a JSON result to stdout containing that
 summary and a git diff --stat, so the caller usually never needs to open the
 report file. Runner-agnostic: nothing here depends on how a runner formats its
 final message. Emits a heartbeat line to
@@ -40,7 +44,8 @@ SCRATCH_DIR = Path("_scratch") / "implementer"
 SWEEP_DIRS = [SCRATCH_DIR]
 FILE_TTL_DAYS = 7
 
-SUMMARY_INSTRUCTION = """
+SUMMARY_INSTRUCTIONS = {
+    "implement": """
 ---
 Progress file (required): {path}
 Create it as soon as you have a plan and overwrite it whenever your status
@@ -48,6 +53,53 @@ changes; the caller reads this file, not your chat output, and it is what
 survives if you are stopped early. Final version, max 15 lines, under a
 `## SUMMARY` heading: what changed, what was not done, verification results
 (commands and outcomes), open questions.
+""",
+    "explore": """
+---
+Findings file (required): {path}
+Read-only task: the findings file is your only output. Create it as soon as
+you have a plan and overwrite it as you learn; the caller reads this file, not
+your chat output, and it is what survives if you are stopped early.
+No length cap: the answer, evidence as file:line references, relevant call
+paths and data flow, confidence, and gaps or open questions. Finish the file
+with a `## SUMMARY` section (max 15 lines): the answer, key file pointers,
+confidence, gaps.
+""",
+    "review": """
+---
+Findings file (required): {path}
+Read-only task: the findings file is your only output; the caller applies
+fixes. Create it as soon as you have a plan and overwrite it as you learn; the
+caller reads this file, not your chat output, and it is what survives if you
+are stopped early. Findings only, most severe first, each with: severity, file:line,
+concrete failure mode, suggested fix direction. If there are no substantive
+findings, say so and name what you inspected and any residual test gaps.
+Finish the file with a `## SUMMARY` section (max 15 lines): finding count by
+severity, the top findings, what was inspected.
+""",
+}
+DEFAULT_KIND = "implement"
+SANDBOXES = ("workspace-write", "read-only")
+WORKER_ENV = "DELEGATE_WORKER"  # set in the worker's environment; a nested delegate.py call exits with guidance
+
+ROLE_INSTRUCTION = """
+---
+You are the delegated worker: this run is the delegation. Do the work directly
+with your own tools, and fan out through your runtime's native sub-agents when
+asked to; the delegate script and the implementer/explorer skills are the
+caller's interface to you. If your runtime keeps you from writing files, put
+the complete findings or progress report in your final message instead — the
+caller persists it.
+"""
+
+FANOUT_INSTRUCTION = """
+---
+Sub-agents (required): spawn {n} sub-agent{plural}{model_note}. Split the
+work into disjoint slices, one per sub-agent; wait for all, then synthesize.
+The sub-agents do the heavy reading and execution — with a single sub-agent,
+it still takes the bulk of the work. Your own thread does decomposition,
+judgment, and the final write-up. When sub-agents edit files, give each its
+own disjoint set of files.
 """
 
 
@@ -108,13 +160,21 @@ def git_snapshot(cwd: Path) -> GitSnapshot:
     )
 
 
-def build_command(worker: dict[str, Any], prompt: str) -> list[str]:
+SUBAGENT_NAME = "delegate-sub"  # claude: name of the custom sub-agent carrying the configured model
+
+
+def build_command(worker: dict[str, Any], prompt: str, subagents: int) -> list[str]:
     runner = worker.get("runner")
     model = worker.get("model")
+    sandbox = worker.get("sandbox") or "workspace-write"
+    if sandbox not in SANDBOXES:
+        raise ValueError(f"unknown sandbox: {sandbox!r} (known: {', '.join(SANDBOXES)})")
+    read_only = sandbox == "read-only"
+    sub = (worker.get("subagent") or {}) if subagents else {}
     if runner == "codex":
         cmd = [
             "codex",
-            "--sandbox", "workspace-write",
+            "--sandbox", "read-only" if read_only else "workspace-write",
             "--ask-for-approval", "on-request",
             "-c", "approvals_reviewer=auto_review",
         ]
@@ -123,27 +183,58 @@ def build_command(worker: dict[str, Any], prompt: str) -> list[str]:
         effort = worker.get("reasoning_effort")
         if effort:
             cmd += ["-c", f'model_reasoning_effort="{effort}"']
+        if subagents:
+            cmd += ["-c", f"agents.max_concurrent_threads_per_session={subagents}"]
+            if sub.get("model"):
+                cmd += ["-c", f'agents.default_subagent_model="{sub["model"]}"']
+            if sub.get("reasoning_effort"):
+                cmd += ["-c", f'agents.default_subagent_reasoning_effort="{sub["reasoning_effort"]}"']
         cmd += ["exec", prompt]
         return cmd
     if runner == "claude":
-        cmd = ["claude", "--permission-mode", "auto"]
+        cmd = ["claude", "--permission-mode", "plan" if read_only else "auto"]
         if model:
             cmd += ["--model", str(model)]
         effort = worker.get("reasoning_effort")
         if effort:
             cmd += ["--effort", str(effort)]
+        if sub.get("model"):
+            agent_def = {
+                SUBAGENT_NAME: {
+                    "description": "Sub-agent for delegated slices of the current task; use it for all fan-out.",
+                    "prompt": "You handle one slice of a larger task for the parent agent. Do exactly the slice you are given and report back concisely with file:line evidence.",
+                    "model": str(sub["model"]),
+                }
+            }
+            cmd += ["--agents", json.dumps(agent_def)]
         cmd += ["-p", prompt]
         return cmd
     if runner == "cursor":
+        if sub.get("model") or sub.get("reasoning_effort"):
+            raise ValueError("cursor runner cannot pin a sub-agent model; drop the worker's `subagent` block or use --subagents 0")
         cmd = [
             "cursor-agent", "--print", "--trust", "--auto-review",
             "--sandbox", "enabled",
         ]
+        if read_only:
+            cmd += ["--mode", "plan"]
         if model:
             cmd += ["--model", str(model)]
         cmd.append(prompt)
         return cmd
     raise ValueError(f"unknown runner: {runner!r} (known: codex, claude, cursor)")
+
+
+def fanout_instruction(worker: dict[str, Any], subagents: int) -> str:
+    sub = worker.get("subagent") or {}
+    model_note = ""
+    if sub.get("model"):
+        if worker.get("runner") == "claude":  # claude pins the model via --agents; effort is the runtime's choice
+            model_note = f" using the `{SUBAGENT_NAME}` subagent ({sub['model']}, preconfigured; it is the agent type for every spawn)"
+        else:
+            effort = f" at {sub['reasoning_effort']} effort" if sub.get("reasoning_effort") else ""
+            model_note = f" ({sub['model']}{effort}, preconfigured; spawn with that model)"
+    return FANOUT_INSTRUCTION.format(n=subagents, plural="" if subagents == 1 else "s", model_note=model_note)
 
 
 def make_worktree(base_cwd: Path) -> Path | None:
@@ -227,7 +318,10 @@ def run_with_heartbeat(cmd: list[str], cwd: Path, timeout_s: float, report: Path
     err_path = report.with_name(report.name + ".stderr.tmp")
     timed_out = False
     with out_path.open("w", encoding="utf-8") as out_f, err_path.open("w", encoding="utf-8") as err_f:
-        proc = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.DEVNULL, stdout=out_f, stderr=err_f)
+        proc = subprocess.Popen(
+            cmd, cwd=cwd, stdin=subprocess.DEVNULL, stdout=out_f, stderr=err_f,
+            env={**os.environ, WORKER_ENV: "1"},
+        )
         started = time.monotonic()
         next_beat = HEARTBEAT_S
         last_size = 0
@@ -273,13 +367,17 @@ def main() -> int:
     parser.add_argument("--worktree", action="store_true", help="Run in a fresh detached git worktree of --cwd's repo.")
     parser.add_argument("--report-file", type=Path, help="Where to write worker output. Default: <cwd>/_scratch/implementer/<ts>-<worker>.md")
     parser.add_argument("--timeout-ms", type=int, help="Override worker timeout from config.")
+    parser.add_argument("--subagents", type=int, help="Number of codex sub-agents the worker must fan out to (0 = none). Default: worker's `subagents` in config, else 0.")
     parser.add_argument("--dry-run", action="store_true", help="Print the resolved command without executing.")
     args = parser.parse_args()
-    sweep_stale_files(args.cwd)
 
     def fail(msg: str) -> int:
         print(json.dumps({"ok": False, "error": msg}, indent=2))
         return 1
+
+    if os.environ.get(WORKER_ENV):
+        return fail("this process is already a delegated worker: do the work directly and fan out through your runtime's native sub-agents")
+    sweep_stale_files(args.cwd)
 
     lead_dir = Path(__file__).resolve().parents[1]
     config = deep_merge(
@@ -302,10 +400,22 @@ def main() -> int:
     if worker is None:
         return fail(f"unknown worker: {name} (known: {', '.join(workers) or 'none'})")
 
+    kind = worker.get("kind") or DEFAULT_KIND
+    if kind not in SUMMARY_INSTRUCTIONS:
+        return fail(f"unknown kind: {kind!r} for worker {name} (known: {', '.join(SUMMARY_INSTRUCTIONS)})")
+    subagents = args.subagents if args.subagents is not None else worker.get("subagents") or 0
+    if isinstance(subagents, bool) or not isinstance(subagents, int) or subagents < 0:
+        return fail(f"subagents must be a non-negative integer, got {subagents!r}")
+    if worker.get("subagent") is not None and not isinstance(worker.get("subagent"), dict):
+        return fail(f"worker {name}: `subagent` must be a mapping with model/reasoning_effort")
+
     run_id = f"{int(time.time())}-{os.getpid()}-{name}"
     summary_rel = SCRATCH_DIR / f"{run_id}.summary.md"
+    full_prompt = prompt + ROLE_INSTRUCTION + SUMMARY_INSTRUCTIONS[kind].format(path=summary_rel)
+    if subagents:
+        full_prompt += fanout_instruction(worker, subagents)
     try:
-        cmd = build_command(worker, prompt + SUMMARY_INSTRUCTION.format(path=summary_rel))
+        cmd = build_command(worker, full_prompt, subagents)
     except ValueError as exc:
         return fail(str(exc))
 
@@ -313,6 +423,8 @@ def main() -> int:
     result: dict[str, Any] = {
         "worker": {"name": name, **{k: v for k, v in worker.items() if k not in ("timeout_ms", "description")}},
         "command": cmd[:-1] + ["<prompt>"],  # keep stdout readable; inline prompt lands in the report
+        "kind": kind,
+        "subagents": subagents,
         "timeout_s": timeout_s,
     }
 
@@ -364,11 +476,17 @@ def main() -> int:
     except OSError:
         summary_text = ""
     if summary_text:
-        summary, summary_source = summary_text[-SUMMARY_CAP_CHARS:], "file"
+        summary, summary_source = extract_summary(summary_text) or summary_text[-SUMMARY_CAP_CHARS:], "file"
     elif extract_summary(stdout):
         summary, summary_source = extract_summary(stdout), "stdout"
+        summary_file.write_text(stdout.strip() + "\n", encoding="utf-8")  # persist findings a runtime kept the worker from writing
     else:
         summary, summary_source = None, "none"
+    if args.worktree and summary_file.exists():
+        kept = base_cwd / summary_rel  # survives worktree cleanup
+        kept.parent.mkdir(parents=True, exist_ok=True)
+        kept.write_text(summary_file.read_text(encoding="utf-8"), encoding="utf-8")
+        summary_file = kept
 
     prompt_ref = str(args.prompt_file.resolve()) if args.prompt_file else "(inline; see bottom of this report)"
     parts = [
@@ -377,6 +495,8 @@ def main() -> int:
         f"worker: {name}",
         f"runner: {worker.get('runner')}",
         f"model: {worker.get('model')}",
+        f"kind: {kind}",
+        f"subagents: {subagents}",
         f"cwd: {cwd}",
         f"exit_code: {exit_code}",
         f"prompt: {prompt_ref}",
@@ -392,13 +512,16 @@ def main() -> int:
     if stderr.strip():
         parts += ["", "## stderr", "", stderr.strip()]
     if not args.prompt_file:
-        parts += ["", "## prompt (inline)", "", prompt]
+        parts += ["", "## prompt (inline)", "", full_prompt]
     report.write_text("\n".join(parts) + "\n", encoding="utf-8")
 
     result["ok"] = exit_code == 0
     result["exit_code"] = exit_code
     result["summary"] = summary
     result["summary_source"] = summary_source
+    result["summary_file"] = str(summary_file)
+    if kind != "implement":
+        result["summary_file_note"] = "full findings; the JSON summary is only its ## SUMMARY tail"
     result["diff_stat"] = diff_stat(cwd, snapshot)
     result["report_file"] = str(report)
     result["report_note"] = "raw runner transcript, often large; search it for the specific error or tail you need"
