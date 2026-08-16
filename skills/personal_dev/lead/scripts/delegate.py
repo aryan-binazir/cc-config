@@ -7,9 +7,12 @@
 
 Resolves the worker from lead.example.yaml + lead.local.yaml (local wins),
 builds the runner command with the local flag conventions, executes it, and
-writes the worker's output to a report file. Prints a JSON result to stdout
-containing the worker's ## SUMMARY section and a git diff --stat, so the
-caller usually never needs to open the report file. Emits a heartbeat line to
+writes the worker's output to a report file under _scratch/implementer/.
+The worker is told to keep a summary file there too, so a summary survives even
+when the run is killed mid-turn. Prints a JSON result to stdout containing that
+summary and a git diff --stat, so the caller usually never needs to open the
+report file. Runner-agnostic: nothing here depends on how a runner formats its
+final message. Emits a heartbeat line to
 stderr every 60s so long foreground runs never look dead.
 """
 
@@ -32,7 +35,18 @@ DEFAULT_TIMEOUT_MS = 1_500_000  # 25 minutes
 HEARTBEAT_S = 60
 SUMMARY_CAP_CHARS = 1500
 DIFF_STAT_CAP_LINES = 30
-PROMPT_TTL_DAYS = 30
+FILE_TTL_DAYS = 30
+SCRATCH_DIR = Path("_scratch") / "implementer"
+
+SUMMARY_INSTRUCTION = """
+---
+Progress file (required): {path}
+Create it as soon as you have a plan and overwrite it whenever your status
+changes; the caller reads this file, not your chat output, and it is what
+survives if you are stopped early. Final version, max 15 lines, under a
+`## SUMMARY` heading: what changed, what was not done, verification results
+(commands and outcomes), open questions.
+"""
 
 
 @dataclass(frozen=True)
@@ -41,16 +55,16 @@ class GitSnapshot:
     preexisting_changes: tuple[str, ...]
 
 
-def sweep_stale_prompts(cwd: Path) -> None:
-    cutoff = time.time() - PROMPT_TTL_DAYS * 24 * 60 * 60
+def sweep_stale_files(cwd: Path) -> None:
+    cutoff = time.time() - FILE_TTL_DAYS * 24 * 60 * 60
     try:
-        prompt_files = list((cwd / "_scratch" / "prompts").glob("*.md"))
+        files = list((cwd / SCRATCH_DIR).glob("*.md"))
     except OSError:
         return
-    for prompt_file in prompt_files:
+    for file in files:
         try:
-            if prompt_file.stat().st_mtime < cutoff:
-                prompt_file.unlink()
+            if file.stat().st_mtime < cutoff:
+                file.unlink()
         except OSError:
             pass
 
@@ -254,11 +268,11 @@ def main() -> int:
     parser.add_argument("--prompt-file", type=Path, help="File containing the self-contained prompt.")
     parser.add_argument("--cwd", type=Path, default=Path.cwd(), help="Directory to run the worker in.")
     parser.add_argument("--worktree", action="store_true", help="Run in a fresh detached git worktree of --cwd's repo.")
-    parser.add_argument("--report-file", type=Path, help="Where to write worker output. Default: /tmp/delegate-<ts>.md")
+    parser.add_argument("--report-file", type=Path, help="Where to write worker output. Default: <cwd>/_scratch/implementer/<ts>-<worker>.md")
     parser.add_argument("--timeout-ms", type=int, help="Override worker timeout from config.")
     parser.add_argument("--dry-run", action="store_true", help="Print the resolved command without executing.")
     args = parser.parse_args()
-    sweep_stale_prompts(args.cwd)
+    sweep_stale_files(args.cwd)
 
     def fail(msg: str) -> int:
         print(json.dumps({"ok": False, "error": msg}, indent=2))
@@ -285,8 +299,10 @@ def main() -> int:
     if worker is None:
         return fail(f"unknown worker: {name} (known: {', '.join(workers) or 'none'})")
 
+    run_id = f"{int(time.time())}-{os.getpid()}-{name}"
+    summary_rel = SCRATCH_DIR / f"{run_id}.summary.md"
     try:
-        cmd = build_command(worker, prompt)
+        cmd = build_command(worker, prompt + SUMMARY_INSTRUCTION.format(path=summary_rel))
     except ValueError as exc:
         return fail(str(exc))
 
@@ -323,7 +339,10 @@ def main() -> int:
         if removed:
             result.pop("worktree", None)
 
-    report = args.report_file or Path(tempfile.gettempdir()) / f"delegate-{int(time.time())}-{os.getpid()}-{name}.md"
+    report = args.report_file or base_cwd / SCRATCH_DIR / f"{run_id}.md"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    summary_file = cwd / summary_rel
+    summary_file.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
     try:
         exit_code, stdout, stderr = run_with_heartbeat(cmd, cwd, timeout_s, report)
@@ -335,6 +354,16 @@ def main() -> int:
         return 1
     if exit_code is None:
         result["timed_out"] = True
+    try:
+        summary_text = summary_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        summary_text = ""
+    if summary_text:
+        summary, summary_source = summary_text[-SUMMARY_CAP_CHARS:], "file"
+    elif extract_summary(stdout):
+        summary, summary_source = extract_summary(stdout), "stdout"
+    else:
+        summary, summary_source = None, "none"
 
     prompt_ref = str(args.prompt_file.resolve()) if args.prompt_file else "(inline; see bottom of this report)"
     parts = [
@@ -346,6 +375,10 @@ def main() -> int:
         f"cwd: {cwd}",
         f"exit_code: {exit_code}",
         f"prompt: {prompt_ref}",
+        "",
+        "## summary",
+        "",
+        summary or "(none)",
         "",
         "## output",
         "",
@@ -359,7 +392,8 @@ def main() -> int:
 
     result["ok"] = exit_code == 0
     result["exit_code"] = exit_code
-    result["summary"] = extract_summary(stdout)
+    result["summary"] = summary
+    result["summary_source"] = summary_source
     result["diff_stat"] = diff_stat(cwd, snapshot)
     result["report_file"] = str(report)
     result["duration_s"] = round(time.monotonic() - started, 1)

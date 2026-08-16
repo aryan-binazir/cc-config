@@ -7,7 +7,7 @@ description: Delegate an implementation, analysis, or review task to the configu
 
 The script is the whole interface.
 
-1. **Write a self-contained prompt** to `_scratch/prompts/<task>.md` (gitignored). The worker has zero conversation context. Include: goal and constraints; relevant files and repo context; scope boundaries — what stays untouched; verification commands whose results must be reported; the acceptance criteria you will judge by; and verbatim: end your output with a `## SUMMARY` section, max 15 lines, covering what changed, what was not done, verification results, and open questions.
+1. **Write a self-contained prompt** to `_scratch/implementer/<task>.md` (gitignored; the script keeps its reports and the worker's summary file in the same directory). The worker has zero conversation context. Include: goal and constraints; relevant files and repo context; scope boundaries — what stays untouched; verification commands whose results must be reported; and the acceptance criteria you will judge by. Do not add summary instructions — the script appends them and tells the worker where to write its progress file.
 
 2. **Run in the background** for anything expected to exceed a couple of minutes. A quiet worker is normal — heartbeats and timeouts are the script's job.
 
@@ -28,7 +28,7 @@ One handoff = one behavioral slice with one set of acceptance criteria and targe
 
 Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anything workers must see (the JSON includes the path).
 
-3. **Accept from the JSON.** Check the summary and diff stat; open changed files selectively, and the full report when the summary is missing or suspicious. Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — ending with the same `## SUMMARY` instruction.
+3. **Accept from the JSON.** Check `summary` (`summary_source` says whether it came from the worker's progress file, its stdout, or nowhere) and `diff_stat`; open changed files selectively, and the full report when the summary is missing or suspicious. A timed-out run still reports the last progress-file state, so judge what got done before deciding to revise or re-run. Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — the script appends the summary instruction again.
 
 On `ok: false`, surface the exact error and stop; Ar decides how to proceed.
 
