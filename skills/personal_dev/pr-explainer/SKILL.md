@@ -32,6 +32,8 @@ Explain the current pull request to a reader who is starting cold. Orient them i
 
 ## Rules
 
+- Less detail than feels natural. Whole explanation: 5 to 8 short paragraphs, or 5 to 8 tour stops. Each stop: 2 to 4 sentences plus at most one `<pre>`.
+- Explain the mechanism once at the level of modules and seams; skip line-by-line commentary, helper functions, and anything the reader can see in the diff.
 - Keep the explanation concise, with only enough system context to orient the reader.
 - Trace what the code actually does rather than trusting names.
 - Group changes by purpose instead of listing every changed file.
