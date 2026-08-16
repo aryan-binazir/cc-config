@@ -35,8 +35,10 @@ DEFAULT_TIMEOUT_MS = 1_500_000  # 25 minutes
 HEARTBEAT_S = 60
 SUMMARY_CAP_CHARS = 1500
 DIFF_STAT_CAP_LINES = 30
-FILE_TTL_DAYS = 7
 SCRATCH_DIR = Path("_scratch") / "implementer"
+# Directories (relative to --cwd) swept of *.md older than FILE_TTL_DAYS on every run.
+SWEEP_DIRS = [SCRATCH_DIR]
+FILE_TTL_DAYS = 7
 
 SUMMARY_INSTRUCTION = """
 ---
@@ -57,16 +59,17 @@ class GitSnapshot:
 
 def sweep_stale_files(cwd: Path) -> None:
     cutoff = time.time() - FILE_TTL_DAYS * 24 * 60 * 60
-    try:
-        files = list((cwd / SCRATCH_DIR).glob("*.md"))
-    except OSError:
-        return
-    for file in files:
+    for rel in SWEEP_DIRS:
         try:
-            if file.stat().st_mtime < cutoff:
-                file.unlink()
+            files = list((cwd / rel).glob("*.md"))
         except OSError:
-            pass
+            continue
+        for file in files:
+            try:
+                if file.stat().st_mtime < cutoff:
+                    file.unlink()
+            except OSError:
+                pass
 
 
 def git_output(cwd: Path, *argv: str, input_text: str | None = None) -> str | None:
