@@ -65,8 +65,8 @@ if [ -n "$attached_session" ]; then
   exit 0
 fi
 
-if tmux has-session -t codex-nvim 2>/dev/null; then
-  tmux new-window -t codex-nvim: -c "$repo_root" "$command"
+if tmux has-session -t nvim-skill 2>/dev/null; then
+  tmux new-window -t nvim-skill: -c "$repo_root" "$command"
 else
-  tmux new-session -d -s codex-nvim -c "$repo_root" "$command"
+  tmux new-session -d -s nvim-skill -c "$repo_root" "$command"
 fi
