@@ -9,7 +9,7 @@ extractors that stop at any `^## ` line can break on fenced markdown examples in
 
 Use one sub-agent, without forking full conversation context. This is mandatory
 for rocket-plan. If delegation cannot be used, stop as blocked before any inline
-preflight checks unless Ar explicitly authorizes an inline bypass in the current
+preflight checks unless the user explicitly authorizes an inline bypass in the current
 conversation.
 
 Pass only:
@@ -113,7 +113,7 @@ extract the JSON and ignore the rest. If no valid JSON is returned, retry once
 with one fresh preflight sub-agent. If the retry also returns no valid JSON,
 stop as blocked with `delegated_preflight_invalid_output`; do not spawn further
 preflight agents and do not fall back to inline preflight without explicit
-current conversation approval from Ar.
+current conversation approval from the user.
 
 ## Planning Exploration Discipline
 

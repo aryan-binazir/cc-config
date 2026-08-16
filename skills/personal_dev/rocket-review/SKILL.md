@@ -113,7 +113,7 @@ available source in this order:
 2. a Linear or Jira ticket ID, resolving the tracker with available tooling
    (the key format fits both trackers)
 3. a full Linear or Jira ticket URL
-4. a markdown spec file path supplied by Ar
+4. a markdown spec file path supplied by the user
 5. explicit fallback spec text
 
 Contracts use the raw branch path: `aryan-binazir/BBA-11` maps to
@@ -160,7 +160,7 @@ is:
 <summary>Rocket Review Summary</summary>
 ```
 
-One rocket review per PR is intentional; a fresh review starts with Ar deleting
+One rocket review per PR is intentional; a fresh review starts with the user deleting
 the summary comment.
 
 ## Practical Sequence
