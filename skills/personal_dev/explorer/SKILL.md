@@ -20,4 +20,4 @@ The explore worker runs read-only: a mid-effort orchestrator that fans the readi
 
 3. **Read the findings.** The JSON `summary` is the `## SUMMARY` tail; `summary_file` holds the full findings and is the deliverable — cite it in the next handoff instead of re-transcribing. `report_file` is the raw runner transcript, for diagnosis when a run fails or the findings look wrong. On `ok: false`, surface the exact error and stop.
 
-Reach for the Claude `Explore` subagent when the answer is needed in-context within seconds; reach for this skill when the exploration is broad, feeds a delegated handoff, or should run in the background while planning continues.
+Reach for your runtime's own quick explore subagent when the answer is needed in-context within seconds; reach for this skill when the exploration is broad, feeds a delegated handoff, or should run in the background while planning continues.

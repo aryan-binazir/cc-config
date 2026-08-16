@@ -16,16 +16,16 @@ uv run ~/repos/cc-config/skills/personal_dev/lead/scripts/delegate.py \
   --worker <name> --prompt-file <file> [--worktree] [--subagents N]
 ```
 
-Pick `--worker` by fit (`--list` prints the live roster):
+Pick `--worker` by fit:
 
 - `xhigh`: Escalation only — after `high` fails, or when the user explicitly requests maximum reasoning.
 - `high`: Default for difficult work, including subtle bugs, architecture, gnarly debugging, and complex implementation.
 - `medium`: Bulk implementation with a clear spec.
 - `low`: Targeted, near-deterministic edits from an exact spec.
 - `frontend`: Frontend and UI work.
-- `explore`: Read-only recon — the `explorer` skill covers it.
+- `explore`: Explore the codebase and return findings with file:line evidence — the `explorer` skill.
 
-`--subagents N` makes the worker fan out to N sub-agents inside its own run and synthesize the results; the worker's config may pin the sub-agent model, otherwise the runner chooses. Use it on write workers for independent slices that touch disjoint files, and keep the default (none) for work whose bottleneck is thinking rather than hands.
+Any worker can fan out: `--subagents N` splits the task across N sub-agents inside the run and returns one synthesized result. Use it whenever the work has independent slices — parallel files, parallel checks, parallel questions.
 
 One handoff = one behavioral slice with one set of acceptance criteria and targeted verification. Signals a prompt is too big: more than one numbered goal, more than ~5KB, or "and" joining independent surfaces (e.g. archive + import + idempotency + CI gate). Split those into sequential handoffs in the same authoritative checkout, inspecting each result before starting the next. Same rule for follow-ups: a revision lists the failed criteria, not a fresh multi-item review agenda. The caller owns integration and final verification.
 
