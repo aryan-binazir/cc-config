@@ -107,7 +107,7 @@ def fetch(pr_number: int | None) -> tuple[dict[str, Any], list[dict[str, Any]], 
     for r in pr["reviews"]["nodes"]:
         items.append(base(r, "review_summary", bool((r["body"] or "").strip()) and not r["isMinimized"]) | {"state": r["state"]})
     for t in pr["reviewThreads"]["nodes"]:
-        thread_active = not (t["isResolved"] or t["isOutdated"])
+        thread_active = not t["isResolved"]  # outdated stays visible: a moved line is not an addressed comment
         for i, c in enumerate(t["comments"]["nodes"]):
             item = base(c, "review_comment", thread_active and not c["isMinimized"])
             item |= {"threadId": t["id"], "resolved": t["isResolved"], "outdated": t["isOutdated"], "path": c["path"],
@@ -188,6 +188,7 @@ def render(state: dict[str, Any], truncated: bool = False) -> str:
             continue
         indent = "  " if "." in item["number"] else ""
         loc = f' {item["path"]}:{item["line"]}' if item.get("path") else ""
+        loc += " (outdated)" if item.get("outdated") else ""
         excerpt = " ".join(item["body"].split())[:120]
         text = f'{item["type"]} @{item["author"]}{loc} — {excerpt}'
         if item["status"] == "handled":
