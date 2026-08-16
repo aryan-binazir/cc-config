@@ -6,16 +6,16 @@
 # Per-worker keys:
 #   runner            codex | claude | cursor
 #   model, reasoning_effort, timeout_ms
-#   kind              implement (default) | explore | review — shapes the
-#                     summary/findings file the worker must write.
-#   sandbox           workspace-write (default) | read-only. codex: sandbox
-#                     flag; claude/cursor: plan mode. Sub-agents inherit it.
+#   kind              implement (default) | explore. explore runs read-only
+#                     (codex sandbox / claude+cursor plan mode, inherited by
+#                     sub-agents) and returns findings as its final message,
+#                     which the script persists under _scratch/explorer/.
 #   subagent          {model, reasoning_effort} for the sub-agents the worker
 #                     spawns. Cheap-and-fast here (e.g. gpt-5.6-luna) is what
 #                     makes fan-out affordable; the parent only decomposes and
 #                     synthesizes. codex pins model + effort; claude pins model;
-#                     cursor takes the fan-out instruction only. Without this
-#                     block the runner picks the sub-agent model itself.
+#                     cursor rejects this block (count only). Without it the
+#                     runner picks the sub-agent model itself.
 #   subagents         default sub-agent count (0 = no fan-out). `--subagents N`
 #                     on the command line overrides. Any runner.
 
@@ -56,19 +56,6 @@ workers:
     model: gpt-5.6-sol
     reasoning_effort: medium
     kind: explore
-    sandbox: read-only
-    subagent:
-      model: gpt-5.6-luna
-      reasoning_effort: xhigh
-    subagents: 3
-    timeout_ms: 900000
-  review:
-    description: Read-only independent review of a diff or branch; findings only. Cheap second pair of eyes from a different model family than the implementer — luna sub-agents review by lens, sol synthesizes.
-    runner: codex
-    model: gpt-5.6-sol
-    reasoning_effort: medium
-    kind: review
-    sandbox: read-only
     subagent:
       model: gpt-5.6-luna
       reasoning_effort: xhigh

@@ -23,7 +23,6 @@ Pick `--worker` by fit (`--list` prints the live roster):
 - `medium`: Bulk implementation with a clear spec.
 - `low`: Targeted, near-deterministic edits from an exact spec.
 - `frontend`: Frontend and UI work.
-- `review`: Read-only independent review; findings only (see below).
 - `explore`: Read-only recon — the `explorer` skill covers it.
 
 `--subagents N` makes the worker fan out to N sub-agents inside its own run and synthesize the results; the worker's config may pin the sub-agent model, otherwise the runner chooses. Use it on write workers for independent slices that touch disjoint files, and keep the default (none) for work whose bottleneck is thinking rather than hands.
@@ -36,6 +35,18 @@ Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anyt
 
 On `ok: false`, surface the exact error and stop; Ar decides how to proceed.
 
-Risky diffs get an independent review: `--worker review` with the diff scope and task-specific context (requirements, files, what "correct" means). It fans out cheap sub-agents by lens and returns findings only — severity, file:line, failure mode, fix direction — in `summary_file`; the caller applies fixes. Verify each finding against the cited code before relaying it.
+Risky diffs get an independent delegated review — this prompt plus task-specific context:
+
+```
+Review these changes for bugs, regressions, missing tests, security issues, and requirements mismatches.
+
+Prioritize findings over summary. For each finding include:
+- severity
+- file and line reference
+- concrete failure mode
+- suggested fix direction
+
+Report findings only — the caller applies fixes. If there are no substantive findings, say so and name any residual test gaps.
+```
 
 Wrapper sub-agents (parallel fan-out triage or hosts without shell access): cheapest model, prompt = "run this exact delegate.py command and return its JSON output verbatim."

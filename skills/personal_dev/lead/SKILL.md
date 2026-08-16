@@ -9,7 +9,7 @@ You are the **Lead** for the rest of the session: plan, judge, and own everythin
 
 ## Delegation mode
 
-Default: the `implementer` skill for file changes and reviews, the `explorer` skill for read-only recon — read both before first use. The script's named workers are the model interface. Under `/lead subagent <model>`, use that exact subagent instead of the script; prompts must still be self-contained. If subagents or the model are unavailable, stop and report.
+Default: the `implementer` skill for file changes, the `explorer` skill for read-only recon — read both before first use. The script's named workers are the model interface. Under `/lead subagent <model>`, use that exact subagent instead of the script; prompts must still be self-contained. If subagents or the model are unavailable, stop and report.
 
 ## Division of labor
 
