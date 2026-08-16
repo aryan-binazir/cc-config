@@ -28,7 +28,7 @@ One handoff = one behavioral slice with one set of acceptance criteria and targe
 
 Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anything workers must see (the JSON includes the path).
 
-3. **Accept from the JSON.** Check `summary` (`summary_source` says whether it came from the worker's progress file, its stdout, or nowhere) and `diff_stat`; open changed files selectively, and the full report when the summary is missing or suspicious. A timed-out run still reports the last progress-file state, so judge what got done before deciding to revise or re-run. Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — the script appends the summary instruction again.
+3. **Accept from the JSON.** Check `summary` (`summary_source` says whether it came from the worker's progress file, its stdout, or nowhere) and `diff_stat`; open changed files selectively. `report_file` is the raw runner transcript — every command, its output, echoed diffs — often megabytes; it is for diagnosis when the summary is missing, contradicts the diff, or the run failed, and rewards searching for the specific error, test name, or tail you need. A timed-out run still reports the last progress-file state, so judge what got done before deciding to revise or re-run. Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — the script appends the summary instruction again.
 
 On `ok: false`, surface the exact error and stop; Ar decides how to proceed.
 
@@ -46,4 +46,4 @@ Prioritize findings over summary. For each finding include:
 Report findings only — the caller applies fixes. If there are no substantive findings, say so and name any residual test gaps.
 ```
 
-Wrapper sub-agents (parallel fan-out triage or hosts without shell access): cheapest model, prompt = "run this exact delegate.py command and return the report file contents."
+Wrapper sub-agents (parallel fan-out triage or hosts without shell access): cheapest model, prompt = "run this exact delegate.py command and return its JSON output verbatim."

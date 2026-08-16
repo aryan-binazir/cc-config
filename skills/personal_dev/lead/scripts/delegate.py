@@ -399,6 +399,7 @@ def main() -> int:
     result["summary_source"] = summary_source
     result["diff_stat"] = diff_stat(cwd, snapshot)
     result["report_file"] = str(report)
+    result["report_note"] = "raw runner transcript, often large; search it for the specific error or tail you need"
     result["duration_s"] = round(time.monotonic() - started, 1)
     clean_up_worktree()
     print(json.dumps(result, indent=2))
