@@ -13,7 +13,7 @@ invoking skill by that variant's `SKILL.md`.
 - Delegated preflight is mandatory. Discover the sub-agent/delegation tool before
   preflight if it is not already exposed.
 - If delegated preflight cannot run, stop before inline checks with
-  `delegated_preflight_unavailable`, unless Ar explicitly approves an inline
+  `delegated_preflight_unavailable`, unless the user explicitly approves an inline
   bypass in the current conversation.
 - Resolve config with `uv run --script
   <rocket-dir>/scripts/resolve_config.py`;
@@ -62,7 +62,7 @@ configured for a non-Codex critic. Cursor requires CLI Auto-review; stop if the
 installed CLI does not support it. These exact commands take precedence
 over the generic `call-codex`/`call-claude` skill conventions
 and must never be replaced with a bypass mode.
-The configured critique is exactly one external round unless Ar asks for more
+The configured critique is exactly one external round unless the user asks for more
 in the current conversation.
 
 ## Preflight
@@ -88,7 +88,7 @@ and review work from the returned `worktree_path`. If the command is missing, ru
 <rocket-dir>/scripts/ensure_branch.py
 --input "<original ticket/spec>"` from the target repo. If branch setup reports
 `main_unavailable`, `dirty_target_worktree`, `worktree_path_exists`,
-`ticket_key_required`, or another failure, stop and ask Ar instead of planning
+`ticket_key_required`, or another failure, stop and ask the user instead of planning
 from the wrong worktree.
 
 Preflight must cover current-repo rules, intended worktree, git state, GitHub
@@ -125,7 +125,7 @@ approach`.
 The contract is not settled until `Goal` explains why the work matters. If the
 ticket/spec is only a task list, push back and ask for the goal or motivation.
 Keep asking focused clarification rounds while material ambiguity remains; stop
-when unresolved items can honestly live in `Assumptions` and Ar has confirmed or
+when unresolved items can honestly live in `Assumptions` and the user has confirmed or
 corrected the contract.
 
 `Validation approach` must drive strict test-first implementation: list each
@@ -139,7 +139,7 @@ After the contract is settled and before presenting the plan:
 1. Draft an execution plan from the contract.
 2. Read `Critic Prompt` and run exactly one configured critic round.
 3. Revise the plan for valid feedback.
-4. Stop if unresolved material concerns require Ar's input.
+4. Stop if unresolved material concerns require user input.
 
 Do not call `update_plan`, present the plan for approval, update Linear,
 persist the contract, or edit files until critique is complete. Updating
@@ -153,7 +153,7 @@ timeout instead of silently skipping critique.
 ## Approval Gate
 
 After critique is complete, call `update_plan` and present the revised plan.
-Stop until Ar explicitly approves.
+Stop until the user explicitly approves.
 
 The visible plan must include the finalized contract, concise execution steps,
 why this is the simplest repo-idiomatic path, strict test-first cycles,
@@ -172,7 +172,7 @@ invoking skill, and `$rocket-review <review-profile>` as the final step.
   For raw specs, ask once for required ticket/branch naming during clarification.
 - Contract file: read `Contract Persistence` and persist the settled contract to
   `_scratch/_contracts/<branch>.md` before code changes. Treat `_scratch` as
-  local review state unless Ar asks to commit it.
+  local review state unless the user asks to commit it.
 - Capsule-based variants (`rocket-plan-sub`, `rocket-plan-headless`) also write
   the implementation capsule described below before code changes.
 

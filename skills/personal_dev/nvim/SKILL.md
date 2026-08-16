@@ -1,6 +1,6 @@
 ---
 name: nvim
-description: Use only when Ar explicitly invokes $nvim or /nvim to open the currently discussed code, file, test, symbol, or location in a new tmux window with Neovim.
+description: Use only when the user explicitly invokes $nvim or /nvim to open the currently discussed code, file, test, symbol, or location in a new tmux window with Neovim.
 ---
 
 # Nvim
@@ -52,7 +52,7 @@ tmux new-window -c "$repo_root" "nvim +150 -- 'path/to/file.go'"
 
 ## Reporting
 
-Respond with only the opened location; add explanation only when Ar asks.
+Respond with only the opened location; add explanation only when the user asks.
 
 ```text
 Opened internal/api/server/routes.go at line 84.
