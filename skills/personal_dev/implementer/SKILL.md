@@ -24,7 +24,7 @@ Pick `--worker` by fit:
 - `low`: Targeted, near-deterministic edits from an exact spec.
 - `frontend`: Frontend and UI work.
 
-Match the handoff shape to the implementation plan. Use one worker for a contained change that can reasonably be implemented, tested, and summarized within its configured window. When the plan contains several substantial vertical slices or crosses a large implementation and verification surface, sequence focused worker handoffs in the same authoritative checkout. Give each worker a complete behavioral slice with clear acceptance criteria and targeted verification, then inspect its result before starting the next slice. The caller owns integration and final verification.
+One handoff = one behavioral slice with one set of acceptance criteria and targeted verification. Signals a prompt is too big: more than one numbered goal, more than ~5KB, or "and" joining independent surfaces (e.g. archive + import + idempotency + CI gate). Split those into sequential handoffs in the same authoritative checkout, inspecting each result before starting the next. Same rule for follow-ups: a revision lists the failed criteria, not a fresh multi-item review agenda. The caller owns integration and final verification.
 
 Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anything workers must see (the JSON includes the path).
 
