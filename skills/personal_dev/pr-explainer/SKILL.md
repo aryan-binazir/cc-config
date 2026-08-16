@@ -17,6 +17,7 @@ Explain the current pull request to a reader who is starting cold. Orient them i
    - **What the PR changes** and how the important pieces work together, grouped by purpose.
    - **Verification, limitations, and intentionally unchanged behavior.**
    - **Numbers last.** File list, line ranges, and diff stats, if useful at all.
+4. Open with the full section list above as an outline. After each section, repeat the outline with the finished sections marked and the next one highlighted, so the reader always knows where they are.
 
 ## Writing rules (Simplified Technical English)
 
