@@ -2,11 +2,11 @@
 name: verify-sandbox
 description: >-
   Stand up an ephemeral verification stack (Postgres, Redis, arbitrary
-  containers) in rootless podman, run throwaway harness code against it, and
-  tear it down verified-clean. Use when verifying code end-to-end against a
-  real local database or service, when a verify step needs evidence beyond
-  unit tests, or when the user asks to sandbox or spin up a throwaway stack
-  or database.
+  containers) in a configured Docker-compatible runtime, run throwaway
+  harness code against it, and tear it down verified-clean. Use when verifying
+  code end-to-end against a real local database or service, when a verify step
+  needs evidence beyond unit tests, or when the user asks to sandbox or spin up
+  a throwaway stack or database.
 ---
 
 # Verify Sandbox
@@ -15,14 +15,16 @@ Prove the code works against real infrastructure, then vanish without a trace.
 
 `<skill-dir>` is the directory containing this file; the tool is
 `<skill-dir>/scripts/sbx` (`sbx --help` lists every command).
+Configuration resolves from `verify-sandbox.example.yaml`, optional
+`verify-sandbox.local.yaml`, and `SBX_*`; `sbx doctor` reports the result.
 
 ## Lane
 
-- Rootless podman is the sandbox's whole world; everything else on the machine
-  — docker, clusters, long-lived dev containers — stays exactly as found.
+- The configured Docker-compatible runtime is the sandbox's whole world;
+  every other host workload stays exactly as found.
 - Every container carries `sbx=1` and `sbx.key=<key>`: create through `sbx`
-  (add both labels when calling podman directly), remove through
-  `sbx down` / `sbx gc`, which reach labeled containers only.
+  (add both labels when calling the configured runtime directly), remove
+  through `sbx down` / `sbx gc`, which reach labeled containers only.
 - Data is synthetic: migrations, fixtures, generated rows. Real data enters a
   sandbox only on the user's explicit opt-in for that run.
 - Harness code is throwaway and lives in `_scratch/` or the session

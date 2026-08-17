@@ -1,0 +1,9 @@
+# Copy this file to verify-sandbox.local.yaml to override these defaults.
+# verify-sandbox.local.yaml is ignored by git.
+
+runtime: podman
+postgres_image: docker.io/library/postgres
+postgres_version: "18"
+redis_image: docker.io/library/redis:7
+gc_ttl_hours: 4
+require_rootless: true

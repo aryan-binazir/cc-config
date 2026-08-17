@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
-# sbx — ephemeral verification sandboxes on rootless podman.
+# sbx — ephemeral verification sandboxes on a configured container runtime.
 #
-# Every container carries the labels sbx=1 and sbx.key=<key>, and every
-# destructive operation here filters on those labels. Containers without the
-# labels — long-lived dev databases, anything docker-side, clusters,
-# observability stacks — are structurally unreachable from this script.
+# Every container carries the labels sbx=1 and sbx.key=<key>. Every removal
+# filters on those labels, keeping every other host workload exactly as found.
 set -euo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+config_assignments=$("${SCRIPT_DIR}/resolve_config.py" --shell) || exit $?
+eval "$config_assignments"
+
 LABEL="sbx=1"
-DEFAULT_TTL_HOURS=4
-DEFAULT_PG_VERSION=18
+RUNTIME_KIND=${RUNTIME##*/}
 
 usage() {
-  cat <<'EOF'
-sbx — ephemeral verification sandboxes (podman-only, label-scoped)
+  cat <<EOF
+sbx — ephemeral verification sandboxes (runtime-configured, label-scoped)
 
 Usage:
-  sbx pg <key> [pg-version]   Start Postgres (default 18) on a random localhost
+  sbx pg <key> [pg-version]   Start Postgres (default ${POSTGRES_VERSION}) on a random localhost
                               port; waits until ready, prints DATABASE_URL.
   sbx redis <key>             Start Redis on a random localhost port; prints REDIS_URL.
   sbx run <key> <name> <image> [command...]
@@ -25,10 +26,11 @@ Usage:
   sbx down <key>              Remove every container for <key>, volumes included;
                               exits non-zero if anything is left behind.
   sbx gc [hours]              Remove ALL sandbox containers older than [hours]
-                              (default 4). `sbx gc 0` removes every sandbox.
+                              (default ${DEFAULT_TTL_HOURS}). 'sbx gc 0' removes every sandbox.
+  sbx doctor                  Report the resolved configuration and runtime readiness.
 
 Keys are lowercase [a-z0-9-], typically the ticket key: abc-42.
-For extra podman options (ports, env, mounts), run podman directly but ALWAYS
+For extra ${RUNTIME} options (ports, env, mounts), run ${RUNTIME} directly and
 include: --label sbx=1 --label sbx.key=<key>
 EOF
 }
@@ -39,16 +41,73 @@ check_key() {
   [[ "${1:-}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "key must be lowercase [a-z0-9-], got '${1:-}'"
 }
 
+runtime_status() {
+  command -v "$RUNTIME" >/dev/null 2>&1 || return 127
+  if [ "$RUNTIME_KIND" = "podman" ] && [ "$REQUIRE_ROOTLESS" = "true" ]; then
+    local rootless
+    rootless=$("$RUNTIME" info --format '{{.Host.Security.Rootless}}' 2>/dev/null) || return 1
+    [ "$rootless" = "true" ] || return 2
+  else
+    "$RUNTIME" info >/dev/null 2>&1 || return 1
+  fi
+}
+
+ensure_runtime() {
+  local status=0
+  runtime_status || status=$?
+  case "$status" in
+    0) return ;;
+    127) die "set runtime in ${LOCAL_CONFIG} or SBX_RUNTIME to an installed container CLI (resolved '${RUNTIME}')" ;;
+    2) die "run podman rootless or set require_rootless: false in ${LOCAL_CONFIG}" ;;
+    *) die "start runtime '${RUNTIME}' and run 'sbx doctor' again" ;;
+  esac
+}
+
+container_exists() {
+  "$RUNTIME" inspect --type container "$1" >/dev/null 2>&1
+}
+
+runtime_rm() {
+  if [ "$RUNTIME_KIND" = "podman" ]; then
+    "$RUNTIME" rm -f -v -t 0 "$@"
+  else
+    "$RUNTIME" rm -f -v "$@"
+  fi
+}
+
+created_epoch() {
+  if [ "$RUNTIME_KIND" = "podman" ]; then
+    "$RUNTIME" inspect -f '{{.Created.Unix}}' "$1"
+    return
+  fi
+  local created
+  created=$("$RUNTIME" inspect -f '{{.Created}}' "$1")
+  if date -d "$created" +%s >/dev/null 2>&1; then
+    date -d "$created" +%s
+  else
+    created=${created%%.*}
+    created=${created%Z}
+    TZ=UTC date -j -f '%Y-%m-%dT%H:%M:%S' "$created" +%s
+  fi
+}
+
+cutoff_epoch() {
+  if date -v-"$1"H +%s >/dev/null 2>&1; then
+    date -v-"$1"H +%s
+  else
+    date -d "$1 hours ago" +%s
+  fi
+}
+
 ensure_create() {
-  [ "$(podman info --format '{{.Host.Security.Rootless}}')" = "true" ] \
-    || die "podman is rootful here; sandboxes require rootless podman"
-  if podman container exists "$1" 2>/dev/null; then
+  ensure_runtime
+  if container_exists "$1"; then
     die "$1 already exists — inspect it or 'sbx down' its key first"
   fi
 }
 
-host_port() { # container internal-port -> podman-assigned host port
-  local mapped; mapped=$(podman port "$1" "$2" | head -1)
+host_port() { # container internal-port -> runtime-assigned host port
+  local mapped; mapped=$("$RUNTIME" port "$1" "$2" | head -1)
   [ -n "$mapped" ] || die "no host port mapped for $1 port $2"
   echo "${mapped##*:}"
 }
@@ -57,24 +116,24 @@ wait_or_remove() { # container tries check-cmd... ; removes container on timeout
   local name=$1 tries=$2; shift 2
   local i
   for i in $(seq 1 "$tries"); do
-    podman exec "$name" "$@" >/dev/null 2>&1 && return 0
+    "$RUNTIME" exec "$name" "$@" >/dev/null 2>&1 && return 0
     sleep 0.5
   done
-  podman logs --tail 20 "$name" >&2 || true
-  podman rm -f -v -t 0 "$name" >/dev/null
+  "$RUNTIME" logs --tail 20 "$name" >&2 || true
+  runtime_rm "$name" >/dev/null
   die "${name} did not become ready; container removed"
 }
 
 cmd_pg() {
   check_key "${1:-}"
-  local key=$1 ver=${2:-$DEFAULT_PG_VERSION}
+  local key=$1 ver=${2:-$POSTGRES_VERSION}
   local name="sbx-${key}-pg"
   ensure_create "$name"
-  podman run -d --name "$name" \
+  "$RUNTIME" run -d --name "$name" \
     --label "$LABEL" --label "sbx.key=${key}" \
     -e POSTGRES_USER=sbx -e POSTGRES_PASSWORD=sbx -e POSTGRES_DB=sbx \
     -p "127.0.0.1::5432" \
-    "docker.io/library/postgres:${ver}" >/dev/null
+    "${POSTGRES_IMAGE}:${ver}" >/dev/null
   wait_or_remove "$name" 120 pg_isready -U sbx -d sbx
   echo "container=${name}"
   echo "DATABASE_URL=postgres://sbx:sbx@127.0.0.1:$(host_port "$name" 5432)/sbx?sslmode=disable"
@@ -85,10 +144,10 @@ cmd_redis() {
   local key=$1
   local name="sbx-${key}-redis"
   ensure_create "$name"
-  podman run -d --name "$name" \
+  "$RUNTIME" run -d --name "$name" \
     --label "$LABEL" --label "sbx.key=${key}" \
     -p "127.0.0.1::6379" \
-    "docker.io/library/redis:7" >/dev/null
+    "$REDIS_IMAGE" >/dev/null
   wait_or_remove "$name" 60 redis-cli ping
   echo "container=${name}"
   echo "REDIS_URL=redis://127.0.0.1:$(host_port "$name" 6379)/0"
@@ -99,46 +158,64 @@ cmd_run() {
   [ $# -ge 3 ] || die "usage: sbx run <key> <name> <image> [command...]"
   local key=$1 name=$2 image=$3; shift 3
   ensure_create "sbx-${key}-${name}"
-  podman run -d --name "sbx-${key}-${name}" \
+  "$RUNTIME" run -d --name "sbx-${key}-${name}" \
     --label "$LABEL" --label "sbx.key=${key}" \
     "$image" "$@" >/dev/null
   echo "container=sbx-${key}-${name}"
 }
 
 cmd_ls() {
+  ensure_runtime
   local -a filters=(--filter "label=${LABEL}")
   if [ -n "${1:-}" ]; then check_key "$1"; filters+=(--filter "label=sbx.key=$1"); fi
-  podman ps -a "${filters[@]}" \
+  "$RUNTIME" ps -a "${filters[@]}" \
     --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 }
 
 cmd_down() {
+  ensure_runtime
   check_key "${1:-}"
   local key=$1
   local ids
-  ids=$(podman ps -aq --filter "label=${LABEL}" --filter "label=sbx.key=${key}")
+  ids=$("$RUNTIME" ps -aq --filter "label=${LABEL}" --filter "label=sbx.key=${key}")
   if [ -n "$ids" ]; then
-    echo "$ids" | xargs podman rm -f -v -t 0 >/dev/null
+    while IFS= read -r id; do runtime_rm "$id" >/dev/null; done <<< "$ids"
   fi
   local leftovers
-  leftovers=$(podman ps -aq --filter "label=${LABEL}" --filter "label=sbx.key=${key}")
+  leftovers=$("$RUNTIME" ps -aq --filter "label=${LABEL}" --filter "label=sbx.key=${key}")
   [ -z "$leftovers" ] || die "sandbox ${key} has leftovers: ${leftovers}"
   echo "sandbox ${key}: clean"
 }
 
 cmd_gc() {
+  ensure_runtime
   local hours=${1:-$DEFAULT_TTL_HOURS}
   [[ "$hours" =~ ^[0-9]+$ ]] || die "gc takes an integer hour count, got '${hours}'"
-  local cutoff=$(( $(date +%s) - hours * 3600 ))
+  local cutoff; cutoff=$(cutoff_epoch "$hours")
   local removed=0 id created
-  for id in $(podman ps -aq --filter "label=${LABEL}"); do
-    created=$(podman inspect -f '{{.Created.Unix}}' "$id")
+  for id in $("$RUNTIME" ps -aq --filter "label=${LABEL}"); do
+    created=$(created_epoch "$id")
     if [ "$created" -le "$cutoff" ]; then
-      podman rm -f -v -t 0 "$id" >/dev/null
+      runtime_rm "$id" >/dev/null
       removed=$((removed + 1))
     fi
   done
   echo "gc: removed ${removed} container(s) older than ${hours}h"
+}
+
+cmd_doctor() {
+  ensure_runtime
+  local version count
+  version=$("$RUNTIME" --version 2>&1); version=${version%%$'\n'*}
+  count=$("$RUNTIME" ps -aq --filter "label=${LABEL}" | awk 'NF {count++} END {print count + 0}')
+  echo "runtime=${RUNTIME}"
+  echo "version=${version}"
+  echo "ready=true"
+  echo "config_files=${CONFIG_FILES}"
+  echo "postgres_image=${POSTGRES_IMAGE}:${POSTGRES_VERSION}"
+  echo "redis_image=${REDIS_IMAGE}"
+  echo "gc_ttl_hours=${DEFAULT_TTL_HOURS}"
+  echo "sbx_containers=${count}"
 }
 
 case "${1:-}" in
@@ -148,6 +225,7 @@ case "${1:-}" in
   ls)    shift; cmd_ls "$@" ;;
   down)  shift; cmd_down "$@" ;;
   gc)    shift; cmd_gc "$@" ;;
+  doctor) shift; cmd_doctor "$@" ;;
   -h|--help|help|"") usage ;;
   *) usage >&2; die "unknown command '${1}'" ;;
 esac
