@@ -141,6 +141,10 @@ function sel(g){gs.forEach(x=>x.classList.toggle('on',x===g));pairs.forEach(p=>p
 info.innerHTML=`<b>${g.dataset.name}</b>${g.dataset.path&&g.dataset.path!==g.dataset.name?` <code>${g.dataset.path}</code>`:''}<br>${g.dataset.desc}<br><span class=role>In this PR:</span> ${g.dataset.role}`}
 gs.forEach(g=>{g.onclick=()=>sel(g);g.onfocus=()=>sel(g);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel(g)}}})
 pairs.forEach(p=>p.onclick=()=>sel(gs.find(g=>g.dataset.pair===p.id)))
+// size the info panel to its tallest possible content so nothing below it moves on click
+{const probe=info.cloneNode(false);probe.style.cssText='position:absolute;visibility:hidden;width:'+info.clientWidth+'px';document.body.append(probe);let h=info.offsetHeight
+ gs.forEach(g=>{probe.innerHTML=`<b>${g.dataset.name}</b>${g.dataset.path&&g.dataset.path!==g.dataset.name?` <code>${g.dataset.path}</code>`:''}<br>${g.dataset.desc}<br><span class=role>In this PR:</span> ${g.dataset.role}`;h=Math.max(h,probe.offsetHeight)})
+ probe.remove();info.style.minHeight=h+'px'}
 // FILL: wires. [from data-name, to data-name or '#group-id', 'R' (right edge → left edge) | 'D' (bottom → top)]. An arrow means "calls".
 const W=[['entry.Handler','core.Run','R'],['core.Run','store.Store','R'],['core.Run','policy.NewThing','D']]
 // ---- do not edit below ----

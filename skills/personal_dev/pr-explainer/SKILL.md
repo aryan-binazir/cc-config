@@ -42,51 +42,30 @@ Explain the current pull request to a reader who is starting cold. Orient them i
 
 ## `html` mode
 
-When invoked with `html` (e.g. `/pr-explainer html`), produce a one-page visual companion instead of prose. Prose mode is the full explanation; html mode is the map and the code.
+`/pr-explainer html` produces a one-page visual companion. Prose mode is the full explanation; html mode is the map and the code.
 
-### Reader
+**Reader.** An engineer who does not know this system. Thinks in packages, types, functions. Has read none of the code. Wants names they can grep.
 
-An engineer who does not know this system and needs to understand it. They think in packages, types, and functions. Write for a reader who has seen none of the code, and use the names the code uses.
+**Files.** `template.html`: fixed CSS/JS, fill the `FILL` slots only. `example.html`: the template filled for a fictional PR; match its shape and density.
 
-### Files
+**Steps.** Copy `template.html` to `_scratch/pr-explainer/<branch>.html`. Fill it top to bottom. `open` it, reply with the path.
 
-- `template.html` in this skill's directory: the page with all CSS and JS in place. Fill the `FILL` slots only; leave everything below `do not edit` alone.
-- `example.html` in this skill's directory: the template filled in for a fictional PR. Match its shape and density.
+**Page, top to bottom.**
+- Title: PR number + one plain line.
+- System / Problem / Fix, one sentence each, before any picture. System names the packages a request passes through. Fix names `pkg.Symbol`.
+- Story line: one sentence readable aloud while following the arrows, using real symbols.
+- Map: the change path, not the system. ~8 boxes, left to right in the direction data flows.
+  - Every box lives in a container labelled `package <name>`.
+  - Box = kind tag (func / type / method, true) + `pkg.Symbol` + one plain phrase saying what it does now ("no longer checks the limit itself"; "unchanged" for context boxes). Plain words only; no diff symbols or shorthand.
+  - Blue = this PR touched it; gray = context. The legend says so; every click obeys it (blue → its code pair, gray → description only).
+  - Every box has `data-desc` (what it is) and `data-role` (what this PR does to it), one sentence each. Context boxes too.
+  - Arrows mean "calls". Label a wire only when the boxes alone don't tell you: a method or interface not in the box title, or a seam this PR added.
+  - Other callers go in the "also" line as text, not as boxes.
+  - Add boxes to `.col` / `.group`, wires to `W`. The script sizes boxes, draws wires, and fixes the info panel's height. Write no coordinates, add no elements outside the slots.
+- Code pairs: one to three, each tied to a blue box.
+  - Title = the symbol that changed + a mono line naming the files. Different files before and after: "removed from … · added to …".
+  - Each side: one plain sentence saying what that code does or meant, then the snippet. Bold the one word whose meaning changed.
+  - `class=d` removed lines, `class=a` added lines. Short lines so both columns fit.
+- Footer: one line verified, one line deliberately unchanged / out of scope. Delete if empty.
 
-### Steps
-
-1. Copy `template.html` to `_scratch/pr-explainer/<branch>.html`.
-2. Fill the slots, top to bottom, following the rules below.
-3. Run `open <file>` and reply with the path only.
-
-### The page, top to bottom
-
-**Title.** PR number and one plain line saying what it does.
-
-**System / Problem / Fix.** One sentence each, before anything visual. System: what this service is and the path a request or piece of data takes through it, naming the packages. Problem: what was wrong or missing, concretely. Fix: what this PR does, naming `pkg.Symbol`.
-
-**Story line.** One sentence the reader can say aloud while following the arrows left to right, using the real symbols.
-
-**Map.** The change path, not the whole system: the packages a changed call passes through, about eight boxes at most. Left to right in the direction data flows.
-- Every box sits inside a container labelled `package <name>`, so the reader sees which symbols share a module.
-- Box title is the code's own symbol, `pkg.Name`, in monospace. Above it a kind tag (func, type, method) that is true. Below it one plain phrase saying what it does now, e.g. "no longer checks the limit itself", "new type: counts requests per tenant". For untouched boxes the phrase is "unchanged".
-- Blue box = this PR touched it; gray box = shown for context. The legend states this and every interaction obeys it: clicking a blue box highlights its code pair; clicking a gray box shows its description only.
-- Each box carries `data-desc` (what it is, one sentence) and `data-role` (what this PR does to it, one sentence). Untouched boxes get both too.
-- Arrows mean "calls". Label a wire only when the label adds information the two boxes lack: a method or interface name that is not the box title, or a seam this PR added or changed.
-- Other callers on the path go in the "also" line as text ("4 other packages call `orchestrator.Run`; unchanged"), not as boxes.
-- Boxes size to their text and wires are drawn by the script from real positions. Add boxes to `.col`/`.group` elements and wires to `W`; write no coordinates.
-
-**Code pairs.** One to three before/after pairs, each tied to a blue box.
-- Title is the symbol that changed, plus a monospace line naming the file or files. When before and after live in different files, say "removed from … · added to …".
-- Each side opens with one plain sentence saying what that code does or meant, then the snippet. Bold the one word whose meaning changed (e.g. connection → tenant).
-- Removed lines carry `class=d`, added lines `class=a`. Keep lines short enough that both columns fit side by side.
-
-**Footer.** One line for what was verified and one for what was deliberately left unchanged or is out of scope. Delete it if there is nothing to say.
-
-### Checks before opening
-
-- Every label survives a reader who has seen no code: real symbols, plain phrases, no diff shorthand or symbols in box text.
-- Every kind tag and path is true for the symbol it sits on.
-- One visual encoding, stated in the legend, obeyed by every click.
-- Every code side has its sentence.
-- Nothing hand-placed: no coordinates, no elements added outside the marked slots.
+**Before opening, confirm:** every label survives a reader who has seen no code · every kind tag and path is true · one encoding, stated, obeyed by every click · every code side has its sentence · nothing hand-placed.

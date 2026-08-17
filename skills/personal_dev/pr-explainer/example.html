@@ -120,6 +120,10 @@ function sel(g){gs.forEach(x=>x.classList.toggle('on',x===g));pairs.forEach(p=>p
 info.innerHTML=`<b>${g.dataset.name}</b>${g.dataset.path&&g.dataset.path!==g.dataset.name?` <code>${g.dataset.path}</code>`:''}<br>${g.dataset.desc}<br><span class=role>In this PR:</span> ${g.dataset.role}`}
 gs.forEach(g=>{g.onclick=()=>sel(g);g.onfocus=()=>sel(g);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel(g)}}})
 pairs.forEach(p=>p.onclick=()=>sel(gs.find(g=>g.dataset.pair===p.id)))
+// size the info panel to its tallest possible content so nothing below it moves on click
+{const probe=info.cloneNode(false);probe.style.cssText='position:absolute;visibility:hidden;width:'+info.clientWidth+'px';document.body.append(probe);let h=info.offsetHeight
+ gs.forEach(g=>{probe.innerHTML=`<b>${g.dataset.name}</b>${g.dataset.path&&g.dataset.path!==g.dataset.name?` <code>${g.dataset.path}</code>`:''}<br>${g.dataset.desc}<br><span class=role>In this PR:</span> ${g.dataset.role}`;h=Math.max(h,probe.offsetHeight)})
+ probe.remove();info.style.minHeight=h+'px'}
 const W=[['api.HTTPHandler','orchestrator.Run','R'],['api.GRPCServer','orchestrator.Run','R'],['cli.RunBatch','orchestrator.Run','R'],['orchestrator.Run','storage.Store','R'],['orchestrator.Run','policy.Limiter','D']]
 const find=n=>n[0]==='#'?map.querySelector(n):gs.find(g=>g.dataset.name===n)
 function draw(){const m=map.getBoundingClientRect();const r=el=>{const b=el.getBoundingClientRect();return{l:b.left-m.left,r:b.right-m.left,t:b.top-m.top,b:b.bottom-m.top,cx:(b.left+b.right)/2-m.left,cy:(b.top+b.bottom)/2-m.top}}
