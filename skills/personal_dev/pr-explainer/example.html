@@ -1,0 +1,129 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width">
+<title>PR #412 — shared Limiter</title>
+<style>
+*{box-sizing:border-box}
+section{display:block}
+.ctx{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;max-width:820px}.ctx dd{margin:0}
+.map{position:relative;display:grid;grid-template-columns:auto auto auto;column-gap:56px;align-items:start;margin:0;padding:6px 0 0}
+.col{display:flex;flex-direction:column;gap:28px}
+.node{white-space:nowrap;cursor:pointer;outline:none;text-align:center}.node small,.node b,.node i{display:block}.node i{font-style:normal}.node.mute{cursor:default}
+.group{display:flex;flex-direction:column;gap:12px}.group span{display:block}
+.wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.wires path{fill:none}
+.legend{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.sw{display:inline-block;width:12px;height:12px}.sw.mute{margin-left:14px}
+.code{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:28px;align-items:start}.pair h2{min-height:3.4em}
+.cmp{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;grid-auto-flow:column;gap:6px 10px;align-items:start}.cmp>div{display:contents}
+pre{margin:0;overflow-x:auto}pre::before{display:block;margin-bottom:4px}
+.cmp>div:first-child pre::before{content:"before"}.cmp>div:last-child pre::before{content:"after"}
+.pair h2 .where{display:block;font-weight:400;margin-top:2px}
+.say{margin:0;align-self:end}.say em{font-style:normal}
+footer{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+
+:root{--fg:#0b2545;--mute:#5b6b85;--line:#c9d3e3;--acc:#0b2545;--accbg:#e6edf7;--del:#f6e3e3;--add:#e2f1e6;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+body{margin:0;background:#f7f9fc;background-image:linear-gradient(#eef2f8 1px,transparent 1px),linear-gradient(90deg,#eef2f8 1px,transparent 1px);background-size:24px 24px;color:var(--fg);font:14.5px/1.5 system-ui;padding:32px 40px;max-width:1240px}
+h1{font-size:18px;margin:0 0 12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}h1 small{text-transform:none;letter-spacing:0;color:var(--mute);font-weight:400;margin-left:10px;font-size:13px}
+code{font:.92em var(--mono)}
+.ctx{margin:0 0 26px}.ctx dt{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.1em;padding-top:3px}.ctx dt:nth-of-type(2){color:#8b1e2d}.ctx dt:nth-of-type(3){color:var(--fg)}
+.story{margin:0 0 16px;font-size:14px;color:var(--mute)}
+.node{border:1px solid var(--fg);background:#fff;padding:8px 16px}
+.node small{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:2px}.node b{font:500 14px var(--mono)}.node i{font-size:11.5px;color:var(--mute);margin-top:3px}
+.node.chg{background:var(--accbg);border-width:2px}.node.chg i{color:var(--fg);font-weight:600}
+.node.mute{border-color:var(--line);color:var(--mute);border-style:dashed;background:transparent}.node:focus,.node.on{outline:2px solid var(--fg);outline-offset:3px}
+.group{border:1px solid var(--line);padding:8px 12px 12px;background:rgba(255,255,255,.6)}.group span{font:11px var(--mono);color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.wires path{stroke:var(--fg);stroke-width:1}
+.legend{font-size:11.5px;color:var(--mute);margin:18px 0 0;text-transform:uppercase;letter-spacing:.06em}.sw{border:2px solid var(--fg);background:var(--accbg)}.sw.mute{border:1px dashed var(--line);background:transparent}
+.also{font-size:12.5px;color:var(--mute);margin:10px 0 0}
+.info{margin-top:14px;padding:12px 14px;background:#fff;border:1px solid var(--line);font-size:13.5px;min-height:4.5em;max-width:820px}.info em{color:var(--mute)}.info b{font-weight:600}.info code{color:var(--mute)}.info .role{font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.08em}
+.pair{border-top:2px solid var(--line);padding-top:10px}.pair.on{border-top-color:var(--fg)}
+.pair h2{font-size:14px;font-weight:600;margin:0 0 8px}.pair h2 .where{font:12px var(--mono);color:var(--mute)}
+.say{font-size:13px}.say em{font-weight:700;text-decoration:underline;text-underline-offset:3px}
+pre{font:12.5px/1.45 var(--mono);background:#fff;padding:8px 10px;border:1px solid var(--line)}pre::before{color:var(--mute);font:10px system-ui;text-transform:uppercase;letter-spacing:.1em}
+.d{background:var(--del)}.a{background:var(--add)}
+footer{margin-top:30px;padding-top:12px;border-top:1px solid var(--line);color:var(--mute);font-size:13px}footer b{color:var(--fg);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.08em}
+</style>
+
+<h1>PR #412 — one shared rate limit per tenant<small>Generic PR Explainer · html companion</small></h1>
+<dl class="ctx">
+<dt>System</dt><dd>The billing API server. Requests arrive over HTTP, gRPC, or the batch CLI, go through the Orchestrator, pass policy checks, and reach Storage.</dd>
+<dt>Problem</dt><dd>Rate limits were enforced separately in each of the three entry points. A tenant that mixed HTTP and gRPC calls got three budgets instead of one.</dd>
+<dt>Fix</dt><dd>One <code>Limiter</code> in Policy, keyed on the tenant, called once by the Orchestrator. The three local checks are deleted.</dd>
+</dl>
+
+<section>
+<div>
+<p class="story">Read left to right: a request enters through <code>api.HTTPHandler</code>, <code>api.GRPCServer</code>, or <code>cli.RunBatch</code>; each calls <code>orchestrator.Run</code>, which asks <code>policy.Limiter.Allow</code> whether this tenant is over budget; only then does <code>storage.Store</code> write it.</p>
+<figure class="map" id="map">
+  <div class="col">
+    <div class="group" id="api"><span>package api</span><div class="node chg" tabindex=0 data-pair="p2" data-name="api.HTTPHandler" data-path="api/http.go" data-desc="Public REST entry point. Parses the request, checks auth, builds a Request, hands it to the Orchestrator." data-role="Removed its private limit check. Now sets req.Tenant from the auth token."><small>func</small><b>api.HTTPHandler</b><i>no longer checks the limit itself</i></div><div class="node chg" tabindex=0 data-pair="p2" data-name="api.GRPCServer" data-path="api/grpc.go" data-desc="Internal service-to-service entry point. Same job as HTTP API, for gRPC callers." data-role="Removed its private limit check. Sets req.Tenant from connection metadata."><small>type</small><b>api.GRPCServer</b><i>no longer checks the limit itself</i></div></div>
+    <div class="group" id="cli"><span>package cli</span><div class="node chg" tabindex=0 data-pair="p2" data-name="cli.RunBatch" data-path="cli/batch.go" data-desc="Offline bulk importer run by operators. Reads a file and submits one Request per row." data-role="Removed its private limit check. Sets req.Tenant from the --tenant flag."><small>func</small><b>cli.RunBatch</b><i>no longer checks the limit itself</i></div></div>
+  </div>
+  <div class="col">
+    <div class="group" id="orchestrator"><span>package orchestrator</span><div class="node chg" tabindex=0 data-pair="p1" data-name="orchestrator.Run" data-path="orchestrator/run.go" data-desc="The one place every Request passes through after entry. Runs policy checks in order, then writes to Storage. Knows nothing about HTTP or gRPC." data-role="Gains one call, limiter.Allow(req), before any other policy. Returns ErrRateLimited, which entry points map to 429."><small>func</small><b>orchestrator.Run</b><i>now calls policy.Limiter.Allow once per request</i></div></div>
+    <div class="group" id="policy" style="flex-direction:column-reverse"><span>package policy</span><div class="node chg" tabindex=0 data-pair="p1" data-name="policy.Limiter" data-path="policy/limiter.go" data-desc="Owns one in-memory counter per tenant and exposes Allow(req) → bool. Replaces the three private checks." data-role="New file. Keys the counter on req.Tenant, so HTTP + gRPC + CLI share one budget."><small>type</small><b>policy.Limiter</b><i>new type: counts requests per tenant</i></div></div>
+  </div>
+  <div class="col">
+    <div class="group" id="storage"><span>package storage</span><div class="node mute" tabindex=0 data-pair="" data-name="storage.Store" data-path="storage/store.go" data-desc="Persists accepted requests to Postgres. Only the Orchestrator calls it." data-role="Unchanged. The rate counter lives in memory inside Limiter, not here."><small>type</small><b>storage.Store</b><i>unchanged</i></div></div>
+  </div>
+  <svg class="wires" aria-hidden="true"><defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#888" stroke="none"/></marker></defs></svg>
+</figure>
+<div class="legend"><span class="sw"></span>changed in this PR — click for its code <span class="sw mute"></span>unchanged, shown for context</div>
+<div class="info" id="info"><em>Click a box: what it is, and what this PR does to it.</em></div>
+</div>
+
+<div class="code">
+<div class="pair" id="p1">
+<h2><code>orchestrator.Run</code> takes over the rate-limit check <span class="where">removed from api/http.go, api/grpc.go, cli/batch.go · added to orchestrator/run.go</span></h2>
+<div class="cmp">
+<div><p class="say">Each entry point kept its own counter, keyed on the <em>connection</em>, and returned 429 itself. Three copies, three budgets.</p>
+<pre>// api/http.go (same in grpc, cli)
+<span class=d>if !limits[conn.Key()].take() {</span>
+<span class=d>  return http.Error(429)      </span>
+<span class=d>}                             </span>
+orchestrator.Run(req)</pre></div>
+<div><p class="say"><code>Run</code> asks <code>Limiter</code> once, before any other policy. <code>Limiter</code> counts per <em>tenant</em>, so all entry points share one budget. Entry points just call <code>Run</code>.</p>
+<pre>// orchestrator/run.go
+<span class=a>if !limiter.Allow(req) {      </span>
+<span class=a>  return ErrRateLimited // 429</span>
+<span class=a>}                             </span>
+applyPolicies(req)
+store.Write(req)</pre></div>
+</div>
+</div>
+
+<div class="pair" id="p2">
+<h2><code>types.Request</code> gains a <code>Tenant</code> field <span class="where">types/request.go</span></h2>
+<div class="cmp">
+<div><p class="say">The request didn't know which tenant sent it; only the connection did.</p>
+<pre>type Request struct {
+  ID      string
+  Payload []byte
+}</pre></div>
+<div><p class="say">Each entry point fills <code>Tenant</code> from its own auth (token, connection metadata, <code>--tenant</code> flag). <code>Limiter</code> keys on it.</p>
+<pre>type Request struct {
+  ID      string
+<span class=a>  Tenant  string</span>
+  Payload []byte
+}</pre></div>
+</div>
+</div>
+</div>
+</section>
+
+<footer>
+<div><b>Verified</b> — table test: same tenant over HTTP then gRPC shares one budget. Entry-point tests pass with local checks removed.</div>
+<div><b>Not changed / limits</b> — limit values and 429 shape unchanged. Counter is per process; replicas get separate budgets (out of scope).</div>
+</footer>
+
+<script>
+const map=document.getElementById('map'),gs=[...map.querySelectorAll('.node')],pairs=[...document.querySelectorAll('.pair')],info=document.getElementById('info'),wires=map.querySelector('.wires')
+function sel(g){gs.forEach(x=>x.classList.toggle('on',x===g));pairs.forEach(p=>p.classList.toggle('on',!!g.dataset.pair&&p.id===g.dataset.pair))
+info.innerHTML=`<b>${g.dataset.name}</b>${g.dataset.path&&g.dataset.path!==g.dataset.name?` <code>${g.dataset.path}</code>`:''}<br>${g.dataset.desc}<br><span class=role>In this PR:</span> ${g.dataset.role}`}
+gs.forEach(g=>{g.onclick=()=>sel(g);g.onfocus=()=>sel(g);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel(g)}}})
+pairs.forEach(p=>p.onclick=()=>sel(gs.find(g=>g.dataset.pair===p.id)))
+const W=[['api.HTTPHandler','orchestrator.Run','R'],['api.GRPCServer','orchestrator.Run','R'],['cli.RunBatch','orchestrator.Run','R'],['orchestrator.Run','storage.Store','R'],['orchestrator.Run','policy.Limiter','D']]
+const find=n=>n[0]==='#'?map.querySelector(n):gs.find(g=>g.dataset.name===n)
+function draw(){const m=map.getBoundingClientRect();const r=el=>{const b=el.getBoundingClientRect();return{l:b.left-m.left,r:b.right-m.left,t:b.top-m.top,b:b.bottom-m.top,cx:(b.left+b.right)/2-m.left,cy:(b.top+b.bottom)/2-m.top}}
+wires.querySelectorAll('path').forEach(p=>p.remove())
+for(const[a,b,side]of W){const A=r(find(a)),B=r(find(b));const d=side==='R'?(Math.abs(A.cy-B.cy)<8?`M${A.r} ${A.cy} H${B.l}`:`M${A.r} ${A.cy} H${(A.r+B.l)/2} V${B.cy} H${B.l}`):`M${A.cx} ${A.b} V${B.t}`
+const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);p.setAttribute('marker-end','url(#ar)');wires.append(p)}}
+draw();addEventListener('resize',draw)
+</script>

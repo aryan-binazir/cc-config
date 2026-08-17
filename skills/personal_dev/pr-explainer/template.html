@@ -1,0 +1,152 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width">
+<title>PR TITLE</title>
+<!--
+  PR Explainer html companion — TEMPLATE. Fill every FILL slot; leave CSS and the JS below "do not edit" untouched.
+  Reference: example.html in this directory is this template filled in. Match it.
+-->
+<style>
+*{box-sizing:border-box}
+section{display:block}
+.ctx{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;max-width:820px}.ctx dd{margin:0}
+.map{position:relative;display:grid;grid-template-columns:auto auto auto;column-gap:56px;align-items:start;margin:0;padding:6px 0 0}
+.col{display:flex;flex-direction:column;gap:28px}
+.node{white-space:nowrap;cursor:pointer;outline:none;text-align:center}.node small,.node b,.node i{display:block}.node i{font-style:normal}.node.mute{cursor:default}
+.group{display:flex;flex-direction:column;gap:12px}.group span{display:block}
+.wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.wires path{fill:none}
+.legend{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.sw{display:inline-block;width:12px;height:12px}.sw.mute{margin-left:14px}
+.code{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:28px;align-items:start}.pair h2{min-height:3.4em}
+.cmp{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;grid-auto-flow:column;gap:6px 10px;align-items:start}.cmp>div{display:contents}
+pre{margin:0;overflow-x:auto}pre::before{display:block;margin-bottom:4px}
+.cmp>div:first-child pre::before{content:"before"}.cmp>div:last-child pre::before{content:"after"}
+.pair h2 .where{display:block;font-weight:400;margin-top:2px}
+.say{margin:0;align-self:end}.say em{font-style:normal}
+footer{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+
+:root{--fg:#0b2545;--mute:#5b6b85;--line:#c9d3e3;--acc:#0b2545;--accbg:#e6edf7;--del:#f6e3e3;--add:#e2f1e6;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+body{margin:0;background:#f7f9fc;background-image:linear-gradient(#eef2f8 1px,transparent 1px),linear-gradient(90deg,#eef2f8 1px,transparent 1px);background-size:24px 24px;color:var(--fg);font:14.5px/1.5 system-ui;padding:32px 40px;max-width:1240px}
+h1{font-size:18px;margin:0 0 12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}h1 small{text-transform:none;letter-spacing:0;color:var(--mute);font-weight:400;margin-left:10px;font-size:13px}
+code{font:.92em var(--mono)}
+.ctx{margin:0 0 26px}.ctx dt{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.1em;padding-top:3px}.ctx dt:nth-of-type(2){color:#8b1e2d}.ctx dt:nth-of-type(3){color:var(--fg)}
+.story{margin:0 0 16px;font-size:14px;color:var(--mute)}
+.node{border:1px solid var(--fg);background:#fff;padding:8px 16px}
+.node small{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:2px}.node b{font:500 14px var(--mono)}.node i{font-size:11.5px;color:var(--mute);margin-top:3px}
+.node.chg{background:var(--accbg);border-width:2px}.node.chg i{color:var(--fg);font-weight:600}
+.node.mute{border-color:var(--line);color:var(--mute);border-style:dashed;background:transparent}.node:focus,.node.on{outline:2px solid var(--fg);outline-offset:3px}
+.group{border:1px solid var(--line);padding:8px 12px 12px;background:rgba(255,255,255,.6)}.group span{font:11px var(--mono);color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.wires path{stroke:var(--fg);stroke-width:1}
+.legend{font-size:11.5px;color:var(--mute);margin:18px 0 0;text-transform:uppercase;letter-spacing:.06em}.sw{border:2px solid var(--fg);background:var(--accbg)}.sw.mute{border:1px dashed var(--line);background:transparent}
+.also{font-size:12.5px;color:var(--mute);margin:10px 0 0}
+.info{margin-top:14px;padding:12px 14px;background:#fff;border:1px solid var(--line);font-size:13.5px;min-height:4.5em;max-width:820px}.info em{color:var(--mute)}.info b{font-weight:600}.info code{color:var(--mute)}.info .role{font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.08em}
+.pair{border-top:2px solid var(--line);padding-top:10px}.pair.on{border-top-color:var(--fg)}
+.pair h2{font-size:14px;font-weight:600;margin:0 0 8px}.pair h2 .where{font:12px var(--mono);color:var(--mute)}
+.say{font-size:13px}.say em{font-weight:700;text-decoration:underline;text-underline-offset:3px}
+pre{font:12.5px/1.45 var(--mono);background:#fff;padding:8px 10px;border:1px solid var(--line)}pre::before{color:var(--mute);font:10px system-ui;text-transform:uppercase;letter-spacing:.1em}
+.d{background:var(--del)}.a{background:var(--add)}
+footer{margin-top:30px;padding-top:12px;border-top:1px solid var(--line);color:var(--mute);font-size:13px}footer b{color:var(--fg);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.08em}
+</style>
+
+<!-- FILL: PR number and a one-line title in plain words -->
+<h1>PR #NNN — what this PR does, in one line<small>PR Explainer · html companion</small></h1>
+<!-- FILL: one sentence each. System = what this service/app is and the path a request or piece of data takes. Problem = what was wrong or missing, concretely. Fix = what this PR does, naming the package and symbol. -->
+<dl class="ctx">
+<dt>System</dt><dd>What system this is, and the path a request takes through it (name the packages).</dd>
+<dt>Problem</dt><dd>What was wrong or missing, in concrete terms.</dd>
+<dt>Fix</dt><dd>What this PR does about it, naming <code>pkg.Symbol</code>.</dd>
+</dl>
+
+<section>
+<div>
+<!-- FILL: one sentence a reader can say aloud while following the arrows left to right. Use the real symbols. -->
+<p class="story">Read left to right: a request enters through <code>pkg.Entry</code>, which calls <code>pkg.Middle</code>, which now calls <code>pkg.NewThing</code>; only then does it reach <code>pkg.Sink</code>.</p>
+<!-- FILL the map. Rules:
+     .col = one column, left→right in the direction data flows. Add to columns that should sit lower (middle/right columns usually).
+     .group = one package. Its <span> label is "package <name>". Every .node lives inside a .group.
+     .node: class "chg" if this PR touched it (needs data-pair = id of its code pair), "mute" if shown for context (data-pair="").
+       data-name = pkg.Symbol (JS uses it for wires), data-path = file, data-desc = what it is (one sentence), data-role = what this PR does to it (one sentence).
+       <small> = kind (func / type / method / package) and must be true. <b> = pkg.Symbol. <i> = what it does now, in plain words; "unchanged" for mute nodes.
+     Keep to the change path: ~8 nodes max. Other callers go in the "also" line below, not in boxes. -->
+<figure class="map" id="map">
+  <div class="col">
+    <div class="group" id="entry"><span>package entry</span>
+      <div class="node chg" tabindex=0 data-pair="p1" data-name="entry.Handler" data-path="entry/handler.go" data-desc="What it is." data-role="What this PR does to it."><small>func</small><b>entry.Handler</b><i>what it does now, in plain words</i></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="group" id="core"><span>package core</span>
+      <div class="node chg" tabindex=0 data-pair="p1" data-name="core.Run" data-path="core/run.go" data-desc="What it is." data-role="What this PR does to it."><small>func</small><b>core.Run</b><i>what it does now, in plain words</i></div>
+    </div>
+    <div class="group" id="policy" style="flex-direction:column-reverse"><span>package policy</span>
+      <div class="node chg" tabindex=0 data-pair="p2" data-name="policy.NewThing" data-path="policy/newthing.go" data-desc="What it is." data-role="New."><small>type</small><b>policy.NewThing</b><i>new type: what it does, in plain words</i></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="group" id="store"><span>package store</span>
+      <div class="node mute" tabindex=0 data-pair="" data-name="store.Store" data-path="store/store.go" data-desc="What it is." data-role="Unchanged."><small>type</small><b>store.Store</b><i>unchanged</i></div>
+    </div>
+  </div>
+  <svg class="wires" aria-hidden="true"><defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#888" stroke="none"/></marker></defs></svg>
+</figure>
+<div class="legend"><span class="sw"></span>changed in this PR — click for its code <span class="sw mute"></span>unchanged, shown for context</div>
+<!-- FILL (optional): callers on the path that are not drawn -->
+<p class="also">Not drawn: N other packages call <code>core.Run</code>; unchanged.</p>
+<div class="info" id="info"><em>Click a box: what it is, and what this PR does to it.</em></div>
+</div>
+
+<div class="code">
+<!-- FILL: 1–3 pairs. id matches a node's data-pair.
+     h2 = the symbol that changed + .where line naming the file(s); if before and after are different files, say "removed from … · added to …".
+     Each side: ONE plain sentence (.say) saying what that code does or meant, then the snippet. Bold (<em>) the one word whose meaning changed.
+     <span class=d> = removed line, <span class=a> = added line. Lines ≤ ~34 chars so both columns fit. -->
+<div class="pair" id="p1">
+<h2><code>core.Run</code> takes over X from the entry points <span class="where">removed from entry/handler.go · added to core/run.go</span></h2>
+<div class="cmp">
+<div><p class="say">What the old code did, and what it was keyed on (<em>old key</em>).</p>
+<pre>// entry/handler.go
+<span class=d>old line</span>
+kept line</pre></div>
+<div><p class="say">What the new code does, and what it is keyed on now (<em>new key</em>).</p>
+<pre>// core/run.go
+<span class=a>new line</span>
+kept line</pre></div>
+</div>
+</div>
+
+<div class="pair" id="p2">
+<h2><code>types.T</code> gains a <code>Field</code> field <span class="where">types/t.go</span></h2>
+<div class="cmp">
+<div><p class="say">What the struct could not express before.</p>
+<pre>type T struct {
+  A string
+}</pre></div>
+<div><p class="say">Who fills the new field and who reads it.</p>
+<pre>type T struct {
+  A string
+<span class=a>  Field string</span>
+}</pre></div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- FILL: one line each. Delete the footer if there is nothing to say. -->
+<footer>
+<div><b>Verified</b> — which tests, and what they show.</div>
+<div><b>Not changed / limits</b> — behavior deliberately left alone; known gaps and why they are out of scope.</div>
+</footer>
+
+<script>
+const map=document.getElementById('map'),gs=[...map.querySelectorAll('.node')],pairs=[...document.querySelectorAll('.pair')],info=document.getElementById('info'),wires=map.querySelector('.wires')
+function sel(g){gs.forEach(x=>x.classList.toggle('on',x===g));pairs.forEach(p=>p.classList.toggle('on',!!g.dataset.pair&&p.id===g.dataset.pair))
+info.innerHTML=`<b>${g.dataset.name}</b>${g.dataset.path&&g.dataset.path!==g.dataset.name?` <code>${g.dataset.path}</code>`:''}<br>${g.dataset.desc}<br><span class=role>In this PR:</span> ${g.dataset.role}`}
+gs.forEach(g=>{g.onclick=()=>sel(g);g.onfocus=()=>sel(g);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel(g)}}})
+pairs.forEach(p=>p.onclick=()=>sel(gs.find(g=>g.dataset.pair===p.id)))
+// FILL: wires. [from data-name, to data-name or '#group-id', 'R' (right edge → left edge) | 'D' (bottom → top)]. An arrow means "calls".
+const W=[['entry.Handler','core.Run','R'],['core.Run','store.Store','R'],['core.Run','policy.NewThing','D']]
+// ---- do not edit below ----
+const find=n=>n[0]==='#'?map.querySelector(n):gs.find(g=>g.dataset.name===n)
+function draw(){const m=map.getBoundingClientRect();const r=el=>{const b=el.getBoundingClientRect();return{l:b.left-m.left,r:b.right-m.left,t:b.top-m.top,b:b.bottom-m.top,cx:(b.left+b.right)/2-m.left,cy:(b.top+b.bottom)/2-m.top}}
+wires.querySelectorAll('path').forEach(p=>p.remove())
+for(const[a,b,side]of W){const A=r(find(a)),B=r(find(b));const d=side==='R'?(Math.abs(A.cy-B.cy)<8?`M${A.r} ${A.cy} H${B.l}`:`M${A.r} ${A.cy} H${(A.r+B.l)/2} V${B.cy} H${B.l}`):`M${A.cx} ${A.b} V${B.t}`
+const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);p.setAttribute('marker-end','url(#ar)');wires.append(p)}}
+draw();addEventListener('resize',draw)
+</script>
