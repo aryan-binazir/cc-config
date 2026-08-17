@@ -28,6 +28,7 @@ body{margin:0;background:#f7f9fc;background-image:linear-gradient(#eef2f8 1px,tr
 h1{font-size:18px;margin:0 0 12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}h1 small{text-transform:none;letter-spacing:0;color:var(--mute);font-weight:400;margin-left:10px;font-size:13px}
 code{font:.92em var(--mono)}
 .ctx{margin:0 0 26px}.ctx dt{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.1em;padding-top:3px}.ctx dt:nth-of-type(2){color:#8b1e2d}.ctx dt:nth-of-type(3){color:var(--fg)}
+.lane+.lane{margin-top:26px;padding-top:18px;border-top:1px solid var(--line)}.lane h3{font:600 13px system-ui;margin:0 0 6px;text-transform:uppercase;letter-spacing:.08em}
 .story{margin:0 0 16px;font-size:14px;color:var(--mute)}
 .node{border:1px solid var(--fg);background:#fff;padding:8px 16px}
 .node small{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:2px}.node b{font:500 14px var(--mono)}.node i{font-size:11.5px;color:var(--mute);margin-top:3px}
@@ -57,16 +58,12 @@ footer{margin-top:30px;padding-top:12px;border-top:1px solid var(--line);color:v
 
 <section>
 <div>
-<!-- FILL: one sentence a reader can say aloud while following the arrows left to right. Use the real symbols. -->
+<!-- FILL: one .lane per independent change in the PR. One lane → omit its <h3>. Several lanes → each gets an <h3> naming the change,
+     its own story line, its own map, and its own "also" line. Each package appears once per lane. ~8 boxes per lane. -->
+<div class="lane">
+<h3>Lane 1 — what this change does, in a few words</h3>
 <p class="story">Read left to right: a request enters through <code>pkg.Entry</code>, which calls <code>pkg.Middle</code>, which now calls <code>pkg.NewThing</code>; only then does it reach <code>pkg.Sink</code>.</p>
-<!-- FILL the map. Rules:
-     .col = one column, left→right in the direction data flows. Add to columns that should sit lower (middle/right columns usually).
-     .group = one package. Its <span> label is "package <name>". Every .node lives inside a .group.
-     .node: class "chg" if this PR touched it (needs data-pair = id of its code pair), "mute" if shown for context (data-pair="").
-       data-name = pkg.Symbol (JS uses it for wires), data-path = file, data-desc = what it is (one sentence), data-role = what this PR does to it (one sentence).
-       <small> = kind (func / type / method / package) and must be true. <b> = pkg.Symbol. <i> = what it does now, in plain words; "unchanged" for mute nodes.
-     Keep to the change path: ~8 nodes max. Other callers go in the "also" line below, not in boxes. -->
-<figure class="map" id="map">
+<figure class="map">
   <div class="col">
     <div class="group" id="entry"><span>package entry</span>
       <div class="node chg" tabindex=0 data-pair="p1" data-name="entry.Handler" data-path="entry/handler.go" data-desc="What it is." data-role="What this PR does to it."><small>func</small><b>entry.Handler</b><i>what it does now, in plain words</i></div>
@@ -87,9 +84,19 @@ footer{margin-top:30px;padding-top:12px;border-top:1px solid var(--line);color:v
   </div>
   <svg class="wires" aria-hidden="true"><defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#888" stroke="none"/></marker></defs></svg>
 </figure>
-<div class="legend"><span class="sw"></span>changed in this PR — click for its code <span class="sw mute"></span>unchanged, shown for context</div>
-<!-- FILL (optional): callers on the path that are not drawn -->
 <p class="also">Not drawn: N other packages call <code>core.Run</code>; unchanged.</p>
+</div>
+<!-- second lane: copy the block above; give its nodes new data-names -->
+<!-- FILL: one sentence a reader can say aloud while following the arrows left to right. Use the real symbols. -->
+<!-- FILL the map. Rules:
+     .col = one column, left→right in the direction data flows. Add to columns that should sit lower (middle/right columns usually).
+     .group = one package. Its <span> label is "package <name>". Every .node lives inside a .group.
+     .node: class "chg" if this PR touched it (needs data-pair = id of its code pair), "mute" if shown for context (data-pair="").
+       data-name = pkg.Symbol (JS uses it for wires), data-path = file, data-desc = what it is (one sentence), data-role = what this PR does to it (one sentence).
+       <small> = kind (func / type / method / package) and must be true. <b> = pkg.Symbol. <i> = what it does now, in plain words; "unchanged" for mute nodes.
+     Keep to the change path: ~8 nodes max. Other callers go in the "also" line below, not in boxes. -->
+
+<div class="legend"><span class="sw"></span>changed in this PR — click for its code <span class="sw mute"></span>unchanged, shown for context</div>
 <div class="info" id="info"><em>Click a box: what it is, and what this PR does to it.</em></div>
 </div>
 
@@ -136,7 +143,7 @@ kept line</pre></div>
 </footer>
 
 <script>
-const map=document.getElementById('map'),gs=[...map.querySelectorAll('.node')],pairs=[...document.querySelectorAll('.pair')],info=document.getElementById('info'),wires=map.querySelector('.wires')
+const maps=[...document.querySelectorAll('.map')],gs=maps.flatMap(m=>[...m.querySelectorAll('.node')]),pairs=[...document.querySelectorAll('.pair')],info=document.getElementById('info')
 function sel(g){gs.forEach(x=>x.classList.toggle('on',x===g));pairs.forEach(p=>p.classList.toggle('on',!!g.dataset.pair&&p.id===g.dataset.pair))
 info.innerHTML=`<b>${g.dataset.name}</b>${g.dataset.path&&g.dataset.path!==g.dataset.name?` <code>${g.dataset.path}</code>`:''}<br>${g.dataset.desc}<br><span class=role>In this PR:</span> ${g.dataset.role}`}
 gs.forEach(g=>{g.onclick=()=>sel(g);g.onfocus=()=>sel(g);g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel(g)}}})
@@ -148,10 +155,10 @@ pairs.forEach(p=>p.onclick=()=>sel(gs.find(g=>g.dataset.pair===p.id)))
 // FILL: wires. [from data-name, to data-name or '#group-id', 'R' (right edge → left edge) | 'D' (bottom → top)]. An arrow means "calls".
 const W=[['entry.Handler','core.Run','R'],['core.Run','store.Store','R'],['core.Run','policy.NewThing','D']]
 // ---- do not edit below ----
-const find=n=>n[0]==='#'?map.querySelector(n):gs.find(g=>g.dataset.name===n)
-function draw(){const m=map.getBoundingClientRect();const r=el=>{const b=el.getBoundingClientRect();return{l:b.left-m.left,r:b.right-m.left,t:b.top-m.top,b:b.bottom-m.top,cx:(b.left+b.right)/2-m.left,cy:(b.top+b.bottom)/2-m.top}}
+const find=(m,n)=>n[0]==='#'?m.querySelector(n):[...m.querySelectorAll('.node')].find(g=>g.dataset.name===n)
+function draw(){for(const map of maps){const wires=map.querySelector('.wires'),mb=map.getBoundingClientRect();const r=el=>{const b=el.getBoundingClientRect();return{l:b.left-mb.left,r:b.right-mb.left,t:b.top-mb.top,b:b.bottom-mb.top,cx:(b.left+b.right)/2-mb.left,cy:(b.top+b.bottom)/2-mb.top}}
 wires.querySelectorAll('path').forEach(p=>p.remove())
-for(const[a,b,side]of W){const A=r(find(a)),B=r(find(b));const d=side==='R'?(Math.abs(A.cy-B.cy)<8?`M${A.r} ${A.cy} H${B.l}`:`M${A.r} ${A.cy} H${(A.r+B.l)/2} V${B.cy} H${B.l}`):`M${A.cx} ${A.b} V${B.t}`
-const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);p.setAttribute('marker-end','url(#ar)');wires.append(p)}}
+for(const[a,b,side]of W){const ea=find(map,a),eb=find(map,b);if(!ea||!eb)continue;const A=r(ea),B=r(eb);const d=side==='R'?(Math.abs(A.cy-B.cy)<8?`M${A.r} ${A.cy} H${B.l}`:`M${A.r} ${A.cy} H${(A.r+B.l)/2} V${B.cy} H${B.l}`):`M${A.cx} ${A.b} V${B.t}`
+const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);p.setAttribute('marker-end','url(#ar)');wires.append(p)}}}
 draw();addEventListener('resize',draw)
 </script>

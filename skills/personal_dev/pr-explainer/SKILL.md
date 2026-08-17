@@ -42,19 +42,20 @@ Explain the current pull request to a reader who is starting cold. Orient them i
 
 ## `html` mode
 
-`/pr-explainer html` produces a one-page visual companion. Prose mode is the full explanation; html mode is the map and the code.
+`/pr-explainer html` gives the normal prose explanation in chat **and** a one-page visual companion. The page is the map and the code; the chat is where the reader asks questions.
 
 **Reader.** An engineer who does not know this system. Thinks in packages, types, functions. Has read none of the code. Wants names they can grep.
 
 **Files.** `template.html`: fixed CSS/JS, fill the `FILL` slots only. `example.html`: the template filled for a fictional PR; match its shape and density.
 
-**Steps.** Copy `template.html` to `_scratch/pr-explainer/<branch>.html`. Fill it top to bottom. `open` it, reply with the path.
+**Steps.** Write the prose explanation in chat as usual. Copy `template.html` to `_scratch/pr-explainer/<branch>.html`, fill it top to bottom, `open` it, and end the reply with the path.
 
 **Page, top to bottom.**
 - Title: PR number + one plain line.
 - System / Problem / Fix, one sentence each, before any picture. System names the packages a request passes through. Fix names `pkg.Symbol`.
+- Lanes: one `.lane` per independent change in the PR. One change → one lane, no heading. Several → each lane gets a short heading, its own story line, its own map, its own "also" line. If the story line needs "one lane at a time", split into lanes.
 - Story line: one sentence readable aloud while following the arrows, using real symbols.
-- Map: the change path, not the system. ~8 boxes, left to right in the direction data flows.
+- Map: one change path per lane, not the system. ~8 boxes, left to right in the direction data flows. Each package appears once per lane.
   - Every box lives in a container labelled `package <name>`.
   - Box = kind tag (func / type / method, true) + `pkg.Symbol` + one plain phrase saying what it does now ("no longer checks the limit itself"; "unchanged" for context boxes). Plain words only; no diff symbols or shorthand.
   - Blue = this PR touched it; gray = context. The legend says so; every click obeys it (blue → its code pair, gray → description only).
