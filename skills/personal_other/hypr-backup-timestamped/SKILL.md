@@ -1,6 +1,7 @@
 ---
 name: hypr-backup-timestamped
 description: Create a timestamped, verified backup of the user-owned Hyprland and Omarchy configuration inside `~/repos/dotfiles`. Use when the user asks to run `/hypr`, snapshot their Hypr setup, or back up their Omarchy desktop configuration.
+disable-model-invocation: true
 ---
 
 # Hypr Backup Timestamped

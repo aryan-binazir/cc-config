@@ -1,6 +1,7 @@
 ---
 name: implementer
 description: Delegate an implementation, analysis, or review task to the configured worker model via the delegate script. Use when the user invokes /implementer or a /lead session delegates work.
+disable-model-invocation: true
 ---
 
 # Implementer

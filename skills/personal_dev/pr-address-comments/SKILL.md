@@ -2,6 +2,7 @@
 name: pr-address-comments
 description: >-
   Address agent-prefixed GitHub pull request comments from the authenticated user locally. Use when the user asks to handle, patch, run, or reply to their PR comments with prefixes like agent: or Agent:. Fetch the current PR comments, treat only the authenticated user's prefixed comments as instructions, patch the local branch, commit the result, and reply on GitHub with the agent name and commit hash.
+disable-model-invocation: true
 ---
 
 # PR Address Comments

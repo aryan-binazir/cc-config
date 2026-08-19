@@ -7,6 +7,7 @@ description: >-
   verification, commit and push, and configured review. Use this
   whenever the user invokes rocket, rocket codex, or rocket claude, or asks for the lighter, lower-friction
   alternative to rocket-plan for an end-to-end task.
+disable-model-invocation: true
 ---
 
 # Rocket

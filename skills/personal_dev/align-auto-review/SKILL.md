@@ -1,6 +1,7 @@
 ---
 name: align-auto-review
 description: Reconcile user-authored Auto-review intent across Claude Code, Codex, and Cursor while preserving native policy models and defaults. Use when asked to add, remove, compare, or synchronize Auto-review policy.
+disable-model-invocation: true
 ---
 
 # Align Auto-review

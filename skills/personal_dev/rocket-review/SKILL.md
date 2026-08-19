@@ -6,6 +6,7 @@ description: >-
   the final review loop, or wants Codex to ensure the current branch has a PR,
   run the configured reviewers, patch what should be patched, and post one final
   PR summary comment. Optional usage: `rocket-review PROFILE`.
+disable-model-invocation: true
 ---
 
 # Rocket Review

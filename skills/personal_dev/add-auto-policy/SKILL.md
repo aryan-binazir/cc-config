@@ -1,6 +1,7 @@
 ---
 name: add-auto-policy
 description: Add one approve or deny rule to both Claude Code Auto mode and Codex Auto-review, translating the same intent into each native policy format. Use only when explicitly invoked with one action and approve or deny; use align-auto-review for broader comparison, removal, or synchronization.
+disable-model-invocation: true
 ---
 
 # Add Auto Policy

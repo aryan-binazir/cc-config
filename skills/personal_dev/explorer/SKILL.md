@@ -1,6 +1,7 @@
 ---
 name: explorer
 description: Delegate read-only codebase exploration — mapping a subsystem, answering "where/how does X happen", surveying call sites — to the fan-out explore worker via the delegate script. Use when the user invokes /explorer, or when a /lead or /rocket session wants recon without spending its own context.
+disable-model-invocation: true
 ---
 
 # Explorer

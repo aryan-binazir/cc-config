@@ -1,6 +1,7 @@
 ---
 name: ask-adversary-in-block
 description: Use when the user invokes ask-adversary-in-block or asks to replace the normal human clarification pass with one configured adversarial model call. Collect every question into one block, take the critique seriously, make the final decisions, and report them to the user.
+disable-model-invocation: true
 ---
 
 # Ask Adversary In Block

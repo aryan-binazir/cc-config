@@ -1,6 +1,7 @@
 ---
 name: lead
 description: Act as session lead — plan and review, delegating every file change via the implementer skill and recon via the explorer skill. Use when the user invokes /lead.
+disable-model-invocation: true
 ---
 
 # Lead
