@@ -40,13 +40,13 @@ Explain the current pull request to a reader who is starting cold. Orient them i
 - Say when the available evidence falls short of a conclusion.
 - After pushing a fix based on a PR comment, reply directly to that comment with the commit hash, alone or in a sentence.
 
-## `html` mode
+## `visual` mode
 
-`/pr-explainer html` gives the normal prose explanation in chat **and** a one-page visual companion. The page is the map and the code; the chat is where the reader asks questions.
+`/pr-explainer visual` gives the normal prose explanation in chat **and** a one-page visual companion. The page is the map and the code; the chat is where the reader asks questions.
 
 **Reader.** An engineer who does not know this system. Thinks in packages, types, functions. Has read none of the code. Wants names they can grep.
 
-**Files.** `template.html`: fixed CSS/JS, fill the `FILL` slots only. `example.html`: the template filled for a fictional PR; match its shape and density.
+**Files.** Always use `template.html`; do not create your own HTML. Its CSS/JS is fixed, so fill the `FILL` slots only. `example.html`: the template filled for a fictional PR; match its shape and density.
 
 **Steps.** Write the prose explanation in chat as usual. Copy `template.html` to `_scratch/pr-explainer/<branch>.html`, fill it top to bottom, `open` it, and end the reply with the path.
 
