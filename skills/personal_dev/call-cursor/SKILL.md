@@ -9,7 +9,7 @@ Ask Cursor/Composer for a second opinion, plan critique, implementation critique
 
 ## Command
 
-Use the bundled wrapper. It merges `call-cursor.example.yaml` with the ignored
+Use the bundled launcher. It merges `call-cursor.example.yaml` with the ignored
 `call-cursor.local.yaml`, then applies the resolved model and timeout. It runs
 Cursor in print mode with sandboxing enabled, defaulting to
 `cursor-grok-4.6-xhigh` (Grok 4.6 Extra High):
@@ -19,18 +19,23 @@ PROMPT=$(cat <<'EOF'
 ...
 EOF
 )
-uv run --script "<call-cursor-skill-dir>/scripts/call.py" "$PROMPT"
+bash "<call-cursor-skill-dir>/scripts/call.sh" "$PROMPT"
 ```
 
 Inspect the effective config without calling Cursor:
 
 ```bash
-uv run --script "<call-cursor-skill-dir>/scripts/call.py" --resolve --pretty
+bash "<call-cursor-skill-dir>/scripts/call.sh" --resolve --pretty
 ```
 
-The wrapper passes `--auto-review` explicitly. Run only in the sandboxed,
+The launcher passes `--auto-review` explicitly. Run only in the sandboxed,
 approval-reviewed mode shown here; an older CLI that lacks Auto-review must fail
-rather than falling back to another approval mode.
+rather than falling back to another approval mode. In T3 Code, request host
+execution for this exact launcher; a reusable approval may cover only
+`bash <call-cursor-skill-dir>/scripts/call.sh`. The launcher then runs the full
+wrapper through the user service manager so UV and Cursor escape the app's
+filesystem and network restrictions while Cursor's own sandbox remains enabled.
+Outside T3 Code, it runs the wrapper directly.
 
 ## Model Selection
 

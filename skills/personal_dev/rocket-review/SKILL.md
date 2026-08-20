@@ -44,7 +44,7 @@ Runner commands:
   `<call-cursor-skill-dir>` is that file's directory.
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
 - `codex`: `codex --sandbox read-only --ask-for-approval on-request -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null`
-- `cursor`: `uv run --script "<call-cursor-skill-dir>/scripts/call.py" "$PROMPT"`
+- `cursor`: `bash "<call-cursor-skill-dir>/scripts/call.sh" "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag; for
 Cursor pass it to the wrapper. Pass Cursor `timeout_ms` to the wrapper as
