@@ -5,10 +5,11 @@ usage() {
   cat >&2 <<'USAGE'
 usage: open_nvim_tmux.sh [--print] <repo-root> <file> [line] [column]
 
+Inside Herdr (HERDR_ENV=1): opens the file in a new tab of the current workspace.
 Inside tmux (TMUX set): opens the file in a new window of the current session.
-Outside tmux (GUI apps, t3code, plain shells): prints a paste-able tmux command
-instead, targeting the tmux session named after the repo. --print forces the
-print behavior.
+Outside Herdr and tmux (GUI apps, t3code, plain shells): prints a paste-able
+tmux command targeting the tmux session named after the repo. --print forces
+the print behavior.
 USAGE
 }
 
@@ -64,6 +65,21 @@ fi
 
 printf -v command '%q ' "${nvim_cmd[@]}"
 command=${command% }
+
+if [ "$print_only" -eq 0 ] && [ "${HERDR_ENV:-}" = 1 ]; then
+  if [ -z "${HERDR_WORKSPACE_ID:-}" ]; then
+    printf 'HERDR_WORKSPACE_ID is required inside Herdr\n' >&2
+    exit 1
+  fi
+
+  tab_result=$(herdr tab create \
+    --workspace "$HERDR_WORKSPACE_ID" \
+    --cwd "$repo_root" \
+    --focus)
+  pane_id=$(jq -er '.result.root_pane.pane_id' <<<"$tab_result")
+  herdr pane run "$pane_id" "$command" >/dev/null
+  exit 0
+fi
 
 if [ "$print_only" -eq 0 ] && [ -n "${TMUX:-}" ]; then
   # Open a shell first and type the command into it, so the window survives

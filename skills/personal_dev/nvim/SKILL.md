@@ -1,12 +1,12 @@
 ---
 name: nvim
-description: Use only when the user explicitly invokes $nvim or /nvim to open the currently discussed code, file, test, symbol, or location in Neovim — in a new tmux window when inside tmux, otherwise by printing a paste-able tmux command targeting the repo's session.
+description: Use only when the user explicitly invokes $nvim or /nvim to open the currently discussed code, file, test, symbol, or location in Neovim — in a new Herdr tab when inside Herdr, a new tmux window when inside tmux, otherwise by printing a paste-able tmux command targeting the repo's session.
 disable-model-invocation: true
 ---
 
 # Nvim
 
-Open the current code/document reference in a new tmux window with `nvim`.
+Open the current code/document reference in a new Herdr tab or tmux window with `nvim`.
 
 ## Behavior
 
@@ -45,14 +45,15 @@ With a column:
 ~/repos/cc-config/skills/personal_dev/nvim/scripts/open_nvim_tmux.sh "$repo_root" path/to/file.go 150 14
 ```
 
-The helper has two modes:
+The helper chooses the active terminal manager, with Herdr taking precedence if both environments are present:
 
+- Inside Herdr (`$HERDR_ENV` is `1`): opens a new tab in the caller's current workspace, rooted at the repo, and runs nvim in its shell. The tab survives quitting nvim and the helper prints nothing.
 - Inside tmux (`$TMUX` set): opens a new window in the current session and runs nvim in its shell (the window survives quitting nvim); prints nothing.
-- Outside tmux (GUI apps such as t3code, plain shells): the agent cannot know which terminal the user is looking at, so the helper prints a paste-able `tmux new-window ... \; send-keys ... \; switch-client` command targeting the tmux session named after the repo (worktrees resolve to their parent repo). If no session matches it prints one line per existing session; if there are no sessions it prints a plain `cd ... && nvim ...` line.
+- Outside Herdr and tmux (GUI apps such as t3code, plain shells): the agent cannot know which terminal the user is looking at, so the helper prints a paste-able `tmux new-window ... \; send-keys ... \; switch-client` command targeting the tmux session named after the repo (worktrees resolve to their parent repo). If no session matches it prints one line per existing session; if there are no sessions it prints a plain `cd ... && nvim ...` line.
 
 ## Reporting
 
-Inside tmux, respond with only the opened location:
+Inside Herdr or tmux, respond with only the opened location:
 
 ```text
 Opened internal/api/server/routes.go at line 84.
