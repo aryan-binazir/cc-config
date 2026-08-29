@@ -1,10 +1,10 @@
 ---
-name: auth-implementer
-description: Delegate a well-defined change to a worker that gets it done in one hour and returns a reviewed PR. Use when the user invokes /auth-implementer.
+name: auto-implementer
+description: Delegate a well-defined change to a worker that gets it done in one hour and returns a reviewed PR. Use when the user invokes /auto-implementer.
 disable-model-invocation: true
 ---
 
-# Auth Implementer
+# Auto Implementer
 
 One worker, one hour, one reviewed PR, zero questions back. Mechanics live in the `implementer` skill.
 
