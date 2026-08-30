@@ -24,7 +24,7 @@ Create one copy-only snapshot containing both sides of the Omarchy desktop setup
 
 1. Verify that `~/.config/hypr` and `~/.config/omarchy` exist and resolve both real paths.
 2. Verify that `~/repos/dotfiles` is a git repository.
-3. Pull the latest dotfiles changes with a fast-forward-only strategy.
+3. Pull the latest dotfiles changes with a fast-forward-only strategy outside the Codex sandbox.
 4. Create a timestamped backup directory at `~/repos/dotfiles/stow/arch-linux/other/BACKUP-hypr-config-<timestamp>`.
 5. Copy `~/.config/hypr` to `<backup>/hypr` and `~/.config/omarchy` to `<backup>/omarchy`, preserving permissions, timestamps, and symlinks.
 6. Write `README-BACKUP.txt` with the snapshot time, both resolved source paths, destination layout, and copy-only policy.
