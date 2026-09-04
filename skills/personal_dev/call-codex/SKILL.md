@@ -12,7 +12,7 @@ Ask Codex for a second opinion, plan critique, implementation critique, or indep
 Use the bundled wrapper. It merges `call-codex.example.yaml` with the ignored
 `call-codex.local.yaml`, then applies the resolved model, reasoning effort, and
 timeout. It runs Codex with workspace sandboxing, automatic approval review,
-and stdin redirected from `/dev/null`, defaulting to `gpt-5.6-sol` with `high`
+and stdin redirected from `/dev/null`, defaulting to `gpt-6-astra` with `high`
 reasoning effort:
 
 ```bash
