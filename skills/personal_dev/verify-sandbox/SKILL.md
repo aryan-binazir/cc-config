@@ -45,7 +45,8 @@ Configuration resolves from `verify-sandbox.example.yaml`, optional
    sized to the behavior under test.
 3. **Exercise.** Drive each of the task's acceptance claims — happy path plus
    at least one failure or edge path — via the real binary, integration tests,
-   or a throwaway harness. A real harness beats a thin probe: delegate
+   or a throwaway harness. Default to writing a harness that proves the changed
+   behavior; skip only if infeasible and state why. Delegate
    harness construction through the `implementer` skill (`medium` fits most
    harness builds; pick the tier by fit). The main agent then runs that
    harness against the sandbox itself — execution, evidence, and the verdict
