@@ -2,5 +2,5 @@
 # call-codex.local.yaml is ignored by git.
 
 model: gpt-6-astra
-reasoning_effort: high
+reasoning_effort: medium
 timeout_ms: 900000

@@ -31,7 +31,7 @@ plan_profiles:
       name: Codex
       runner: codex
       model: gpt-6-astra
-      reasoning_effort: high
+      reasoning_effort: medium
       timeout_ms: 1500000
     grill:
       skill: grill-with-docs
@@ -54,6 +54,6 @@ review_profiles:
       - name: Codex
         runner: codex
         model: gpt-6-astra
-        reasoning_effort: high
+        reasoning_effort: medium
         timeout_ms: 2100000
         max_rounds: 2
