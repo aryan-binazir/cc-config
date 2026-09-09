@@ -26,19 +26,19 @@ workers:
     description: Escalation only — use after high fails, or when the user explicitly requests maximum reasoning.
     runner: codex
     model: gpt-6-astra
-    reasoning_effort: xhigh
+    reasoning_effort: high
     timeout_ms: 1800000
   high:
     description: Default for difficult work, including subtle bugs, architecture, gnarly debugging, and complex implementation.
     runner: codex
     model: gpt-6-astra
-    reasoning_effort: high
+    reasoning_effort: medium
     timeout_ms: 1500000
   medium:
     description: Bulk implementation with a clear spec. Pass --subagents N to parallelize independent slices (disjoint files).
     runner: codex
     model: gpt-6-astra
-    reasoning_effort: medium
+    reasoning_effort: low
     timeout_ms: 1500000
   low:
     description: Targeted, near-deterministic edits from an exact spec.
@@ -56,7 +56,7 @@ workers:
     description: Read-only exploration, codebase mapping, and question-answering; returns a findings file the next handoff can cite. Sub-agents do the reading, the orchestrator synthesizes.
     runner: codex
     model: gpt-6-astra
-    reasoning_effort: medium
+    reasoning_effort: low
     service_tier: priority
     kind: explore
     subagent:
