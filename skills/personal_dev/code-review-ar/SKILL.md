@@ -11,7 +11,9 @@ Review only the changes introduced on the current branch since merge-base. Use p
 
 Review only commits between merge-base and `HEAD`, and only files this branch intentionally modified. Ignore unrelated pre-existing code, upstream changes brought in by merges or rebases, and rebase-noise files.
 
-Use only the diff as evidence; put anything you are unsure about under `## Uncertain`.
+Check changes against repo rules (`AGENTS.md`, `CLAUDE.md`, coding standards) and conventions in surrounding code. Ground findings in issues introduced by the diff; label uncertainty under `## Uncertain`.
+
+Honor any supplied implementation contract and its scope.
 
 ## Get Changes
 
@@ -33,11 +35,11 @@ git diff --stat $BASE..HEAD
 
 Default mode. Run sub-agents in parallel, each working independently from the same diff.
 
-If an implementation contract (Goal, Accepted scope, Assumptions, Out of scope, Validation approach) is provided in the caller's prompt, include it in each sub-agent's prompt so they review against the contract too. Treat Out of scope items as deliberate, settled exclusions.
+Pass any supplied implementation contract and applicable repo rules to each sub-agent.
 
 - **Agent 1: Correctness & Regressions** — Does this code actually work? Logic errors, broken algorithms, wrong assumptions. Will merging break existing functionality? Removed behavior, changed contracts, broken integrations.
 - **Agent 2: Security & Performance** — Injection risks, auth issues, data exposure, secrets in code. N+1 queries, unnecessary loops, memory leaks, expensive operations.
-- **Agent 3: Maintainability & Edge Cases** — Naming, complexity, duplication, missing error handling, test coverage gaps. What inputs would break this? Null handling, empty arrays, boundary conditions, race conditions.
+- **Agent 3: Maintainability & Edge Cases** — Repo rules and conventions, naming, complexity, duplication, missing error handling, test coverage gaps. What inputs would break this? Null handling, empty arrays, boundary conditions, race conditions.
 
 ## Single Review
 
@@ -47,7 +49,7 @@ Only when explicitly requested. Review focus:
 2. **Regressions**: Removed behavior, changed contracts, broken integrations.
 3. **Security**: Injection risks, auth issues, data exposure, secrets in code.
 4. **Performance**: N+1 queries, unnecessary loops, memory leaks, expensive operations.
-5. **Maintainability**: Naming, complexity, duplication, missing error handling, test coverage gaps.
+5. **Maintainability**: Repo rules and conventions, naming, complexity, duplication, missing error handling, test coverage gaps.
 6. **Edge Cases**: Null handling, empty arrays, boundary conditions, race conditions.
 
 ## Output
