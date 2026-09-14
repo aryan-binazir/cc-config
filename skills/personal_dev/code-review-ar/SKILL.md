@@ -1,11 +1,11 @@
 ---
-name: code-review
-description: Review committed changes on the current branch since it diverged from the base branch and report only issues that need fixing. Use when the user asks for a review of committed branch changes, a diff review against main, or whether the current branch is safe to merge. Default mode uses parallel sub-agent passes for correctness, security, performance, maintainability, and edge cases, then integrates a single findings-first review. Use `code-review single` only when the user explicitly asks for a single-pass review.
+name: code-review-ar
+description: Review committed changes on the current branch since it diverged from the base branch and report only issues that need fixing. Use when the user asks for a review of committed branch changes, a diff review against main, or whether the current branch is safe to merge. Default mode uses parallel sub-agent passes for correctness, security, performance, maintainability, and edge cases, then integrates a single findings-first review. Use `code-review-ar single` only when the user explicitly asks for a single-pass review.
 ---
 
-# Code Review
+# Code Review AR
 
-Review only the changes introduced on the current branch since merge-base. Use parallel sub-agents by default; use single-pass review only when the user or a calling skill explicitly requests `code-review single`.
+Review only the changes introduced on the current branch since merge-base. Use parallel sub-agents by default; use single-pass review only when the user or a calling skill explicitly requests `code-review-ar single`.
 
 ## Scope
 

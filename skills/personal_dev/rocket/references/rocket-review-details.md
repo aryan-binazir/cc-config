@@ -51,8 +51,8 @@ simpler existing repo patterns, helpers, abstractions, or integration points
 that should have been used instead.
 
 Review only the changes introduced on this branch. The configured slash command
-handles scoping. The canonical `/code-review` command runs parallel review by
-default; only `/code-review single` runs the single-pass alternative.
+handles scoping. The canonical `/code-review-ar` command runs parallel review by
+default; only `/code-review-ar single` runs the single-pass alternative.
 
 Give a brutally honest review of whether the current branch satisfies the
 contract and whether it used the simplest repo-idiomatic implementation path.
@@ -95,8 +95,8 @@ them.
 
 For a qualifying non-approval follow-up, give the reviewer its complete round 1
 output, the disposition of every finding, the patch commit, and a concise patch
-summary. If the configured slash command is `/code-review`, label this follow-up
-`/code-review single`; the default command's parallel discovery passes are
+summary. If the configured slash command is `/code-review-ar`, label this follow-up
+`/code-review-ar single`; the default command's parallel discovery passes are
 appropriate for round 1 but not fix verification. Do not persist that
 substitution back to config. Begin the follow-up request with:
 

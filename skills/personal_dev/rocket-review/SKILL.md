@@ -225,8 +225,8 @@ plus the patch decisions and commit, and ask whether the fixes are
 satisfactory — it verifies the round 1 findings and flags unresolved findings
 or regressions caused by the patches. Keep round 2 scoped to exactly that
 follow-up; full-branch discovery stays a round 1 activity. When the configured
-slash command is `/code-review`, identify the round 2 command as
-`/code-review single` so its default parallel discovery workflow stays off — a
+slash command is `/code-review-ar`, identify the round 2 command as
+`/code-review-ar single` so its default parallel discovery workflow stays off — a
 round-scoped prompt change that leaves the saved reviewer configuration as-is.
 
 For each finding, choose exactly one diary status: `[patched]`,
