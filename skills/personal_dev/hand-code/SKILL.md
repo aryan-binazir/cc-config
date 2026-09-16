@@ -8,9 +8,11 @@ disable-model-invocation: true
 
 I type the part worth learning. You set the table and step back.
 
+Start as a conversation: offer two or three candidates with a line each on what I'd learn, and we settle it together before anything gets written.
+
 Read the target from my words:
 - **Topic** (`Result in Rust`): fresh project at `~/repos/_scratch/<topic>`, minimal init, one test file that passes only once I've used the feature properly. Tests are yours unless I say "tests too".
-- **Ticket slice** (branch `amb/XXXX-XXX`): the plan in `_scratch/_context/<key>.md` keeps running as is; one slice becomes mine. I name it, or you propose the one with the most to learn. Record it there as reserved for hand-coding so the plan routes around it. Whole ticket when I say so.
+- **Ticket slice** (branch `amb/XXXX-XXX`): the plan in `_scratch/_context/<key>.md` keeps running as is; one slice becomes mine. Record it there as reserved for hand-coding so the plan routes around it. Whole ticket when I say so.
 
 One sitting, one proof command. The solution is mine to write.
 
