@@ -1,6 +1,6 @@
 ---
 name: hand-code
-description: Keep my hands in the language. Given a topic ("Result in Rust"), brief me on the idea, then build the smallest sandbox with that part left as a hole. Given a ticket, reserve one slice of the running plan for me. Then open it in Neovim.
+description: Keep my hands in the language. Given a topic ("Result in Rust"), brief me, then build the smallest sandbox with that part left as a hole. Given a ticket, reserve one slice of the plan for me. Then open it in Neovim.
 disable-model-invocation: true
 ---
 
@@ -8,13 +8,13 @@ disable-model-invocation: true
 
 Keep my hands in the language. You brief me and set the table; I type the part that exercises it.
 
-One sitting: about fifteen minutes of typing with the brief and the test in front of me. That sizes the hole; nobody times me.
+Size the hole to fifteen minutes of typing with the brief and the test beside me. The pace is mine.
 
 ## 1. Settle the target
 
-Offer two or three candidates, one line each on the feature I would exercise. We pick together before anything gets written.
+Offer two or three candidates, one line each on the feature I would exercise. We pick together, then you build.
 
-- **Topic** (`Result in Rust`): smallest project that runs at `~/repos/_scratch/<topic>`. One feature, one file, one test that passes only once I have used it properly. Tests are yours unless I say "tests too".
+- **Topic** (`Result in Rust`): smallest project that runs at `~/repos/_scratch/<topic>`. One feature, one file, one test that passes once I have used it properly. Tests are yours unless I say "tests too".
 - **Ticket slice** (branch `amb/XXXX-XXX`): the plan in `_scratch/_context/<key>.md` keeps running; one slice becomes mine. Record it there as reserved for hand-coding so the plan routes around it. Whole ticket when I say so.
 
 ## 2. Build the hole
