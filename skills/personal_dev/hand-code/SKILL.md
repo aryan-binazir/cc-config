@@ -1,25 +1,17 @@
 ---
 name: hand-code
-description: Find one small, worthwhile code change for me to hand-code in the current repo, then open it in Neovim.
+description: Set the table for me to hand-code the part worth learning. Given a topic ("Result in Rust") or a ticket slice, build the smallest runnable scaffold with that part left as a hole, then open it in Neovim.
 disable-model-invocation: true
 ---
 
 # Hand Code
 
-Scout only. Read and report. Do not edit, commit, or create branches or tickets.
+I type the part worth learning. You build everything around it.
 
-Require one mode keyword. If neither is present, ask.
+Read the target from my words:
+- **Topic** (`Result in Rust`): fresh project at `~/repos/_scratch/<topic>`, minimal init, one test file that passes only once I've used the feature properly.
+- **Ticket slice** (branch `amb/XXXX-XXX`): chores are yours, the slice is mine. I name the slice, or you propose the one with the most to learn. Fixtures, wiring, boilerplate done; the slice a stub with a failing test. Start from `_scratch/_context/<key>.md`. Whole ticket when I say so.
 
-- `learn`: The language is new to me. Pick a contained task with nearby tests or examples to copy from. Name the language features I will practice, but do not solve the task.
-- `sharp`: I know the language. Reading and tracing the existing code is part of the exercise, so give minimal clues.
+Tests are yours unless I say "tests too". One sitting, one proof command. Stubs stay honest holes; the solution is mine to write.
 
-If I name a ticket/branch, or the current branch is one (e.g. `amb/XXXX-XXX`), pick unfinished work in its scope, checking `_scratch/_context/<ticket-key>.md` if it exists. Otherwise pick from anywhere in the repo.
-
-Find one real change I can finish in one sitting: a bug you can show, missing behavior, or concrete maintenance pain. Coverage numbers, style preferences, and imagined refactors do not count. If there is no honest task, say so.
-
-Tell me what to change, why it matters with `file:line` evidence, what done means, and the command that proves it. Then open the starting file and line:
-
-```bash
-repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-~/repos/cc-config/skills/personal_dev/nvim/scripts/open_nvim_tmux.sh "$repo_root" <file> <line>
-```
+Hand off in five lines: what I'm building, the one idea it exercises, the proof command, where to start. Then run the `nvim` skill on the stub at the hole.
