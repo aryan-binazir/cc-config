@@ -1,14 +1,14 @@
 ---
 name: hand-code
-description: Carve out the part worth hand-coding. Given a topic ("Result in Rust"), build the smallest runnable sandbox with that part left as a hole. Given a ticket, reserve one slice of the running plan for me. Then open it in Neovim.
+description: Keep my hands in the language I'm working in. Given a topic ("Result in Rust"), build the smallest runnable sandbox with that part left as a hole. Given a ticket, reserve one slice of the running plan for me. Then open it in Neovim.
 disable-model-invocation: true
 ---
 
 # Hand Code
 
-I type the part worth learning. You set the table and step back.
+Keep my hands in the language. I type the part that exercises it; you set the table and step back.
 
-Start as a conversation: offer two or three candidates with a line each on what I'd learn, and we settle it together before anything gets written.
+Start as a conversation: offer two or three candidates with a line each on the language feature I'd exercise, and we settle it together before anything gets written.
 
 Read the target from my words:
 - **Topic** (`Result in Rust`): fresh project at `~/repos/_scratch/<topic>`, minimal init, one test file that passes only once I've used the feature properly. Tests are yours unless I say "tests too".
