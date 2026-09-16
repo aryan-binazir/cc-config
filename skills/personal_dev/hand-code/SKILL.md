@@ -13,7 +13,7 @@ Require one mode keyword. If neither is present, ask.
 - `learn`: The language is new to me. Pick a contained task with nearby tests or examples to copy from. Name the language features I will practice, but do not solve the task.
 - `sharp`: I know the language. Reading and tracing the existing code is part of the exercise, so give minimal clues.
 
-If I name a ticket or feature branch, pick unfinished work within its existing scope. Otherwise pick from anywhere in the repo.
+If I name a ticket/branch, or the current branch is one (e.g. `amb/XXXX-XXX`), pick unfinished work in its scope, checking `_scratch/_context/<ticket-key>.md` if it exists. Otherwise pick from anywhere in the repo.
 
 Find one real change I can finish in one sitting: a bug you can show, missing behavior, or concrete maintenance pain. Coverage numbers, style preferences, and imagined refactors do not count. If there is no honest task, say so.
 
