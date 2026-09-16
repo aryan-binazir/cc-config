@@ -12,7 +12,7 @@ Size the hole to fifteen minutes of typing with the brief and the test beside me
 
 ## 1. Settle the target
 
-Offer two or three candidates, one line each on the feature I would exercise. We pick together, then you build.
+Offer two or three candidates, one line each on what I would build and what it teaches, in plain words for someone who has never seen the feature. We pick together, then you build.
 
 - **Topic** (`Result in Rust`): smallest project that runs at `~/repos/_scratch/<topic>`. One feature, one file, one test that passes once I have used it properly. Tests are yours unless I say "tests too".
 - **Ticket slice** (branch `amb/XXXX-XXX`): the plan in `_scratch/_context/<key>.md` keeps running; one slice becomes mine. Record it there as reserved for hand-coding so the plan routes around it. Whole ticket when I say so.
