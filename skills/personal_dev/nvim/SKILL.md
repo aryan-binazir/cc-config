@@ -1,7 +1,7 @@
 ---
 name: nvim
 description: Use only when the user explicitly invokes $nvim or /nvim to open the currently discussed code, file, test, symbol, or location in Neovim — in a new Herdr tab when inside Herdr, a new tmux window when inside tmux, otherwise by printing a paste-able tmux command targeting the repo's session.
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # Nvim
