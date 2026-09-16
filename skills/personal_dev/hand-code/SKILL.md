@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Keep my hands in the language. You brief me and set the table; I type the part that exercises it.
 
-One sitting: ten to twenty minutes with the brief and the test in front of me. Size the hole and the brief to that.
+One sitting: about fifteen minutes of typing with the brief and the test in front of me. That sizes the hole; nobody times me.
 
 ## 1. Settle the target
 
@@ -29,6 +29,6 @@ One message:
 
 1. **Brief.** The problem the idea solves in a paragraph, each tool as a three-line runnable snippet, the one gotcha that bites. Two minutes to read, and everything the hole needs.
 2. **Hand-off.** What I am building, the idea it exercises, the proof command, the file to start in.
-3. **Time box.** Name it. When I overrun, I say so and you walk the solution part by part against the tests.
+3. **Walk-through.** Available whenever I ask: the solution part by part against the tests.
 
 Then run the `nvim` skill on the file to start in.
