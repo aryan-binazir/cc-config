@@ -20,14 +20,14 @@ Offer two or three candidates, one line each on the feature I would exercise. We
 ## 2. Build the hole
 
 - **Test is the spec.** It pins every name, signature, and message shape.
-- **Hole file** opens with a comment listing what to declare, in order, each item naming the test that checks it. Exact on *what*, silent on *how*.
+- **Hole file** opens with a comment that teaches. First the idea in plain words: what problem it solves and how the pieces fit. Then each item to declare, in order: its signature, why it exists, how the language feature behind it works, the test that checks it. Assume I have never seen the feature. Concise, and every word explains.
 - **Proof** is one command. Run it before hand-off: it fails only on the missing symbols.
 
 ## 3. Brief, then hand off
 
 One message:
 
-1. **Brief.** The problem the idea solves in a paragraph, each tool as a three-line runnable snippet, the one gotcha that bites. Two minutes to read, and everything the hole needs.
+1. **Brief.** The same idea as the hole comment, plus each tool as a three-line runnable snippet and the one gotcha that bites.
 2. **Hand-off.** What I am building, the idea it exercises, the proof command, the file to start in.
 3. **Walk-through.** Available whenever I ask: the solution part by part against the tests.
 
