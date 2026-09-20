@@ -7,7 +7,7 @@ description: >-
   code end-to-end against a real local database or service, when a verify step
   needs evidence beyond unit tests, or when the user asks to sandbox or spin up
   a throwaway stack or database.
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # Verify Sandbox
