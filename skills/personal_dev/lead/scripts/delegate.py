@@ -199,9 +199,9 @@ def build_command(worker: dict[str, Any], prompt: str, subagents: int, read_only
             cmd += ["--agents", json.dumps(agent_def)]
         cmd += ["-p", prompt]
         return cmd
-    if runner == "cursor":
+    if runner == "cursor-agent":
         if sub.get("model") or sub.get("reasoning_effort"):
-            raise ValueError("cursor runner cannot pin a sub-agent model; drop the worker's `subagent` block or use --subagents 0")
+            raise ValueError("cursor-agent runner cannot pin a sub-agent model; drop the worker's `subagent` block or use --subagents 0")
         cmd = [
             "cursor-agent", "--print", "--trust", "--auto-review",
             "--sandbox", "enabled",
@@ -212,7 +212,7 @@ def build_command(worker: dict[str, Any], prompt: str, subagents: int, read_only
             cmd += ["--model", str(model)]
         cmd.append(prompt)
         return cmd
-    raise ValueError(f"unknown runner: {runner!r} (known: codex, claude, cursor)")
+    raise ValueError(f"unknown runner: {runner!r} (known: codex, claude, cursor-agent)")
 
 
 def fanout_instruction(worker: dict[str, Any], subagents: int, read_only: bool) -> str:
@@ -475,7 +475,7 @@ def main() -> int:
     except OSError:
         summary_text = ""
     if not summary_text and read_only and stdout.strip():
-        summary_file.write_text(stdout.strip() + "\n", encoding="utf-8")  # claude/cursor: final message arrives on stdout
+        summary_file.write_text(stdout.strip() + "\n", encoding="utf-8")  # claude/cursor-agent: final message arrives on stdout
         summary_text = stdout.strip()
     summary_marker = "## SUMMARY" in summary_text
     if summary_text:
