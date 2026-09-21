@@ -13,7 +13,8 @@ from typing import Any
 
 import yaml
 
-RUNNERS = {"claude", "codex", "cursor"}
+RUNNERS = {"claude", "codex", "cursor-agent"}
+CALL_SKILLS = {"claude": "call-claude", "codex": "call-codex", "cursor-agent": "call-cursor"}
 ALLOWED_KEYS = {"runner", "model", "effort", "reasoning_effort", "timeout_ms"}
 
 
@@ -44,7 +45,7 @@ def validate(config: dict[str, Any]) -> dict[str, Any]:
     if runner != "codex":
         config.pop("reasoning_effort", None)
     effort_key = "effort" if runner == "claude" else "reasoning_effort"
-    if runner != "cursor" and (
+    if runner != "cursor-agent" and (
         not isinstance(config.get(effort_key), str) or not config[effort_key]
     ):
         raise ValueError(f"{effort_key} must be a non-empty string for {runner}")
@@ -71,7 +72,7 @@ def resolve(skill_dir: Path) -> dict[str, Any]:
     return {
         "ok": True,
         "config": config,
-        "call_skill": f"call-{config['runner']}",
+        "call_skill": CALL_SKILLS[config["runner"]],
         "local_exists": local.exists(),
     }
 
