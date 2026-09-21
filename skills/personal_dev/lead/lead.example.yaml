@@ -4,19 +4,19 @@
 # description of what it is good at, and the agent picks by description.
 #
 # Per-worker keys:
-#   runner            codex | claude | cursor
+#   runner            codex | claude | cursor-agent
 #   model, reasoning_effort, timeout_ms
 #   service_tier      codex only: e.g. `priority` (Fast: 1.5x speed, more usage). Session-wide,
 #                     so the worker's spawned sub-agents inherit it.
 #   kind              implement (default) | explore. explore runs read-only
-#                     (codex sandbox / claude+cursor plan mode, inherited by
+#                     (codex sandbox / claude+cursor-agent plan mode, inherited by
 #                     sub-agents) and returns findings as its final message,
 #                     which the script persists under _scratch/explorer/.
 #   subagent          {model, reasoning_effort} for the sub-agents the worker
 #                     spawns. A fast, low-cost model here is what
 #                     makes fan-out affordable; the parent only decomposes and
 #                     synthesizes. codex and claude pin model + effort;
-#                     cursor rejects this block (count only). Without it the
+#                     cursor-agent rejects this block (count only). Without it the
 #                     runner picks the sub-agent model itself.
 #   subagents         default sub-agent count (0 = no fan-out). `--subagents N`
 #                     on the command line overrides. Any runner.
