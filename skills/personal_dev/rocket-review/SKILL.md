@@ -39,11 +39,11 @@ and ordered `reviewers`. Each reviewer provides `name`, `runner`, optional
 `timeout_ms`, and `max_rounds`.
 
 Runner commands:
-- For Cursor, resolve the `call-cursor` skill's `SKILL.md` to its real path;
+- For `cursor-agent`, resolve the `call-cursor` skill's `SKILL.md` to its real path;
   `<call-cursor-skill-dir>` is that file's directory.
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
 - `codex`: `codex --sandbox read-only --ask-for-approval on-request -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null`
-- `cursor`: `bash "<call-cursor-skill-dir>/scripts/call.sh" "$PROMPT"`
+- `cursor-agent`: `bash "<call-cursor-skill-dir>/scripts/call.sh" "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag; for
 Cursor pass it to the wrapper. Pass Cursor `timeout_ms` to the wrapper as

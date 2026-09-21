@@ -72,7 +72,7 @@ failure. Checkout mode, tracker, runner, model, and effort come only from the
 resolved `plan_profile.config`: `checkout` (one of `worktree` or `branch`),
 `tracker`, `critic`, optional `grill`, `review`, and `review_profile`.
 
-For configured `cursor`, `claude`, or `codex` runners, read the matching
+For configured `cursor-agent`, `claude`, or `codex` runners, read the matching
 `call-cursor`, `call-claude`, or `call-codex` skill before invocation. Pass the
 configured `model`, `effort`, `reasoning_effort`, and `timeout_ms` when present;
 omit absent options so the runner uses its own defaults. Stop if a configured

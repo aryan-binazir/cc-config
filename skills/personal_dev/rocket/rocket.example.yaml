@@ -12,10 +12,9 @@ plan_profiles:
     checkout: worktree
     tracker: linear
     critic:
-      name: Claude
-      runner: claude
-      model: claude-opus-5
-      effort: high
+      name: Grok
+      runner: cursor-agent
+      model: grok-4.7-xhigh
       timeout_ms: 1500000
     grill:
       skill: grill-with-docs
@@ -45,10 +44,9 @@ review_profiles:
     summary_title: Rocket Review Summary
     diary_name: rocket_review
     reviewers:
-      - name: Claude
-        runner: claude
-        model: claude-opus-5
-        effort: high
+      - name: Grok
+        runner: cursor-agent
+        model: grok-4.7-xhigh
         timeout_ms: 2100000
         max_rounds: 2
       - name: Codex

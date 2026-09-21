@@ -19,7 +19,6 @@ from typing import Any
 RUNNER_BINARIES = {
     "claude": "claude",
     "codex": "codex",
-    "cursor": "cursor-agent",
     "cursor-agent": "cursor-agent",
 }
 

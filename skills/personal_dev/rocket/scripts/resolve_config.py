@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-RUNNERS = {"claude", "codex", "cursor"}
+RUNNERS = {"claude", "codex", "cursor-agent"}
 REVIEW_RUNNERS = RUNNERS | {"rocket-review"}
 TRACKERS = {"jira", "linear"}
 CHECKOUTS = {"branch", "worktree"}

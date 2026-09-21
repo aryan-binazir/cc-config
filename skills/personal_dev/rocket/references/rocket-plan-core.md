@@ -40,16 +40,16 @@ Use `<skill> <profile>` when provided; otherwise use `defaults.plan_profile`.
 Stop if `plan_profiles.<profile>` is missing.
 
 Each plan profile provides `critic.name`, `critic.runner` (`claude`, `codex`, or
-`cursor`), optional `critic.model`, optional Claude `critic.effort`, optional
+`cursor-agent`), optional `critic.model`, optional Claude `critic.effort`, optional
 Codex `critic.reasoning_effort`, optional `critic.timeout_ms` defaulting to
 `900000`, and `review_profile` for `$rocket-review`.
 
 Critic runner commands:
-- For Cursor, resolve the `call-cursor` skill's `SKILL.md` to its real path;
+- For `cursor-agent`, resolve the `call-cursor` skill's `SKILL.md` to its real path;
   `<call-cursor-skill-dir>` is that file's directory.
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
 - `codex`: `codex --sandbox workspace-write --ask-for-approval on-request -c approvals_reviewer=auto_review exec "$PROMPT" < /dev/null`
-- `cursor`: `bash "<call-cursor-skill-dir>/scripts/call.sh" "$PROMPT"`
+- `cursor-agent`: `bash "<call-cursor-skill-dir>/scripts/call.sh" "$PROMPT"`
 
 When `model` is set, pass the runner's supported `--model <model>` flag; for
 Cursor pass it to the wrapper. Pass Cursor `timeout_ms` to the wrapper as
