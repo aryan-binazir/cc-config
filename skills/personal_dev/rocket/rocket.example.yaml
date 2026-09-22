@@ -48,10 +48,10 @@ review_profiles:
         runner: cursor-agent
         model: grok-4.7-xhigh
         timeout_ms: 2100000
-        max_rounds: 2
+        max_rounds: 1
       - name: Codex
         runner: codex
         model: gpt-6-astra
         reasoning_effort: medium
         timeout_ms: 2100000
-        max_rounds: 2
+        max_rounds: 1
