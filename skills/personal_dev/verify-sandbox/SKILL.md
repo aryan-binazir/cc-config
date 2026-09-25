@@ -21,8 +21,8 @@ Configuration resolves from `verify-sandbox.example.yaml`, optional
 
 ## Lane
 
-- The configured Docker-compatible runtime is the sandbox's whole world;
-  every other host workload stays exactly as found.
+- Prefer the configured Docker-compatible runtime; when infeasible, explain
+  why and use an isolated alternative. Preserve unrelated host workloads.
 - Every container carries `sbx=1` and `sbx.key=<key>`: create through `sbx`
   (add both labels when calling the configured runtime directly), remove
   through `sbx down` / `sbx gc`, which reach labeled containers only.
@@ -38,6 +38,8 @@ Configuration resolves from `verify-sandbox.example.yaml`, optional
 
 ## Workflow
 
+Apply setup and teardown steps to the infrastructure used.
+
 1. **Up.** `sbx pg <key>` / `sbx redis <key>` — random localhost ports;
    capture the printed URLs and point the code under test at them via env
    vars or flags, keeping committed config untouched.
@@ -45,8 +47,8 @@ Configuration resolves from `verify-sandbox.example.yaml`, optional
    sized to the behavior under test.
 3. **Exercise.** Drive each of the task's acceptance claims — happy path plus
    at least one failure or edge path — via the real binary, integration tests,
-   or a throwaway harness. Default to writing a harness that proves the changed
-   behavior; skip only if infeasible and state why. Delegate
+   or a throwaway harness. Always write and run a harness proving the changed
+   behavior, driving any UI through a browser or PTY as appropriate. Delegate
    harness construction through the `implementer` skill (`medium` fits most
    harness builds; pick the tier by fit). The main agent then runs that
    harness against the sandbox itself — execution, evidence, and the verdict
@@ -54,14 +56,15 @@ Configuration resolves from `verify-sandbox.example.yaml`, optional
 4. **Evidence.** Capture the commands and their decisive output (query
    results, responses, exit codes) while the sandbox is still up.
 5. **Down.** `sbx down <key>`; its clean confirmation is the teardown proof.
+   For alternatives, stop temporary processes and verify cleanup.
    `sbx gc` reaps sandboxes older than 4 hours.
 
 ## Report
 
 Start with `RESULT: PASS` only when every acceptance claim is evidenced and
-`sbx down` confirms clean teardown; otherwise start with `RESULT: FAIL`.
+cleanup is verified; otherwise start with `RESULT: FAIL`.
 In chat, evidence-first: each claim with its command and decisive output;
-open questions the sandbox left unanswered; the `sbx down` confirmation.
+open questions the sandbox left unanswered; teardown proof.
 When the task has a PR, also post a comment in collapsed `<details>` with
 `Sandbox: PASS` or `Sandbox: FAIL` in `<summary>`; include every test's method,
 result, and evidence, plus teardown confirmation.
