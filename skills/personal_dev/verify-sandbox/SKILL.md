@@ -62,4 +62,7 @@ Start with `RESULT: PASS` only when every acceptance claim is evidenced and
 `sbx down` confirms clean teardown; otherwise start with `RESULT: FAIL`.
 In chat, evidence-first: each claim with its command and decisive output;
 open questions the sandbox left unanswered; the `sbx down` confirmation.
+When the task has a PR, also post a comment in collapsed `<details>` with
+`Sandbox: PASS` or `Sandbox: FAIL` in `<summary>`; include every test's method,
+result, and evidence, plus teardown confirmation.
 Complete means evidenced and torn down.
