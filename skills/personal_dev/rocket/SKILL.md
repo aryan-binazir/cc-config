@@ -282,6 +282,8 @@ If `review.runner` is `rocket-review`: read and follow the `rocket-review`
 skill with the resolved `review_profile.name`, supplying the tracked issue or
 no-ticket task description as its spec source. Rocket Review owns PR creation
 and resolution, and replaces the verdict loop below.
+After Rocket Review completes, run `verify-sandbox` against the final `HEAD`;
+on failure, report and await the user's direction.
 
 For any other runner, require an existing PR — stop if none exists. Use the
 resolved `review` runner and its exact non-interactive conventions to review
