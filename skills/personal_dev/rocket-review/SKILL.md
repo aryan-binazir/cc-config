@@ -176,9 +176,12 @@ the summary comment.
    re-verify upstream freshness, then update the diary.
 9. Record every executed round's exact reviewer verdict and any post-round
    branch state.
-10. Post one final PR comment derived from the diary.
-11. If a Linear ticket exists, sync the managed region.
-12. Return the final user-facing status grouped by numbered PR, with every
+10. Read and follow `comment-reaper` on the diff against the base branch, so
+    the code speaks for itself. Commit and push any clearer shape, and record
+    that commit as post-round branch state.
+11. Post one final PR comment derived from the diary.
+12. If a Linear ticket exists, sync the managed region.
+13. Return the final user-facing status grouped by numbered PR, with every
     reviewer named beside that reviewer's exact round result.
 
 ## Review Rounds
