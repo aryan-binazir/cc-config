@@ -2,8 +2,8 @@
 name: prove-it
 description: >-
   Test what shipped for real: fresh main, throwaway full stack, one strong
-  sub-agent per flow, every defect fixed through a reviewed PR, a second pass
-  on a fresh stack, one consolidated report. Use when the user invokes
+  sub-agent per flow, every defect fixed through a reviewed PR,
+  one consolidated report. Use when the user invokes
   /prove-it, says "prove it", "test everything we shipped", "shakedown",
   "pre-launch check", or "make sure it works for real".
 ---
@@ -11,8 +11,7 @@ description: >-
 # Prove It
 
 `/prove-it <scope>` — test it for real, fix what breaks, hand back reviewed PRs.
-You orchestrate: sub-agents test and fix, you read every diff yourself, and
-merging stays with the user.
+You orchestrate: sub-agents test and fix, you read every diff yourself.
 
 ## Loop
 
@@ -35,7 +34,7 @@ merging stays with the user.
    bullets in the PR body. A worker that times out mid-review resumes in the
    same worktree. Optional: `call-codex` on the fix plan first; it catches
    fixes that contradict specs.
-6. **Second pass.** Re-verify the merged fixes on a fresh stack.
+6. **Merge.** Stop and ask the user; merge reviewed PRs only if they agree.
 7. **Report.** One consolidated report, sandbox torn down clean, every
    checkout clean.
 
