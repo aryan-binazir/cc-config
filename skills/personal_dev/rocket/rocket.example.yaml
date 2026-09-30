@@ -29,7 +29,7 @@ plan_profiles:
     critic:
       name: Codex
       runner: codex
-      model: gpt-6.1
+      model: gpt-6.1-sol
       reasoning_effort: high
       timeout_ms: 1500000
     grill:
@@ -51,7 +51,7 @@ review_profiles:
         max_rounds: 1
       - name: Codex
         runner: codex
-        model: gpt-6.1
+        model: gpt-6.1-sol
         reasoning_effort: high
         timeout_ms: 2100000
         max_rounds: 1

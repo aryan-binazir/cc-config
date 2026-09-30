@@ -1,6 +1,6 @@
 # Copy this file to call-codex.local.yaml to override these defaults.
 # call-codex.local.yaml is ignored by git.
 
-model: gpt-6.1
+model: gpt-6.1-sol
 reasoning_effort: high
 timeout_ms: 900000
