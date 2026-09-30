@@ -22,9 +22,10 @@ You orchestrate: sub-agents test and fix, you read every diff yourself.
    Zero human accounts needed.
 3. **Brief.** One shared tester brief: env, helpers, the hard rules, the
    report shape.
-4. **Fan out.** One sub-agent per flow or per shipped fix (Opus, highest
-   reasoning). Browser testers drive the real UI with Playwright: stub the
-   auth SDK in-page and inject bearer tokens so the real SPA renders. Anything
+4. **Fan out.** One sub-agent per flow or per shipped fix, using the model
+   and reasoning level the user specifies. Browser testers drive the real UI
+   with Playwright: stub the auth SDK in-page and inject bearer tokens so the
+   real SPA renders. Anything
    touching money, scores, or irreversible state also gets an adversarial
    verifier. A log monitor watches for ERROR/panic/5xx the whole time.
 5. **Triage.** By-design and cosmetic items get listed. Each real defect gets
