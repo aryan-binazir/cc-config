@@ -26,7 +26,7 @@ workers:
     description: Escalation only — use after high fails, or when the user explicitly requests maximum reasoning.
     runner: codex
     model: gpt-6.1-sol
-    reasoning_effort: high
+    reasoning_effort: xhigh
     timeout_ms: 1800000
   high:
     description: Default for difficult work, including subtle bugs, architecture, gnarly debugging, and complex implementation.
@@ -38,18 +38,18 @@ workers:
     description: Bulk implementation with a clear spec. Pass --subagents N to parallelize independent slices (disjoint files).
     runner: codex
     model: gpt-6.1-sol
-    reasoning_effort: high
+    reasoning_effort: medium
     timeout_ms: 1500000
   low:
     description: Targeted, near-deterministic edits from an exact spec.
     runner: codex
     model: gpt-6.1-sol
-    reasoning_effort: high
+    reasoning_effort: low
     timeout_ms: 1500000
   frontend:
     description: Frontend and UI work.
-    runner: claude
-    model: claude-opus-5-5
+    runner: codex
+    model: gpt-6.1-sol
     reasoning_effort: high
     timeout_ms: 1500000
   explore:
