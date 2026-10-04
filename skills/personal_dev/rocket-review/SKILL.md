@@ -52,11 +52,12 @@ Codex `reasoning_effort` as
 `-c model_reasoning_effort="<reasoning_effort>"`; stop if either option is
 configured for a mismatched runner.
 
-Reviewers are read-only, invoked through exactly the commands above. The Cursor
+Invoke reviewers through exactly the commands above. The Cursor
 wrapper fails closed unless CLI Auto-review is active; stop if the installed CLI
-lacks it. The reviewer prompt must
-state that the review is read-only and files stay unmodified — patching
-findings is the main agent's job.
+lacks it. The reviewer prompt must require preserving reviewed source and Git
+state, using isolated temporary fixtures and caches for verification, and
+cleaning up only what the reviewer creates. Patching findings is the main
+agent's job.
 
 ## Preflight
 

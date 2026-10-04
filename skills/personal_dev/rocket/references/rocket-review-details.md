@@ -83,8 +83,9 @@ Use NEEDS FIXES when the branch is not yet acceptable.
 Within each finding, include concrete file and line references when possible.
 No padding. No compliments.
 
-You are a reviewer only. Do not modify, create, or delete any files, do not
-commit, and do not push. Report findings; the implementing agent applies fixes.
+You are a reviewer only. Preserve reviewed source and Git state; use isolated
+temporary fixtures and caches for verification, then clean up only what you
+created. Report findings; the implementing agent applies fixes.
 ```
 
 Only patched findings from a non-approval round 1 verdict qualify for round 2.
