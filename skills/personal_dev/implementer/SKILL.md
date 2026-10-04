@@ -34,7 +34,7 @@ Parallel workers each need `--worktree`; worktrees start at HEAD, so commit anyt
 
 3. **Accept from the JSON.** Check `summary` (`summary_source` says whether it came from the worker's progress file, its stdout, or nowhere) and `diff_stat`; open changed files selectively. `report_file` is the raw runner transcript — every command, its output, echoed diffs — often megabytes; it is for diagnosis when the summary is missing, contradicts the diff, or the run failed, and rewards searching for the specific error, test name, or tail you need. A timed-out run still reports the last progress-file state, so judge what got done before deciding to revise or re-run. Revisions: a compact follow-up in the same cwd/worktree — failed criteria, files/lines, error excerpts, what stays unchanged — the script appends the summary instruction again.
 
-On `ok: false`, surface the exact error and stop; the user decides how to proceed.
+Read `completed` as the worker's reported status; verify results against the acceptance criteria and resume any remaining work. On `ok: false`, surface the exact error and stop; the user decides how to proceed.
 
 Risky diffs get an independent delegated review — this prompt plus task-specific context:
 

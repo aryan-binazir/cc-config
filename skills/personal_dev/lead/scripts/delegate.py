@@ -75,6 +75,9 @@ You are the delegated worker: this run is the delegation. Do the work directly
 with your own tools, and fan out through your runtime's native sub-agents when
 asked to; the delegate script and the implementer/explorer skills belong to
 the caller.
+
+End your `## SUMMARY` with `Status: incomplete` during progress. Change it to
+`Status: complete` once all assigned work and verification are finished.
 """
 
 FANOUT_INSTRUCTION = """
@@ -273,7 +276,7 @@ def extract_summary(text: str) -> str | None:
     if idx == -1:
         return None
     body = text[idx + len("## SUMMARY"):].strip()
-    return body[:SUMMARY_CAP_CHARS] or None
+    return body or None
 
 
 def diff_stat(cwd: Path, snapshot: GitSnapshot) -> str | None:
@@ -365,7 +368,7 @@ def main() -> int:
     args = parser.parse_args()
 
     def fail(msg: str) -> int:
-        print(json.dumps({"ok": False, "error": msg}, indent=2))
+        print(json.dumps({"ok": False, "completed": False, "error": msg}, indent=2))
         return 1
 
     if os.environ.get(WORKER_ENV):
@@ -418,6 +421,7 @@ def main() -> int:
 
     timeout_s = (args.timeout_ms or worker.get("timeout_ms") or DEFAULT_TIMEOUT_MS) / 1000
     result: dict[str, Any] = {
+        "completed": False,
         "worker": {"name": name, **{k: v for k, v in worker.items() if k not in ("timeout_ms", "description")}},
         "command": cmd[:-1] + ["<prompt>"],  # keep stdout readable; inline prompt lands in the report
         "kind": kind,
@@ -484,6 +488,11 @@ def main() -> int:
         summary, summary_source = extract_summary(stdout), "stdout"
     else:
         summary, summary_source = None, "none"
+    result["completed"] = exit_code == 0 and (
+        extract_summary(summary_text or stdout) or ""
+    ).splitlines()[-1:] == ["Status: complete"]
+    if summary:
+        summary = summary[:SUMMARY_CAP_CHARS]
     if args.worktree and not read_only and summary_file.exists():
         kept = base_cwd / summary_rel  # survives worktree cleanup
         kept.write_text(summary_file.read_text(encoding="utf-8"), encoding="utf-8")
