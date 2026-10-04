@@ -11,7 +11,8 @@ description: >-
 # Prove It
 
 `/prove-it <scope>` — test it for real, fix what breaks, hand back reviewed PRs.
-You orchestrate: sub-agents test and fix, you read every diff yourself.
+Workers own setup, testing, and fixes end to end. You keep them moving,
+resolve disputed findings, and review diffs.
 
 ## Loop
 
@@ -20,10 +21,11 @@ You orchestrate: sub-agents test and fix, you read every diff yourself.
    services host-side, a stand-in auth provider that mints tokens for
    unlimited synthetic users, the real frontend dev server proxied to it.
    Zero human accounts needed.
-3. **Brief.** One shared tester brief: env, helpers, the hard rules, the
-   report shape.
-4. **Fan out.** One sub-agent per flow or per shipped fix, using the model
-   and reasoning level the user specifies. Browser testers drive the real UI
+3. **Brief.** Share one environment and tester brief. Workers handle routine
+   fixture setup within their ownership; reuse completed evidence.
+4. **Fan out.** Keep independent workers running in parallel, one per complete
+   user journey, grouping related checks. Use the user's chosen model and
+   reasoning level. Browser testers drive the real UI
    with Playwright: stub the auth SDK in-page and inject bearer tokens so the
    real SPA renders. Anything
    touching money, scores, or irreversible state also gets an adversarial
