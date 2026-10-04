@@ -257,10 +257,11 @@ stays as-is and covers only what it reviewed.
 Allow the configured timeout for each round, default `900000` ms. Quiet periods
 and progress chatter are normal while the process is still running.
 
-Each failed round gets one automatic retry against the same pushed branch
-state. If the retry fails, stop immediately and report the raw output, failure
-mode, and actual elapsed time for both attempts — the diary records the failure
-exactly as it happened.
+Recover completed reviews from captured output or transcripts. Ask the reviewer
+once to clarify missing or malformed verdicts using existing findings. Retry
+only incomplete reviews, once against the same pushed branch state. If
+unresolved, stop and report the raw output, failure mode, and actual elapsed
+time for both attempts; record the failure exactly in the diary.
 
 Use timeout language only when the full configured timeout was actually
 consumed; stopped-early runs are premature aborts.
@@ -322,11 +323,10 @@ Rules:
 ## Stop Conditions
 
 Stop and report instead of guessing if:
-- repo, branch, profile, `gh`, auth, runner, push, upstream, or PR resolution
+- repo, branch, profile, `gh`, auth, runner setup, push, upstream, or PR resolution
   fails
 - the existing PR head branch differs from the checked-out branch
 - repo-local PR title/body rules cannot be satisfied
 - the working tree has unclear changes
 - no reliable spec can be handed to reviewers
-- a runner fails twice for the same round, times out, aborts early, or returns
-  malformed output after normalization
+- a round remains unresolved after recovery and its one clarification or retry

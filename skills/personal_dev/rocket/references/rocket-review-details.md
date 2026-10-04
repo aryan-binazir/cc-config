@@ -131,8 +131,8 @@ that section, uppercased with surrounding whitespace and trailing punctuation
 stripped. Approval requires exact `APPROVE` or `APPROVE WITH FIXES`. Any other
 token is non-approval; this includes `NEEDS FIXES` and foreign/legacy tokens
 such as `REJECT` from reviewers that ignore the requested format.
-Missing or malformed verdict output remains a runner failure under the failure
-rules below; never route it into the round-2 review branch.
+Missing or malformed verdicts use the recovery and clarification rules below
+within the same round.
 
 Do not collapse `APPROVE WITH FIXES` into `APPROVE`. Preserve the verdict token
 exactly. Both are approval verdicts for round control: patch accepted findings
@@ -186,9 +186,11 @@ Failure modes:
 - `malformed output`: the CLI exited within budget but no expected sections,
   no parseable priority findings, or no verdict remained after normalization.
 
-Retry once per failed round number using the same prompt and pushed branch state.
-If retry fails, stop and report raw output, exact failure mode, and elapsed time
-for both attempts. Do not consume the next round as a retry.
+Recover completed reviews from captured output or transcripts. Ask the reviewer
+once to clarify missing or malformed verdicts using existing findings. Retry
+only incomplete reviews, once with the same prompt and pushed branch state.
+If unresolved, stop and report raw output, exact failure mode, and elapsed time
+for both attempts. Keep recovery, clarification, and retry in the same round.
 
 Capture complete CLI output, including leading chatter and final answer. Extract
 the final structured review block after completion.
