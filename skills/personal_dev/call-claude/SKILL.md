@@ -35,5 +35,5 @@ or `--effort` for that call and leave the config untouched.
 or critique target, relevant files and repo context, and the output format you
 want.
 
-The resolved `timeout_ms` defaults to 15 minutes. Quiet periods are normal —
+The resolved `timeout_ms` defaults to 30 minutes. Quiet periods are normal —
 keep waiting.

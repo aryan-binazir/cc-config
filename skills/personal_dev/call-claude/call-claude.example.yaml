@@ -3,4 +3,4 @@
 
 model: claude-opus-5-5
 effort: xhigh
-timeout_ms: 900000
+timeout_ms: 1800000

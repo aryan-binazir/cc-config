@@ -3,4 +3,4 @@
 
 runner: cursor-agent
 model: grok-4.7-xhigh
-timeout_ms: 900000
+timeout_ms: 1800000

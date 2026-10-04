@@ -33,25 +33,25 @@ workers:
     runner: codex
     model: gpt-6.1-sol
     reasoning_effort: high
-    timeout_ms: 1500000
+    timeout_ms: 1800000
   medium:
     description: Bulk implementation with a clear spec. Pass --subagents N to parallelize independent slices (disjoint files).
     runner: codex
     model: gpt-6.1-sol
     reasoning_effort: medium
-    timeout_ms: 1500000
+    timeout_ms: 1800000
   low:
     description: Targeted, near-deterministic edits from an exact spec.
     runner: codex
     model: gpt-6.1-sol
     reasoning_effort: low
-    timeout_ms: 1500000
+    timeout_ms: 1800000
   frontend:
     description: Frontend and UI work.
     runner: codex
     model: gpt-6.1-sol
     reasoning_effort: xhigh
-    timeout_ms: 1500000
+    timeout_ms: 1800000
   explore:
     description: Read-only exploration, codebase mapping, and question-answering; returns a findings file the next handoff can cite. Sub-agents do the reading, the orchestrator synthesizes.
     runner: codex
@@ -60,7 +60,7 @@ workers:
     service_tier: priority
     kind: explore
     subagent:
-      model: gpt-5.6-luna
+      model: gpt-6-luna
       reasoning_effort: xhigh
     subagents: 3
     timeout_ms: 900000
