@@ -4,6 +4,8 @@ description: Use when the user invokes ask-adversary-in-block or asks to replace
 disable-model-invocation: true
 ---
 
+Configuration loads `ask-adversary-in-block.local.yaml` when present, otherwise `ask-adversary-in-block.example.yaml`.
+
 # Ask Adversary In Block
 
 Resolve this skill's directory and run:

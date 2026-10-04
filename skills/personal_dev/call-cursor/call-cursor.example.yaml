@@ -1,5 +1,5 @@
-# Copy this file to call-cursor.local.yaml to override these defaults.
-# call-cursor.local.yaml is ignored by git.
+# Copy this file to call-cursor.local.yaml and edit the copy.
+# The gitignored local file is used instead of this example when it exists.
 
 model: cursor-grok-4.6-xhigh
 timeout_ms: 900000

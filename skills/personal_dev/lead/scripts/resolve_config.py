@@ -3,9 +3,9 @@
 # requires-python = ">=3.11"
 # dependencies = ["PyYAML>=6.0.2"]
 # ///
-"""Inspect the merged lead config (lead.example.yaml + lead.local.yaml).
+"""Inspect lead.local.yaml, or lead.example.yaml when local is absent.
 
-Shared YAML loading/merging helpers for delegate.py live here too.
+Shared YAML loading helpers for delegate.py live here too.
 """
 
 from __future__ import annotations
@@ -33,20 +33,14 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     return data
 
 
-def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(base)
-    for key, value in override.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = deep_merge(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
+def load_config(lead_dir: Path) -> dict[str, Any]:
+    local = lead_dir / "lead.local.yaml"
+    return load_yaml_file(local if local.exists() else lead_dir / "lead.example.yaml")
 
 
 def resolve(lead_dir: Path, name: str | None) -> dict[str, Any]:
-    example = lead_dir / "lead.example.yaml"
     local = lead_dir / "lead.local.yaml"
-    config = deep_merge(load_yaml_file(example), load_yaml_file(local))
+    config = load_config(lead_dir)
     workers = config.get("workers") or {}
     errors: list[str] = []
 
@@ -67,7 +61,7 @@ def resolve(lead_dir: Path, name: str | None) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Inspect the merged lead config and resolve a worker tier.")
+    parser = argparse.ArgumentParser(description="Inspect the selected lead config and resolve a worker tier.")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
     parser.add_argument("--lead-dir", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--worker", help="Worker name from config. Defaults to defaults.worker.")

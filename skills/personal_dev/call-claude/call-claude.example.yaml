@@ -1,5 +1,5 @@
-# Copy this file to call-claude.local.yaml to override these defaults.
-# call-claude.local.yaml is ignored by git.
+# Copy this file to call-claude.local.yaml and edit the copy.
+# The gitignored local file is used instead of this example when it exists.
 
 model: claude-opus-5-5
 effort: high

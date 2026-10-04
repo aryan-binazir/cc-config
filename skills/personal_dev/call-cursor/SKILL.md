@@ -9,8 +9,8 @@ Ask Cursor/Composer for a second opinion, plan critique, implementation critique
 
 ## Command
 
-Use the bundled launcher. It merges `call-cursor.example.yaml` with the ignored
-`call-cursor.local.yaml`, then applies the resolved model and timeout. It runs
+Use the bundled launcher. It loads `call-cursor.local.yaml` when present, otherwise
+`call-cursor.example.yaml`, then applies the resolved model and timeout. It runs
 Cursor in print mode with sandboxing enabled, defaulting to
 `cursor-grok-4.6-xhigh` (Grok 4.6 Extra High):
 

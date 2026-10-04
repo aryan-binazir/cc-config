@@ -5,7 +5,7 @@
 # ///
 """Run a task on the configured worker model. One command, zero agent tokens.
 
-Resolves the worker from lead.example.yaml + lead.local.yaml (local wins),
+Resolves the worker from lead.local.yaml, or lead.example.yaml when local is absent,
 builds the runner command with the local flag conventions, executes it, and
 writes the worker's output to a report file under _scratch/implementer/.
 The worker is told to keep a summary file there too, so a summary survives even
@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from resolve_config import deep_merge, load_yaml_file  # sibling module
+from resolve_config import load_config  # sibling module
 
 DEFAULT_TIMEOUT_MS = 1_500_000  # 25 minutes
 HEARTBEAT_S = 60
@@ -380,10 +380,7 @@ def main() -> int:
     sweep_stale_files(args.cwd)
 
     lead_dir = Path(__file__).resolve().parents[1]
-    config = deep_merge(
-        load_yaml_file(lead_dir / "lead.example.yaml"),
-        load_yaml_file(lead_dir / "lead.local.yaml"),
-    )
+    config = load_config(lead_dir)
     workers = config.get("workers") or {}
     if args.list:
         print(json.dumps({n: (w or {}).get("description") for n, w in workers.items()}, indent=2))

@@ -64,10 +64,7 @@ def validate(config: dict[str, Any]) -> dict[str, Any]:
 def resolve(skill_dir: Path) -> dict[str, Any]:
     local = skill_dir / "ask-adversary-in-block.local.yaml"
     config = validate(
-        {
-            **load(skill_dir / "ask-adversary-in-block.example.yaml"),
-            **load(local),
-        }
+        load(local if local.exists() else skill_dir / "ask-adversary-in-block.example.yaml")
     )
     return {
         "ok": True,

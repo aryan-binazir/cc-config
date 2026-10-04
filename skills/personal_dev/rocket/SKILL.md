@@ -65,8 +65,8 @@ uv run --script "<rocket-skill-dir>/scripts/resolve_config.py"
 For `$rocket codex` or `$rocket claude`, pass the literal profile as the
 resolver's positional argument.
 
-The resolver merges `rocket.example.yaml` with the ignored
-`rocket.local.yaml`, then selects the requested `plan_profiles` entry or
+The resolver loads `rocket.local.yaml` when present, otherwise
+`rocket.example.yaml`, then selects the requested `plan_profiles` entry or
 `defaults.plan_profile` when no profile was supplied. Stop on any resolver
 failure. Checkout mode, tracker, runner, model, and effort come only from the
 resolved `plan_profile.config`: `checkout` (one of `worktree` or `branch`),

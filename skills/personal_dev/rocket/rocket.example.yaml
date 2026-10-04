@@ -1,6 +1,6 @@
-# Copy this file to rocket.local.yaml on a machine that needs different defaults.
-# rocket.local.yaml is ignored by git. Name plan profiles after their executor,
-# such as `codex` or `claude`.
+# Copy this file to rocket.local.yaml and edit the copy.
+# The gitignored local file is used instead of this example when it exists.
+# Name plan profiles after their executor, such as `codex` or `claude`.
 
 defaults:
   plan_profile: codex

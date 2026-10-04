@@ -13,7 +13,7 @@ posts to the right GitHub target (thread reply or PR comment) and records the
 commit hash. `--json` prints the state instead of the checklist. Every failure
 exits 1 with a one-line JSON `{"ok": false, "error": ..., "hint": ...}`.
 
-Config: pr-comments.example.yaml + pr-comments.local.yaml (local wins).
+Config: pr-comments.local.yaml, or pr-comments.example.yaml when local is absent.
 """
 
 from __future__ import annotations
@@ -51,13 +51,12 @@ def load_config() -> dict[str, Any]:
     import yaml
 
     cfg: dict[str, Any] = {}
-    for name in ("pr-comments.example.yaml", "pr-comments.local.yaml"):
-        p = SKILL_DIR / name
-        if p.exists():
-            data = yaml.safe_load(p.read_text()) or {}
-            if not isinstance(data, dict):
-                raise Fail(f"{p} must contain a YAML object")
-            cfg |= data
+    local = SKILL_DIR / "pr-comments.local.yaml"
+    path = local if local.exists() else SKILL_DIR / "pr-comments.example.yaml"
+    if path.exists():
+        cfg = yaml.safe_load(path.read_text()) or {}
+        if not isinstance(cfg, dict):
+            raise Fail(f"{path} must contain a YAML object")
     if cfg.get("provider", "github") != "github":
         raise Fail(f'provider {cfg["provider"]!r} has no adapter yet', "github (github.com + GHES via host:) is the supported provider")
     cfg.setdefault("state_dir", "_scratch/pr_reviews")

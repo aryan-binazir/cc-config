@@ -1,5 +1,5 @@
-# Copy this file to ask-adversary-in-block.local.yaml to override these defaults.
-# ask-adversary-in-block.local.yaml is ignored by git.
+# Copy this file to ask-adversary-in-block.local.yaml and edit the copy.
+# The gitignored local file is used instead of this example when it exists.
 
 runner: cursor-agent
 model: grok-4.7-xhigh

@@ -1,7 +1,7 @@
-# Copy this file to lead.local.yaml and edit that. lead.local.yaml is ignored
-# by git and wins over this file (deep merge). Workers are defined HERE and
-# only here — name them anything (a role, a specialty), give each a
-# description of what it is good at, and the agent picks by description.
+# Copy this file to lead.local.yaml and edit the copy.
+# The gitignored local file is used instead of this example when it exists.
+# Workers are defined in the selected file. Name them anything and give each
+# a description of what it is good at; the agent picks by description.
 #
 # Per-worker keys:
 #   runner            codex | claude | cursor-agent

@@ -16,8 +16,8 @@ Prove the code works against real infrastructure, then vanish without a trace.
 
 `<skill-dir>` is the directory containing this file; the tool is
 `<skill-dir>/scripts/sbx` (`sbx --help` lists every command).
-Configuration resolves from `verify-sandbox.example.yaml`, optional
-`verify-sandbox.local.yaml`, and `SBX_*`; `sbx doctor` reports the result.
+Configuration loads `verify-sandbox.local.yaml` when present, otherwise
+`verify-sandbox.example.yaml`, then applies `SBX_*` overrides. `sbx doctor` reports the result.
 
 ## Lane
 

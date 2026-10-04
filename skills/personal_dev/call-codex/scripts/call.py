@@ -27,15 +27,10 @@ def load_yaml(path: Path) -> dict[str, Any]:
     return data
 
 
-def merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    return {**base, **override}
-
-
 def resolve(skill_dir: Path) -> tuple[dict[str, Any], Path]:
     local_path = skill_dir / "call-codex.local.yaml"
-    config = merge(
-        load_yaml(skill_dir / "call-codex.example.yaml"),
-        load_yaml(local_path),
+    config = load_yaml(
+        local_path if local_path.exists() else skill_dir / "call-codex.example.yaml"
     )
     unknown = sorted(set(config) - {"model", "reasoning_effort", "timeout_ms"})
     if unknown:
@@ -71,7 +66,7 @@ def command(config: dict[str, Any], prompt: str) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Call Codex using merged example and local configuration."
+        description="Call Codex using local configuration, or example when local is absent."
     )
     parser.add_argument("prompt", nargs="?")
     parser.add_argument("--model")

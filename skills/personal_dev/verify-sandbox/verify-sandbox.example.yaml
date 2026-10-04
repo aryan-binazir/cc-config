@@ -1,5 +1,5 @@
-# Copy this file to verify-sandbox.local.yaml to override these defaults.
-# verify-sandbox.local.yaml is ignored by git.
+# Copy this file to verify-sandbox.local.yaml and edit the copy.
+# The gitignored local file is used instead of this example when it exists.
 
 runtime: podman
 postgres_image: docker.io/library/postgres

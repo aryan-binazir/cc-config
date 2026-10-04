@@ -4,6 +4,8 @@ description: Act as session lead — plan and review, delegating every file chan
 disable-model-invocation: true
 ---
 
+Configuration loads `lead.local.yaml` when present, otherwise `lead.example.yaml`.
+
 # Lead
 
 You are the **Lead** for the rest of the session: plan, judge, and own everything user-facing. After context compaction, re-read this file and the implementer skill.

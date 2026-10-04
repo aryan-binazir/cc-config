@@ -41,16 +41,6 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     return data
 
 
-def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(base)
-    for key, value in override.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = deep_merge(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
-
-
 def apply_timeout_defaults(config: dict[str, Any]) -> None:
     for profile in (config.get("plan_profiles") or {}).values():
         if not isinstance(profile, dict):
@@ -127,7 +117,7 @@ def resolve_profiles(
 ) -> dict[str, Any]:
     example = rocket_dir / "rocket.example.yaml"
     local = rocket_dir / "rocket.local.yaml"
-    config = deep_merge(load_yaml_file(example), load_yaml_file(local))
+    config = load_yaml_file(local if local.exists() else example)
     apply_timeout_defaults(config)
     defaults = config.get("defaults") or {}
     plan_name = plan_profile or defaults.get("plan_profile")

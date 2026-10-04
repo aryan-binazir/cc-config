@@ -45,7 +45,8 @@ def load_yaml(path: Path) -> dict[str, Any]:
 def resolve(skill_dir: Path) -> tuple[dict[str, Any], list[Path], Path]:
     example = skill_dir / "verify-sandbox.example.yaml"
     local = skill_dir / "verify-sandbox.local.yaml"
-    config = {**load_yaml(example), **load_yaml(local)}
+    selected = local if local.exists() else example
+    config = load_yaml(selected)
     unknown = sorted(set(config) - set(ENV_KEYS))
     if unknown:
         raise ValueError(f"unknown config keys: {', '.join(unknown)}")
@@ -71,7 +72,7 @@ def resolve(skill_dir: Path) -> tuple[dict[str, Any], list[Path], Path]:
     if not isinstance(config.get("require_rootless"), bool):
         raise ValueError("require_rootless must be a boolean")
 
-    files = [example] + ([local] if local.exists() else [])
+    files = [selected]
     return config, files, local
 
 

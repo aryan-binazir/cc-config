@@ -20,7 +20,7 @@ uv run --script "$PRC" --pr <number> ...                      # explicit PR
 
 One GraphQL call pulls issue comments, review summaries, and review threads with thread-level `isResolved`. Active items (unresolved, unminimized; outdated threads stay, tagged) get stable numbers — `1`, `2` top-level, `1.1` replies — persisted in `<state_dir>/pr-<number>.json`; numbering, triage, and `pr-address-comments`' `agent` fields survive re-runs. An item whose body or `updatedAt` changes reopens; items deleted upstream go inactive; the script's own replies stay unnumbered. State files older than `sweep_days` are removed on fetch. Failures exit 1 with `{"ok": false, "error", "hint"}` — relay both to the user.
 
-Config: `pr-comments.example.yaml` + gitignored `pr-comments.local.yaml` (local wins) — `provider` (github; covers github.com and GitHub Enterprise), `host` (forwarded as `GH_HOST`), `state_dir`, `sweep_days`, `agent`.
+Config: gitignored `pr-comments.local.yaml` when present, otherwise `pr-comments.example.yaml` — `provider` (github; covers github.com and GitHub Enterprise), `host` (forwarded as `GH_HOST`), `state_dir`, `sweep_days`, `agent`.
 
 ## Workflow
 

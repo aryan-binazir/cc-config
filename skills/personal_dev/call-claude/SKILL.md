@@ -9,8 +9,8 @@ Ask Claude Code for a second opinion, plan critique, implementation critique, or
 
 ## Command
 
-Use the bundled wrapper. It merges `call-claude.example.yaml` with the ignored
-`call-claude.local.yaml`, then applies the resolved model, effort, and timeout.
+Use the bundled wrapper. It loads `call-claude.local.yaml` when present, otherwise
+`call-claude.example.yaml`, then applies the resolved model, effort, and timeout.
 It runs Claude in print mode with Auto permission review, defaulting to
 `claude-opus-5-5` with `high` effort:
 
