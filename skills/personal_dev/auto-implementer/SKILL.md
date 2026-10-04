@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 One worker, one hour, one reviewed PR, zero questions back. Mechanics live in the `implementer` skill.
 
-Write `_scratch/implementer/<slug>.md` — **Goal**, **Evidence** (file:line), **Scope** (owned files; concurrent branches nearby), **Shape** (design it), **Allowed fixes** (or `None`), **Acceptance** (checkable) — then append [`AUTONOMY.md`](AUTONOMY.md).
+Write `_scratch/implementer/<slug>.md` — **Goal**, **Evidence** (file:line), **Scope** (owned files; concurrent branches nearby), **Shape** (design it), **Allowed fixes** (or `None`), **Acceptance** (checkable) — then append [`AUTONOMY.md`](AUTONOMY.md). Require the worker to read and follow the `tdd` skill before implementing.
 
 ```bash
 uv run ~/repos/cc-config/skills/personal_dev/lead/scripts/delegate.py \
