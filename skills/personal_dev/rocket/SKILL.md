@@ -189,10 +189,8 @@ hard-to-reverse architecture:
 - One question at a time, with a default maximum of three.
 - Answer repository-inspectable questions by inspection.
 - State reversible implementation assumptions and proceed with them.
-- Include confirmation of the proposed public test seam required by the `tdd`
-  skill; fold it into another material question when practical.
-- A clear task proceeds immediately, apart from any seam confirmation still
-  required by `tdd`.
+- For TDD, state obvious public test seams and proceed; confirm unclear seams
+  with the user.
 - If material ambiguity remains after three questions, say the task is short of
   implementation-ready and ask whether to continue clarifying or proceed with
   explicit assumptions.
@@ -203,7 +201,7 @@ user-facing behavior or scope.
 ## 3. Plan And Get Configured Critique
 
 Write a concise implementation plan covering the intended behavior, affected
-areas, confirmed test seams, red-green slices, and required verification.
+areas, selected test seams, red-green slices, and required verification.
 
 Use the resolved `critic` runner and its exact non-interactive conventions to
 critique the plan against the resolved task, repository evidence, and
@@ -217,9 +215,10 @@ critique round, unless the run fails or the user asks for more.
 
 ## 4. Implement Test-First
 
-Read and follow the available `tdd` skill completely before implementation.
+Read and follow the available `tdd` skill completely before implementation,
+with Rocket's seam rule above replacing its seam-confirmation requirement.
 
-Work in vertical red-green slices through the confirmed public seams: write one
+Work in vertical red-green slices through the selected public seams: write one
 failing behavior test, run it to observe the expected failure, add only enough
 production code to pass, then repeat.
 
