@@ -2,5 +2,5 @@
 # The gitignored local file is used instead of this example when it exists.
 
 model: claude-opus-5-5
-effort: high
+effort: xhigh
 timeout_ms: 900000

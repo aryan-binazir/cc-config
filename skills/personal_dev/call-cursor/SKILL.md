@@ -12,7 +12,7 @@ Ask Cursor/Composer for a second opinion, plan critique, implementation critique
 Use the bundled launcher. It loads `call-cursor.local.yaml` when present, otherwise
 `call-cursor.example.yaml`, then applies the resolved model and timeout. It runs
 Cursor in print mode with sandboxing enabled, defaulting to
-`cursor-grok-4.6-xhigh` (Grok 4.6 Extra High):
+`grok-4.7-xhigh` (Grok 4.7 Extra High):
 
 ```bash
 PROMPT=$(cat <<'EOF'
@@ -40,15 +40,15 @@ Outside T3 Code, it runs the wrapper directly.
 ## Model Selection
 
 Cursor carries effort in the model ID — the `xhigh` suffix *is* the reasoning
-effort. Call Grok only as 4.6 at extra-high: `cursor-grok-4.6-xhigh`. That is
+effort. Call Grok only as 4.7 at extra-high: `grok-4.7-xhigh`. That is
 also what a bare "use Grok" request means. To pass it explicitly:
 
 ```bash
 cursor-agent --print --trust --auto-review --sandbox enabled \
-  --model cursor-grok-4.6-xhigh "$PROMPT"
+  --model grok-4.7-xhigh "$PROMPT"
 ```
 
-Use `cursor-grok-4.6-xhigh-fast` only when the user explicitly asks for the
+Use `grok-4.7-xhigh-fast` only when the user explicitly asks for the
 fast variant.
 
 When the user requests a different model, pass their exact model name with
@@ -59,5 +59,5 @@ family without an exact tag, resolve it against `cursor-agent --list-models`.
 or critique target, relevant files and repo context, and the output format you
 want.
 
-The resolved `timeout_ms` defaults to 15 minutes. Quiet periods are normal —
+The resolved `timeout_ms` defaults to 30 minutes. Quiet periods are normal —
 keep waiting.

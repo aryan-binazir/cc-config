@@ -50,7 +50,7 @@ workers:
     description: Frontend and UI work.
     runner: codex
     model: gpt-6.1-sol
-    reasoning_effort: high
+    reasoning_effort: xhigh
     timeout_ms: 1500000
   explore:
     description: Read-only exploration, codebase mapping, and question-answering; returns a findings file the next handoff can cite. Sub-agents do the reading, the orchestrator synthesizes.

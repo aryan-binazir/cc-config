@@ -12,7 +12,7 @@ Ask Claude Code for a second opinion, plan critique, implementation critique, or
 Use the bundled wrapper. It loads `call-claude.local.yaml` when present, otherwise
 `call-claude.example.yaml`, then applies the resolved model, effort, and timeout.
 It runs Claude in print mode with Auto permission review, defaulting to
-`claude-opus-5-5` with `high` effort:
+`claude-opus-5-5` with `xhigh` effort:
 
 ```bash
 PROMPT=$(cat <<'EOF'
