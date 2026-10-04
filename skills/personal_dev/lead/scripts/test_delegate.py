@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -130,6 +132,43 @@ class DelegateCompletionTest(unittest.TestCase):
         self.assertTrue(result["timed_out"])
         self.assertIsNone(result["exit_code"])
         self.assertFalse(result["completed"])
+
+    def test_timeout_stops_child_writes_and_preserves_unrelated_process(self) -> None:
+        writes = self.root / "child-writes"
+        child_pid = self.root / "child-pid"
+        child_code = (
+            "import sys, time\n"
+            "with open(sys.argv[1], 'ab', buffering=0) as out:\n"
+            "    for _ in range(200):\n"
+            "        out.write(b'x')\n"
+            "        time.sleep(0.05)\n"
+        )
+        (self.bin_dir / "codex").write_text(
+            f"#!{sys.executable}\n"
+            "import subprocess, sys, time\n"
+            "from pathlib import Path\n"
+            f"child = subprocess.Popen([sys.executable, '-c', {child_code!r}, {str(writes)!r}])\n"
+            f"Path({str(child_pid)!r}).write_text(str(child.pid))\n"
+            "child.wait()\n",
+            encoding="utf-8",
+        )
+        control = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(10)"])
+        try:
+            _, result = self.run_delegate(timeout=True)
+            self.assertTrue(result["timed_out"])
+            before = writes.read_bytes()
+            self.assertGreater(len(before), 0)
+            time.sleep(0.2)
+            self.assertEqual(writes.read_bytes(), before)
+            self.assertIsNone(control.poll())
+        finally:
+            control.terminate()
+            control.wait(timeout=5)
+            if child_pid.exists():
+                try:
+                    os.kill(int(child_pid.read_text()), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
 
     def test_stdout_fallback_can_complete(self) -> None:
         _, result = self.run_delegate(stdout="## SUMMARY\nVerified.\nStatus: complete\n")

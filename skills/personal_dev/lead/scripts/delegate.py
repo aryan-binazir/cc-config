@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -316,7 +317,7 @@ def run_with_heartbeat(cmd: list[str], cwd: Path, timeout_s: float, report: Path
     with out_path.open("w", encoding="utf-8") as out_f, err_path.open("w", encoding="utf-8") as err_f:
         proc = subprocess.Popen(
             cmd, cwd=cwd, stdin=subprocess.DEVNULL, stdout=out_f, stderr=err_f,
-            env={**os.environ, WORKER_ENV: "1"},
+            env={**os.environ, WORKER_ENV: "1"}, start_new_session=True,
         )
         started = time.monotonic()
         next_beat = HEARTBEAT_S
@@ -334,7 +335,10 @@ def run_with_heartbeat(cmd: list[str], cwd: Path, timeout_s: float, report: Path
                     last_size = size
                     last_growth = now
                 if elapsed >= timeout_s:
-                    proc.kill()
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
                     proc.wait()
                     timed_out = True
                     break
