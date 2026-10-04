@@ -34,12 +34,12 @@ resolve disputed findings, and review diffs.
    one `auto-implementer` run: own worktree, `tdd`, project checks,
    `verify-sandbox` results posted as a PR comment *before* `rocket-review`,
    reviewers in the foreground, findings patched, "What users will see"
-   bullets in the PR body. A worker that times out mid-review resumes in the
-   same worktree. Optional: `call-codex` on the fix plan first; it catches
+   bullets in the PR body. Resume interrupted workers from their existing
+   worktree and evidence. Optional: `call-codex` on the fix plan first; it catches
    fixes that contradict specs.
 6. **Merge.** Stop and ask the user; merge reviewed PRs only if they agree.
-7. **Report.** One consolidated report, sandbox torn down clean, every
-   checkout clean.
+7. **Report.** One consolidated report, owned resources cleaned up;
+   unrelated work preserved.
 
 ## Hard rules (verbatim in the brief)
 
@@ -56,5 +56,5 @@ resolve disputed findings, and review diffs.
 CLAIM <name>: VERIFIED | FAILED | NOT VERIFIED — evidence
 PR #n: what users will see
 OPEN: P<n> CONFIRMED|SUSPECTED file:line — one line each
-SANDBOX: down clean · CHECKOUTS: clean
+OWNED RESOURCES: cleaned up · UNRELATED WORK: preserved
 ```
