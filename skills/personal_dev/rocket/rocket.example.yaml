@@ -13,8 +13,9 @@ plan_profiles:
     tracker: linear
     critic:
       name: Opus
-      runner: cursor-agent
-      model: claude-opus-5-5-xhigh
+      runner: claude
+      model: claude-opus-5-5
+      effort: xhigh
       timeout_ms: 1500000
     grill:
       skill: grill-with-docs
@@ -45,8 +46,9 @@ review_profiles:
     diary_name: rocket_review
     reviewers:
       - name: Opus
-        runner: cursor-agent
-        model: claude-opus-5-5-xhigh
+        runner: claude
+        model: claude-opus-5-5
+        effort: xhigh
         timeout_ms: 2100000
         max_rounds: 1
       - name: Codex
