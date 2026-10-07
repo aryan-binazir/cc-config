@@ -1,18 +1,11 @@
 ---
 name: call-claude
-description: Use this whenever the user asks to call Claude, run Claude Code headlessly, invoke /call-claude, or get a second opinion from Claude. This skill gives the exact local command style for non-interactive Claude execution.
+description: Call Claude Code headlessly for a second opinion, critique, or independent read. Use when the user asks to call, run, or consult Claude.
 ---
 
 # Call Claude
 
-Ask Claude Code for a second opinion, plan critique, implementation critique, or independent read on a prompt.
-
-## Command
-
-Use the bundled wrapper. It loads `call-claude.local.yaml` when present, otherwise
-`call-claude.example.yaml`, then applies the resolved model, effort, and timeout.
-It runs Claude in print mode with Auto permission review, defaulting to
-`claude-opus-5-5` with `xhigh` effort:
+The bundled wrapper runs Claude in print mode under Auto permission review, with model, effort, and timeout from `call-claude.local.yaml` when present, otherwise `call-claude.example.yaml`:
 
 ```bash
 PROMPT=$(cat <<'EOF'
@@ -22,18 +15,8 @@ EOF
 uv run --script "<call-claude-skill-dir>/scripts/call.py" "$PROMPT"
 ```
 
-Inspect the effective config without calling Claude:
+`--resolve --pretty` prints the effective config without calling Claude. When the user explicitly requests a model or effort, pass `--model` or `--effort` for that call; leave the config as is.
 
-```bash
-uv run --script "<call-claude-skill-dir>/scripts/call.py" --resolve --pretty
-```
+`PROMPT` is the worker's entire context: the question or critique target, relevant files and repo context, and the output format you want.
 
-When the user explicitly requests a different model or effort, pass `--model`
-or `--effort` for that call and leave the config untouched.
-
-`PROMPT` is the worker's entire context — make it self-contained: the question
-or critique target, relevant files and repo context, and the output format you
-want.
-
-The resolved `timeout_ms` defaults to 30 minutes. Quiet periods are normal —
-keep waiting.
+Quiet periods are normal up to `timeout_ms` (30 minutes by default); keep waiting.

@@ -1,19 +1,11 @@
 ---
 name: call-codex
-description: Use this whenever the user asks to call Codex, run Codex headlessly, invoke /call-codex, or get a second opinion from Codex. This skill gives the exact local command style for non-interactive Codex execution.
+description: Call Codex headlessly for a second opinion, critique, or independent read. Use when the user asks to call, run, or consult Codex.
 ---
 
 # Call Codex
 
-Ask Codex for a second opinion, plan critique, implementation critique, or independent read on a prompt.
-
-## Command
-
-Use the bundled wrapper. It loads `call-codex.local.yaml` when present, otherwise
-`call-codex.example.yaml`, then applies the resolved model, reasoning effort, and
-timeout. It runs Codex with workspace sandboxing, automatic approval review,
-and stdin redirected from `/dev/null`, defaulting to `gpt-6.1-sol` with `high`
-reasoning effort:
+The bundled wrapper runs `codex exec` in the workspace-write sandbox under Auto-review, with model, reasoning effort, and timeout from `call-codex.local.yaml` when present, otherwise `call-codex.example.yaml`:
 
 ```bash
 PROMPT=$(cat <<'EOF'
@@ -23,18 +15,8 @@ EOF
 uv run --script "<call-codex-skill-dir>/scripts/call.py" "$PROMPT"
 ```
 
-Inspect the effective config without calling Codex:
+`--resolve --pretty` prints the effective config without calling Codex. When the user explicitly requests a model or reasoning effort, pass `--model` or `--reasoning-effort` for that call; leave the config as is.
 
-```bash
-uv run --script "<call-codex-skill-dir>/scripts/call.py" --resolve --pretty
-```
+`PROMPT` is the worker's entire context: the question or critique target, relevant files and repo context, and the output format you want.
 
-When the user explicitly requests a different model or reasoning effort, pass
-`--model` or `--reasoning-effort` for that call and leave the config untouched.
-
-`PROMPT` is the worker's entire context — make it self-contained: the question
-or critique target, relevant files and repo context, and the output format you
-want.
-
-The resolved `timeout_ms` defaults to 30 minutes. Quiet periods are normal —
-keep waiting.
+Quiet periods are normal up to `timeout_ms` (30 minutes by default); keep waiting.

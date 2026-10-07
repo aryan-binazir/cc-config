@@ -1,60 +1,39 @@
 ---
 name: code-review-ar
-description: Review committed changes on the current branch since it diverged from the base branch and report only issues that need fixing. Use when the user asks for a review of committed branch changes, a diff review against main, or whether the current branch is safe to merge. Default mode uses parallel sub-agent passes for correctness, security, performance, maintainability, and edge cases, then integrates a single findings-first review. Use `code-review-ar single` only when the user explicitly asks for a single-pass review.
+description: Findings-only review of the current branch's committed changes since merge-base, ending in a merge verdict. Use to review a branch, diff it against main, or judge whether it is safe to merge. Runs parallel sub-agents; `code-review-ar single` runs one pass, only on explicit request.
 ---
 
 # Code Review AR
 
-Review only the changes introduced on the current branch since merge-base. Use parallel sub-agents by default; use single-pass review only when the user or a calling skill explicitly requests `code-review-ar single`.
-
 ## Scope
 
-Review only commits between merge-base and `HEAD`, and only files this branch intentionally modified. Ignore unrelated pre-existing code, upstream changes brought in by merges or rebases, and rebase-noise files.
-
-Check changes against repo rules (`AGENTS.md`, `CLAUDE.md`, coding standards) and conventions in surrounding code. Ground findings in issues introduced by the diff; label uncertainty under `## Uncertain`.
-
-Honor any supplied implementation contract and its scope.
+Review only commits between merge-base and `HEAD`, and only files this branch intentionally modified; pre-existing code, upstream changes pulled in by merges or rebases, and rebase noise stay out. Judge the diff against repo rules (`AGENTS.md`, `CLAUDE.md`, coding standards), surrounding conventions, and any supplied implementation contract and its scope. Ground every finding in what the diff introduced; put doubts under `## Uncertain`.
 
 ## Get Changes
 
 ```bash
-# Find the merge-base (where this branch diverged from main)
 BASE=$(git merge-base origin/main HEAD 2>/dev/null || git merge-base origin/master HEAD)
-
-# Get ONLY the diff between merge-base and current HEAD
 git diff $BASE..HEAD
-
-# List commits on this branch only (exclude merge commits)
 git log --oneline --no-merges $BASE..HEAD
-
-# Summary of files changed on this branch
 git diff --stat $BASE..HEAD
 ```
 
-## Parallel Review
+## Lenses
 
-Default mode. Run sub-agents in parallel, each working independently from the same diff.
+1. **Correctness**: logic errors, broken algorithms, wrong assumptions.
+2. **Regressions**: removed behavior, changed contracts, broken integrations.
+3. **Security**: injection, auth, data exposure, secrets in code.
+4. **Performance**: N+1 queries, needless loops, memory leaks, expensive operations.
+5. **Maintainability**: repo rules and conventions, naming, complexity, duplication, missing error handling, test coverage gaps.
+6. **Edge cases**: null handling, empty arrays, boundary conditions, race conditions.
 
-Pass any supplied implementation contract and applicable repo rules to each sub-agent.
+**Parallel** (default): three independent sub-agents on the same diff, each handed any contract and the applicable repo rules, covering lenses 1–2, 3–4, and 5–6. Integrate their findings into one review.
 
-- **Agent 1: Correctness & Regressions** — Does this code actually work? Logic errors, broken algorithms, wrong assumptions. Will merging break existing functionality? Removed behavior, changed contracts, broken integrations.
-- **Agent 2: Security & Performance** — Injection risks, auth issues, data exposure, secrets in code. N+1 queries, unnecessary loops, memory leaks, expensive operations.
-- **Agent 3: Maintainability & Edge Cases** — Repo rules and conventions, naming, complexity, duplication, missing error handling, test coverage gaps. What inputs would break this? Null handling, empty arrays, boundary conditions, race conditions.
-
-## Single Review
-
-Only when explicitly requested. Review focus:
-
-1. **Correctness**: Logic errors, broken algorithms, wrong assumptions.
-2. **Regressions**: Removed behavior, changed contracts, broken integrations.
-3. **Security**: Injection risks, auth issues, data exposure, secrets in code.
-4. **Performance**: N+1 queries, unnecessary loops, memory leaks, expensive operations.
-5. **Maintainability**: Repo rules and conventions, naming, complexity, duplication, missing error handling, test coverage gaps.
-6. **Edge Cases**: Null handling, empty arrays, boundary conditions, race conditions.
+**Single** (`code-review-ar single`, only when the user or a calling skill asks): one pass over all six lenses.
 
 ## Output
 
-List only issues that need fixing, each pointing at exactly what is wrong and where.
+List only issues that need fixing, each pinned to exactly what is wrong and where. With none, say so plainly.
 
 ```
 ## Critical
@@ -77,13 +56,11 @@ Consider fixing.
 APPROVE | APPROVE WITH FIXES | NEEDS FIXES
 ```
 
-End `## Verdict` with exactly one token on its own line: `APPROVE` (ready to merge as-is), `APPROVE WITH FIXES` (acceptable, specific fixes should land before merge), or `NEEDS FIXES` (still short of acceptable).
-
-If no issues are found, say so plainly.
+End `## Verdict` with exactly one token on its own line: `APPROVE` (merge as-is), `APPROVE WITH FIXES` (acceptable once specific fixes land), or `NEEDS FIXES` (not yet acceptable).
 
 ## Save Review
 
-Also save a concise artifact. Branch name from `git branch --show-current`, replace `/` with `-`, `mkdir -p _scratch/_reviews`, then write `_scratch/_reviews/{branchname}-review.md`:
+Also write a concise artifact to `_scratch/_reviews/<branch>-review.md`, where `<branch>` is `git branch --show-current` with `/` → `-`:
 
 ```
 ## Verdict
