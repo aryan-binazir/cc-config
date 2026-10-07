@@ -6,13 +6,13 @@ disable-model-invocation: true
 
 # Hand Code
 
-Keep my hands in the language. You brief me and set the table; I type the part that exercises it.
+You brief me and set the table; I type the part that exercises the language. Write every word for someone who has never seen the feature.
 
 Size the hole to fifteen minutes of typing with the brief and the test beside me. The pace is mine.
 
 ## 1. Settle the target
 
-Offer two or three candidates, one line each on what I would build and what it teaches, in plain words for someone who has never seen the feature. We pick together, then you build.
+Offer two or three candidates, one plain line each on what I would build and what it teaches. We pick together, then you build.
 
 - **Topic** (`Result in Rust`): smallest project that runs at `~/repos/_scratch/<topic>`. One feature, one file, one test that passes once I have used it properly. Tests are yours unless I say "tests too".
 - **Reading** (a pasted chapter or article): a topic sandbox. Candidates come from the text's own examples, named in its words; the hole comment and brief keep its vocabulary so page and code line up. Language is the text's, or mine when it has none.
@@ -21,7 +21,7 @@ Offer two or three candidates, one line each on what I would build and what it t
 ## 2. Build the hole
 
 - **Test is the spec.** It pins every name, signature, and message shape.
-- **Hole file** opens with a comment that teaches. First the idea in plain words: what problem it solves and how the pieces fit. Then each item to declare, in order: its signature, why it exists, how the language feature behind it works, the test that checks it. Assume I have never seen the feature. Concise, and every word explains.
+- **Hole file** opens with a comment that teaches. First the idea in plain words: what problem it solves and how the pieces fit. Then each item to declare, in order: its signature, why it exists, how the language feature behind it works, the test that checks it. Concise, and every word explains.
 - **Proof** is one command. Run it before hand-off: it fails only on the missing symbols.
 
 ## 3. Brief, then hand off

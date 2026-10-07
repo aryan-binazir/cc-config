@@ -1,54 +1,37 @@
 ---
 name: context-sync
-description: Post the final task status as a comment on the relevant Jira or Linear issue. Use when finishing, pausing, blocking, or handing off ticket-backed work and the external tracker needs the final status synced. Detect Jira vs Linear from explicit issue links, the source ticket already used in the conversation, branch/PR/commit references resolved through available tools, and repo environment. Local `_scratch/_context` files stay untouched.
+description: Post a final status comment on the Jira or Linear issue that owns the work. Use when the tracker needs the status of finished, paused, blocked, or handed-off ticket work.
 ---
 
 # Context Sync
 
-Post a concise final status comment to the external ticket that owns the work.
-
-## Scope
-
-The whole deliverable is exactly one final status comment in Jira or Linear. Everything else — ticket descriptions, labels, fields, assignees, priorities, workflow status, `_scratch/_context` files, PRs, commits, and code — stays untouched, with one exception: edit ticket metadata when the user explicitly asks for it.
-
-Claim only what the conversation or verified repo state supports. Stop and ask for the issue URL or key when the target can't be determined confidently.
+The deliverable is exactly one concise final status comment on the owning ticket. Ticket descriptions, labels, fields, assignees, priorities, workflow status, `_scratch/_context` files, PRs, commits, and code stay untouched; edit ticket metadata only on explicit request.
 
 ## Target Detection
 
-Use this order:
+Find the candidate, in priority order:
 
-1. An explicit issue URL or key from the user's current request.
+1. An explicit issue URL or key in the current request.
 2. The source ticket already fetched or discussed in the conversation.
-3. Ticket references from the current branch, recent commits, PR title/body, and local repo rules.
-4. Resolve the candidate issue through available Jira or Linear tooling.
-5. A URL host that clearly identifies the tracker decides it: `linear.app` or known Linear workspace URLs → Linear; Atlassian/Jira hosts → Jira.
-6. A bare issue key such as `ABC-123` fits both trackers; resolve it with available tools.
-7. If both Jira and Linear resolve, or neither does, ask the user which issue to comment on.
+3. Ticket references in the current branch, recent commits, PR title/body, and local repo rules: candidates until verified.
 
-Environment signals are supporting evidence, not proof: a branch name or repo convention can identify a candidate, but verify the issue exists in the chosen tracker before posting.
+Pick the tracker: a `linear.app` or known Linear workspace URL → Linear; an Atlassian/Jira host → Jira; a bare key like `ABC-123` fits both, so resolve it through available tools. Verify the issue exists in the chosen tracker before posting. When both trackers resolve, neither does, or the target stays uncertain, ask for the issue URL or key.
 
 ## Status Collection
 
-Build the comment from factual state only:
+Claim only what the conversation or verified repo state supports:
 
-- Current outcome: `Complete`, `Blocked`, or `Partial`.
+- Outcome: `Complete`, `Blocked`, or `Partial`.
 - What changed or was done.
 - What was verified, with exact commands when known, and what was left unverified if relevant.
 - PR, branch, commit, or artifact links when available.
 - Remaining work, blockers, or follow-up owners.
 
-Use the conversation first; check repo state when it keeps the status honest:
-
-```bash
-git status -sb
-git log --oneline -5
-```
-
-Include the PR link when one exists and GitHub tooling is available. Run expensive checks only when the user asked for fresh verification.
+Use the conversation first; check `git status -sb` and `git log --oneline -5` when they keep the status honest. Look up the PR link with GitHub tooling when available. Reserve expensive checks for when the user asks for fresh verification.
 
 ## Comment Format
 
-Keep it short and scannable; omit empty sections. For blocked or partial work, make the blocker obvious in the first two lines.
+Short and scannable; omit empty sections. For blocked or partial work, make the blocker obvious in the first two lines.
 
 ```md
 Final status: Complete
@@ -68,9 +51,8 @@ Remaining:
 - None
 ```
 
-## Posting Rules
+## Posting
 
-- Prefer installed MCP/app tools for Jira or Linear; use CLI or API tooling only when it is already configured.
-- Work with existing tooling and credentials only, and post only through tracker tools or APIs.
-- If a write-capable tracker tool is unavailable, report the blocker and include the exact comment body that should be posted.
+- Post through installed MCP/app tracker tools, else CLI or API tooling already configured with existing credentials.
+- With no write-capable tool, report the blocker plus the exact comment body to post.
 - After posting, reply with the issue key or URL, tracker name, and a one-sentence summary of what was posted.

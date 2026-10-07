@@ -1,6 +1,6 @@
 ---
 name: add-auto-policy
-description: Add one approve or deny rule to both Claude Code Auto mode and Codex Auto-review, translating the same intent into each native policy format. Use only when explicitly invoked with one action and approve or deny; use align-auto-review for broader comparison, removal, or synchronization.
+description: Add one approve or deny rule to both Claude Code Auto mode and Codex Auto-review, each in its native policy format. For broader compare, remove, or sync work, use align-auto-review.
 disable-model-invocation: true
 ---
 
@@ -18,9 +18,9 @@ Mirror intent, not syntax.
      Start a missing list with `"$defaults"`; preserve an existing list's
      deliberate sentinel choice.
    - Codex: append a local `[auto_review].policy` `Outcome rule: allow ...` or
-     `Outcome rule: deny ... regardless of user authorization`. This policy is
-     supplemental: append only the new rule, preserving its existing text and
-     leaving the built-in policy where it lives.
+     `Outcome rule: deny ... regardless of user authorization`, preserving its
+     existing text. A local policy replaces the default, so with no local
+     policy yet, first copy the current official default in verbatim.
 4. Use Claude `soft_deny` or an overridable Codex denial only when explicitly
    requested. Write only to `autoMode` and `[auto_review].policy`;
    `permissions`, `.rules`, and activation settings stay untouched.

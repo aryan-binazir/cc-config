@@ -1,11 +1,9 @@
 ---
 name: prove-it
 description: >-
-  Test what shipped for real: fresh main, throwaway full stack, one strong
-  sub-agent per flow, every defect fixed through a reviewed PR,
-  one consolidated report. Use when the user invokes
-  /prove-it, says "prove it", "test everything we shipped", "shakedown",
-  "pre-launch check", or "make sure it works for real".
+  Test what shipped for real on a throwaway full stack, fixing every defect
+  through a reviewed PR. Use for a shakedown or pre-launch check, or when asked
+  to prove it works for real.
 ---
 
 # Prove It
@@ -23,22 +21,21 @@ resolve disputed findings, and review diffs.
    Zero human accounts needed.
 3. **Brief.** Share one environment and tester brief. Workers handle routine
    fixture setup within their ownership; reuse completed evidence.
-4. **Fan out.** Keep independent workers running in parallel, one per complete
-   user journey, grouping related checks. Use the user's chosen model and
-   reasoning level. Browser testers drive the real UI
-   with Playwright: stub the auth SDK in-page and inject bearer tokens so the
-   real SPA renders. Anything
-   touching money, scores, or irreversible state also gets an adversarial
-   verifier. A log monitor watches for ERROR/panic/5xx the whole time.
-5. **Triage.** By-design and cosmetic items get listed. Each real defect gets
-   one `auto-implementer` run: own worktree, `tdd`, project checks,
+4. **Fan out.** Run independent workers in parallel, one per complete user
+   journey, grouping related checks, on the user's chosen model and reasoning
+   level. Browser testers drive the real UI with Playwright: stub the auth SDK
+   in-page and inject bearer tokens so the real SPA renders. Anything touching
+   money, scores, or irreversible state also gets an adversarial verifier. A
+   log monitor watches for ERROR/panic/5xx throughout.
+5. **Triage.** List by-design and cosmetic items. Each real defect gets one
+   `auto-implementer` run: own worktree, `tdd`, project checks,
    `verify-sandbox` results posted as a PR comment *before* `rocket-review`,
    reviewers in the foreground, findings patched, "What users will see"
    bullets in the PR body. Resume interrupted workers from their existing
-   worktree and evidence. Optional: `call-codex` on the fix plan first; it catches
-   fixes that contradict specs.
-6. **Merge.** Stop and ask the user; merge reviewed PRs only if they agree.
-7. **Report.** One consolidated report, owned resources cleaned up;
+   worktree and evidence. Optional: `call-codex` on the fix plan first; it
+   catches fixes that contradict specs.
+6. **Merge.** Ask the user; merge reviewed PRs on their yes.
+7. **Report.** One consolidated report, owned resources cleaned up,
    unrelated work preserved.
 
 ## Hard rules (verbatim in the brief)
