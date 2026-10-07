@@ -22,7 +22,7 @@ Always use the bundled helper (line and column optional):
 
 ```bash
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-~/repos/cc-config/skills/personal_dev/nvim/scripts/open_nvim_tmux.sh "$repo_root" path/to/file.go 150 [14]
+~/repos/cc-config/skills/personal_dev/nvim/scripts/open_nvim_tmux.sh "$repo_root" path/to/file.go 150 14
 ```
 
 Inside Herdr or tmux, it opens a new tab or window and prints nothing; reply with only the location:
