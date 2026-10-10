@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import tempfile
 import unittest
@@ -17,6 +18,34 @@ NAMES = (
 
 
 class SkillConfigTest(unittest.TestCase):
+    def test_model_effort_defaults(self) -> None:
+        def check(config: dict) -> None:
+            if config.get("model") == "gpt-6.1-sol":
+                self.assertEqual(config["reasoning_effort"], "xhigh")
+            elif config.get("model") == "claude-opus-5-5":
+                self.assertEqual(config["effort"], "high")
+            for value in config.values():
+                if isinstance(value, dict):
+                    check(value)
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict):
+                            check(item)
+
+        for name in ("call-codex", "call-claude", "ask-adversary-in-block", "rocket"):
+            with self.subTest(skill=name):
+                check(yaml.safe_load((SKILLS / name / f"{name}.example.yaml").read_text()))
+        settings = json.loads((SKILLS.parents[1] / "settings.json").read_text())
+        self.assertEqual(settings["modelSettings"]["claude-opus-5-5"]["effortLevel"], "high")
+
+    def test_lead_worker_efforts(self) -> None:
+        config = yaml.safe_load((SKILLS / "lead/lead.example.yaml").read_text())
+        self.assertEqual(
+            {name: worker["reasoning_effort"] for name, worker in config["workers"].items()},
+            {"xhigh": "xhigh", "high": "high", "medium": "medium", "low": "low",
+             "frontend": "xhigh", "explore": "high"},
+        )
+
     def test_local_selection_and_missing_local_fallback(self) -> None:
         for name in NAMES:
             with self.subTest(skill=name), tempfile.TemporaryDirectory() as tmp:

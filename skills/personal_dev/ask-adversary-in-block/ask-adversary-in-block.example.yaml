@@ -3,5 +3,5 @@
 
 runner: claude
 model: claude-opus-5-5
-effort: xhigh
+effort: high
 timeout_ms: 1800000
