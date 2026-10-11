@@ -5,7 +5,7 @@ usage() {
   cat >&2 <<'USAGE'
 usage: open_nvim_tmux.sh [--print] <repo-root> <file> [line] [column]
 
-Inside Herdr (HERDR_ENV=1) or tmux (TMUX set): opens the file in nvim in a
+Inside Herdr (HERDR_ENV=1) or tmux (TMUX and TMUX_PANE set): opens the file in nvim in a
 pane left of the calling agent's pane, reusing that nvim on later calls.
 Outside Herdr and tmux (GUI apps, t3code, plain shells): prints a paste-able
 tmux command targeting the tmux session named after the repo. --print forces
@@ -55,30 +55,39 @@ if [ -n "$column" ] && ! [[ "$column" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-if [ -n "$line" ] && [ -n "$column" ]; then
-  nvim_cmd=(nvim "+call cursor($line, $column)" "+normal! zz" -- "$file")
-elif [ -n "$line" ]; then
-  nvim_cmd=(nvim "+$line" -- "$file")
+if [ -n "$line" ]; then
+  nvim_cmd=(nvim "+call cursor($line, ${column:-1})" "+normal! zz" -- "$file")
 else
   nvim_cmd=(nvim -- "$file")
 fi
 
-printf -v command '%q ' "${nvim_cmd[@]}"
-command=${command% }
-
-# Inside Herdr or tmux, nvim lives in a pane left of the agent, paired to it and
-# reachable over its --listen socket, so later opens reuse it.
 socket_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/agent-nvim
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+  socket_dir+=-$UID
+fi
+if [ "$print_only" -eq 0 ] && { [ "${HERDR_ENV:-}" = 1 ] || [ -n "${TMUX:-}" ]; }; then
+  if [ "${HERDR_ENV:-}" != 1 ] && [ -z "${TMUX_PANE:-}" ]; then
+    printf 'TMUX_PANE is required inside tmux\n' >&2
+    exit 1
+  fi
+  if [ -L "$socket_dir" ] || { [ -e "$socket_dir" ] && [ ! -O "$socket_dir" ]; }; then
+    printf 'socket directory must be owned by this user and not a symlink: %s\n' "$socket_dir" >&2
+    exit 1
+  fi
+  mkdir -p -m 700 "$socket_dir"
+  [ -O "$socket_dir" ] && [ ! -L "$socket_dir" ] && chmod 700 "$socket_dir"
+fi
 
 jump_to_file() {
   for _ in $(seq 60); do
     nvim --server "$socket" --remote-expr 1 >/dev/null 2>&1 && break
     sleep 0.05
   done
-  local jump="edit ' .. fnameescape('${file_path//\'/\'\'}')"
-  [ -n "$line" ] && jump+=" .. ' | call cursor($line, ${column:-1}) | normal! zz'"
+  local path=${file_path//\'/\'\'}
+  local jump="if expand('%:p') !=# '$path' | execute 'edit ' .. fnameescape('$path') | endif"
+  [ -n "$line" ] && jump+=" | call cursor($line, ${column:-1}) | normal! zz"
   nvim --server "$socket" --remote-send '<C-\><C-N>'
-  nvim --server "$socket" --remote-expr "execute('$jump)" >/dev/null
+  nvim --server "$socket" --remote-expr "execute('${jump//\'/\'\'}')" >/dev/null
 }
 
 if [ "$print_only" -eq 0 ] && [ "${HERDR_ENV:-}" = 1 ]; then
@@ -86,11 +95,11 @@ if [ "$print_only" -eq 0 ] && [ "${HERDR_ENV:-}" = 1 ]; then
   key=${agent//[^[:alnum:]_-]/-}
   socket=$socket_dir/herdr-$key.sock
   label=agent-nvim-$key
-  mkdir -p -m 700 "$socket_dir"
   editor=$(herdr pane list --workspace "${HERDR_WORKSPACE_ID:?HERDR_WORKSPACE_ID is required inside Herdr}" |
     jq -r --arg label "$label" '[.result.panes[] | select(.label == $label)][0].pane_id // empty')
 
   if [ -n "$editor" ]; then
+    herdr pane focus --pane "$agent" --direction left >/dev/null
     jump_to_file
   else
     rm -f "$socket"
@@ -100,10 +109,9 @@ if [ "$print_only" -eq 0 ] && [ "${HERDR_ENV:-}" = 1 ]; then
     herdr pane rename "$editor" "$label" >/dev/null
     printf -v listen_command '%q ' nvim --listen "$socket" "${nvim_cmd[@]:1}"
     herdr pane run "$editor" "exec ${listen_command% }" >/dev/null
+    herdr pane focus --pane "$agent" --direction left >/dev/null
   fi
-  herdr pane focus --pane "$agent" --direction left >/dev/null
 
-  # Label the agent the way nvim's <leader>pi/cc/cd do, so nvim's sends reach it.
   agent_name=$(herdr pane get "$agent" | jq -r '.result.pane.agent // empty')
   case "$agent_name" in
     claude | codex | opencode | pi) herdr pane rename "$agent" "nvim-ai-${editor//[^[:alnum:]_-]/-}-$agent_name" >/dev/null ;;
@@ -114,20 +122,20 @@ fi
 if [ "$print_only" -eq 0 ] && [ -n "${TMUX:-}" ] && [ -n "${TMUX_PANE:-}" ]; then
   agent=$TMUX_PANE
   socket=$socket_dir/tmux-$(tmux display-message -p '#{pid}')-${agent#%}.sock
-  mkdir -p -m 700 "$socket_dir"
-  editor=$(tmux list-panes -t "$agent" -F '#{pane_id} #{@agent_nvim_for}' | awk -v a="$agent" '$2 == a { print $1; exit }')
+  editor=$(tmux list-panes -s -t "$agent" -F '#{pane_id} #{@agent_nvim_for} #{pane_dead}' | awk -v a="$agent" '$2 == a && $3 == 0 { print $1; exit }')
 
   if [ -n "$editor" ]; then
-    jump_to_file
+    socket=$(tmux show-option -p -v -t "$editor" @agent_nvim_socket)
+    tmux select-window -t "$editor"
     tmux select-pane -t "$editor"
+    jump_to_file
   else
     rm -f "$socket"
-    editor=$(tmux split-window -h -b -l 65% -t "$agent" -c "$repo_root" -P -F '#{pane_id}' \
+    editor=$(tmux split-window -h -b -l 65% -t "$agent" -c "${repo_root//#/##}" -P -F '#{pane_id}' \
       nvim --listen "$socket" "${nvim_cmd[@]:1}")
     tmux set-option -p -t "$editor" @agent_nvim_for "$agent" \; set-option -p -t "$editor" @agent_nvim_socket "$socket"
   fi
 
-  # Mark the agent the way nvim's <leader>pi/cc/cd do, so nvim's sends reach it.
   agent_name=$(tmux display-message -p -t "$agent" '#{pane_current_command}')
   case "$agent_name" in
     claude | codex | opencode | pi) tmux set-option -p -t "$agent" @nvim_ai_pane "$agent_name" ;;
@@ -135,11 +143,9 @@ if [ "$print_only" -eq 0 ] && [ -n "${TMUX:-}" ] && [ -n "${TMUX_PANE:-}" ]; the
   exit 0
 fi
 
-# Not inside tmux: print a command to paste. Target the tmux session named
-# after the repo (worktrees resolve to their parent repo), so the window lands
-# in the session where the user works on this codebase; switch-client jumps
-# there when pasted inside any tmux pane. The window opens a shell and types
-# the nvim command so it survives quitting nvim.
+printf -v command '%q ' "${nvim_cmd[@]}"
+command=${command% }
+
 common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
 if [ -n "$common_dir" ]; then
   repo_name=$(basename "$(dirname "$common_dir")")

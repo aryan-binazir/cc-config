@@ -93,8 +93,108 @@ class TmuxSplitTest(unittest.TestCase):
         self.assertEqual(self.editor()["pane_active"], "1")
         self.assertEqual(
             self.nvim_eval("expand('%:p') .. ':' .. line('.') .. ':' .. col('.')"),
-            f"{self.repo / "it's b.txt"}:30:2",
+            str(self.repo / "it's b.txt") + ":30:2",
         )
+
+    def test_reopening_current_buffer_preserves_unsaved_edits_and_jumps(self) -> None:
+        self.open("a.txt")
+        self.nvim_eval("setline(1, 'unsaved')")
+        self.tmux("select-pane", "-t", self.agent)
+        result = self.open("a.txt", "25", "2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.nvim_eval("getline(1) .. ':' .. &modified"), "unsaved:1")
+        self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), "25:2")
+        self.assertEqual(self.editor()["pane_active"], "1")
+        self.assertEqual(len(self.panes()), 2)
+
+    def test_first_open_honors_column_and_line_defaults(self) -> None:
+        (self.repo / "a.txt").write_text("    abcdef\n" * 100)
+        for args, column in ((('60', '6'), '6'), (('60',), '1')):
+            with self.subTest(args=args):
+                self.assertEqual(self.open("a.txt", *args).returncode, 0)
+                self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), '60:' + column)
+                self.assertLess(abs(int(self.nvim_eval("winline()")) - 24), 3)
+                subprocess.run(["nvim", "--server", self.editor()["@agent_nvim_socket"],
+                                "--remote-send", "<C-\\><C-N>:qa!<CR>"], check=True, env=self.env)
+                wait_for(lambda: list(self.panes()) == [self.agent])
+
+    def test_reuse_focuses_before_an_edit_error(self) -> None:
+        self.open("a.txt")
+        self.nvim_eval("setline(1, 'unsaved')")
+        self.nvim_eval("execute('set nohidden')")
+        self.tmux("select-pane", "-t", self.agent)
+        result = self.open("it's b.txt")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.editor()["pane_active"], "1")
+
+    def test_broken_out_editor_reuses_recorded_socket(self) -> None:
+        self.open("a.txt")
+        self.nvim_eval("1")
+        editor = self.editor()
+        sock = editor["@agent_nvim_socket"]
+        self.tmux("break-pane", "-d", "-s", editor["pane_id"])
+        self.env["XDG_RUNTIME_DIR"] = str(self.tmp / "other-run")
+        result = self.open("a.txt", "20")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.tmux("list-panes", "-s").splitlines()), 2)
+        self.assertTrue(Path(sock).exists())
+        self.assertEqual(self.tmux("display-message", "-p", "#{pane_id}"), editor["pane_id"])
+        value = subprocess.run(["nvim", "--server", sock, "--remote-expr", "line('.')"],
+                               capture_output=True, text=True, check=True, env=self.env)
+        self.assertEqual(value.stdout.strip(), "20")
+
+    def test_dead_editor_is_replaced(self) -> None:
+        self.open("a.txt")
+        self.nvim_eval("1")
+        editor = self.editor()
+        self.tmux("set-option", "-p", "-t", editor["pane_id"], "remain-on-exit", "on")
+        subprocess.run(["nvim", "--server", editor["@agent_nvim_socket"], "--remote-send",
+                        "<C-\\><C-N>:qa!<CR>"], check=True, env=self.env)
+        wait_for(lambda: self.tmux("display-message", "-p", "-t", editor["pane_id"], "#{pane_dead}") == "1")
+        result = self.open("a.txt", "8")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.panes()), 3)
+        self.assertNotEqual(self.tmux("display-message", "-p", "#{pane_id}"), editor["pane_id"])
+
+    def test_hash_in_repo_path(self) -> None:
+        renamed = self.repo.with_name("repo#{pane_id}")
+        self.repo.rename(renamed)
+        self.repo = renamed
+        result = self.open("a.txt")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.nvim_eval("expand('%:p')"), str(self.repo / "a.txt"))
+
+    def test_socket_directory_is_private(self) -> None:
+        directory = self.tmp / "run/agent-nvim"
+        directory.mkdir(mode=0o755)
+        result = self.open("a.txt")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+
+    def test_symlink_socket_directory_is_rejected(self) -> None:
+        directory = self.tmp / "run/agent-nvim"
+        directory.symlink_to(self.repo, target_is_directory=True)
+        result = self.open("a.txt")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("not a symlink", result.stderr)
+        self.assertEqual(len(self.panes()), 1)
+
+    def test_missing_tmux_pane_is_an_error(self) -> None:
+        del self.env["TMUX_PANE"]
+        result = self.open("a.txt")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("TMUX_PANE is required", result.stderr)
+        self.assertEqual(result.stdout, "")
+
+    def test_print_mode_keeps_existing_session_command(self) -> None:
+        self.tmux("rename-session", "repo")
+        del self.env["TMUX_PANE"]
+        result = subprocess.run([str(SCRIPT), "--print", str(self.repo), "a.txt"],
+                                capture_output=True, text=True, env=self.env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "# opens in tmux session repo\n"
+                         f'tmux new-window -t repo: -c {self.repo} \\; send-keys "nvim -- a.txt" Enter \\; switch-client -t repo\n')
+        self.assertEqual(len(self.panes()), 1)
 
     def test_agent_pane_is_marked_for_nvim_sends(self) -> None:
         self.open("a.txt")
@@ -117,6 +217,7 @@ esac
 """
 
 
+@unittest.skipUnless(shutil.which("jq"), "needs jq")
 class HerdrSplitTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="nvim-skill-herdr-"))
@@ -149,7 +250,7 @@ class HerdrSplitTest(unittest.TestCase):
             f"pane split --pane w1:p2 --direction right --ratio 0.65 --cwd {self.tmp}",
             "pane swap --source-pane w1:p2 --target-pane w1:p9",
             "pane rename w1:p9 agent-nvim-w1-p2",
-            f"pane run w1:p9 exec nvim --listen {sock} +3 -- a.txt",
+            f"pane run w1:p9 exec nvim --listen {sock} +call\\ cursor\\(3\\,\\ 1\\) +normal\\!\\ zz -- a.txt",
             "pane focus --pane w1:p2 --direction left",
             "pane get w1:p2",
             "pane rename w1:p2 nvim-ai-w1-p9-claude",
@@ -161,6 +262,7 @@ class HerdrSplitTest(unittest.TestCase):
         sock.parent.mkdir(parents=True)
         env = self.env | {"XDG_CONFIG_HOME": str(self.tmp / "c"), "XDG_DATA_HOME": str(self.tmp / "d"), "XDG_STATE_HOME": str(self.tmp / "s")}
         nvim = subprocess.Popen(["nvim", "--headless", "--listen", str(sock)], env=env, cwd=self.tmp)
+        self.addCleanup(nvim.wait)
         self.addCleanup(nvim.kill)
         wait_for(sock.exists)
         self.panes.write_text('[{"pane_id":"w1:p9","label":"agent-nvim-w1-p2"}]')
