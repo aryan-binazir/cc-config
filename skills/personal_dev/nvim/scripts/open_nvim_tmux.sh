@@ -70,12 +70,12 @@ if [ "$print_only" -eq 0 ] && { [ "${HERDR_ENV:-}" = 1 ] || [ -n "${TMUX:-}" ]; 
     printf 'TMUX_PANE is required inside tmux\n' >&2
     exit 1
   fi
-  if [ -L "$socket_dir" ] || { [ -e "$socket_dir" ] && [ ! -O "$socket_dir" ]; }; then
+  mkdir -p -m 700 "$socket_dir"
+  { [ -O "$socket_dir" ] && [ ! -L "$socket_dir" ]; } || {
     printf 'socket directory must be owned by this user and not a symlink: %s\n' "$socket_dir" >&2
     exit 1
-  fi
-  mkdir -p -m 700 "$socket_dir"
-  [ -O "$socket_dir" ] && [ ! -L "$socket_dir" ] && chmod 700 "$socket_dir"
+  }
+  chmod 700 "$socket_dir"
 fi
 
 jump_to_file() {
@@ -84,7 +84,7 @@ jump_to_file() {
     sleep 0.05
   done
   local path=${file_path//\'/\'\'}
-  local jump="if expand('%:p') !=# '$path' | execute 'edit ' .. fnameescape('$path') | endif"
+  local jump="if resolve(expand('%:p')) !=# resolve('$path') | execute 'edit ' .. fnameescape('$path') | endif"
   [ -n "$line" ] && jump+=" | call cursor($line, ${column:-1}) | normal! zz"
   nvim --server "$socket" --remote-send '<C-\><C-N>'
   nvim --server "$socket" --remote-expr "execute('${jump//\'/\'\'}')" >/dev/null

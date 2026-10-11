@@ -107,6 +107,25 @@ class TmuxSplitTest(unittest.TestCase):
         self.assertEqual(self.editor()["pane_active"], "1")
         self.assertEqual(len(self.panes()), 2)
 
+    def test_dot_relative_reopen_preserves_unsaved_edits(self) -> None:
+        self.open("a.txt")
+        self.nvim_eval("setline(1, 'unsaved')")
+        result = self.open("./a.txt", "25", "2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.nvim_eval("getline(1) .. ':' .. &modified"), "unsaved:1")
+        self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), "25:2")
+
+    def test_symlinked_repo_reopen_preserves_unsaved_edits(self) -> None:
+        alias = self.tmp / "alias"
+        alias.symlink_to(self.repo, target_is_directory=True)
+        self.repo = alias
+        self.open("a.txt")
+        self.nvim_eval("setline(1, 'unsaved')")
+        result = self.open("a.txt", "25", "2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.nvim_eval("getline(1) .. ':' .. &modified"), "unsaved:1")
+        self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), "25:2")
+
     def test_first_open_honors_column_and_line_defaults(self) -> None:
         (self.repo / "a.txt").write_text("    abcdef\n" * 100)
         for args, column in ((('60', '6'), '6'), (('60',), '1')):
