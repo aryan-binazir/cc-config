@@ -5,8 +5,8 @@ usage() {
   cat >&2 <<'USAGE'
 usage: open_nvim_tmux.sh [--print] <repo-root> <file> [line] [column]
 
-Inside Herdr (HERDR_ENV=1): opens the file in a new tab of the current workspace.
-Inside tmux (TMUX set): opens the file in a new window of the current session.
+Inside Herdr (HERDR_ENV=1) or tmux (TMUX set): opens the file in nvim in a
+pane left of the calling agent's pane, reusing that nvim on later calls.
 Outside Herdr and tmux (GUI apps, t3code, plain shells): prints a paste-able
 tmux command targeting the tmux session named after the repo. --print forces
 the print behavior.
@@ -66,25 +66,72 @@ fi
 printf -v command '%q ' "${nvim_cmd[@]}"
 command=${command% }
 
-if [ "$print_only" -eq 0 ] && [ "${HERDR_ENV:-}" = 1 ]; then
-  if [ -z "${HERDR_WORKSPACE_ID:-}" ]; then
-    printf 'HERDR_WORKSPACE_ID is required inside Herdr\n' >&2
-    exit 1
-  fi
+# Inside Herdr or tmux, nvim lives in a pane left of the agent, paired to it and
+# reachable over its --listen socket, so later opens reuse it.
+socket_dir=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/agent-nvim
 
-  tab_result=$(herdr tab create \
-    --workspace "$HERDR_WORKSPACE_ID" \
-    --cwd "$repo_root" \
-    --focus)
-  pane_id=$(jq -er '.result.root_pane.pane_id' <<<"$tab_result")
-  herdr pane run "$pane_id" "$command" >/dev/null
+jump_to_file() {
+  for _ in $(seq 60); do
+    nvim --server "$socket" --remote-expr 1 >/dev/null 2>&1 && break
+    sleep 0.05
+  done
+  local jump="edit ' .. fnameescape('${file_path//\'/\'\'}')"
+  [ -n "$line" ] && jump+=" .. ' | call cursor($line, ${column:-1}) | normal! zz'"
+  nvim --server "$socket" --remote-send '<C-\><C-N>'
+  nvim --server "$socket" --remote-expr "execute('$jump)" >/dev/null
+}
+
+if [ "$print_only" -eq 0 ] && [ "${HERDR_ENV:-}" = 1 ]; then
+  agent=${HERDR_PANE_ID:?HERDR_PANE_ID is required inside Herdr}
+  key=${agent//[^[:alnum:]_-]/-}
+  socket=$socket_dir/herdr-$key.sock
+  label=agent-nvim-$key
+  mkdir -p -m 700 "$socket_dir"
+  editor=$(herdr pane list --workspace "${HERDR_WORKSPACE_ID:?HERDR_WORKSPACE_ID is required inside Herdr}" |
+    jq -r --arg label "$label" '[.result.panes[] | select(.label == $label)][0].pane_id // empty')
+
+  if [ -n "$editor" ]; then
+    jump_to_file
+  else
+    rm -f "$socket"
+    # Herdr splits only right or down; the 65% left child becomes nvim's after the swap.
+    editor=$(herdr pane split --pane "$agent" --direction right --ratio 0.65 --cwd "$repo_root" | jq -er '.result.pane.pane_id')
+    herdr pane swap --source-pane "$agent" --target-pane "$editor" >/dev/null
+    herdr pane rename "$editor" "$label" >/dev/null
+    printf -v listen_command '%q ' nvim --listen "$socket" "${nvim_cmd[@]:1}"
+    herdr pane run "$editor" "exec ${listen_command% }" >/dev/null
+  fi
+  herdr pane focus --pane "$agent" --direction left >/dev/null
+
+  # Label the agent the way nvim's <leader>pi/cc/cd do, so nvim's sends reach it.
+  agent_name=$(herdr pane get "$agent" | jq -r '.result.pane.agent // empty')
+  case "$agent_name" in
+    claude | codex | opencode | pi) herdr pane rename "$agent" "nvim-ai-${editor//[^[:alnum:]_-]/-}-$agent_name" >/dev/null ;;
+  esac
   exit 0
 fi
 
-if [ "$print_only" -eq 0 ] && [ -n "${TMUX:-}" ]; then
-  # Open a shell first and type the command into it, so the window survives
-  # quitting nvim.
-  tmux new-window -c "$repo_root" \; send-keys "$command" Enter
+if [ "$print_only" -eq 0 ] && [ -n "${TMUX:-}" ] && [ -n "${TMUX_PANE:-}" ]; then
+  agent=$TMUX_PANE
+  socket=$socket_dir/tmux-$(tmux display-message -p '#{pid}')-${agent#%}.sock
+  mkdir -p -m 700 "$socket_dir"
+  editor=$(tmux list-panes -t "$agent" -F '#{pane_id} #{@agent_nvim_for}' | awk -v a="$agent" '$2 == a { print $1; exit }')
+
+  if [ -n "$editor" ]; then
+    jump_to_file
+    tmux select-pane -t "$editor"
+  else
+    rm -f "$socket"
+    editor=$(tmux split-window -h -b -l 65% -t "$agent" -c "$repo_root" -P -F '#{pane_id}' \
+      nvim --listen "$socket" "${nvim_cmd[@]:1}")
+    tmux set-option -p -t "$editor" @agent_nvim_for "$agent" \; set-option -p -t "$editor" @agent_nvim_socket "$socket"
+  fi
+
+  # Mark the agent the way nvim's <leader>pi/cc/cd do, so nvim's sends reach it.
+  agent_name=$(tmux display-message -p -t "$agent" '#{pane_current_command}')
+  case "$agent_name" in
+    claude | codex | opencode | pi) tmux set-option -p -t "$agent" @nvim_ai_pane "$agent_name" ;;
+  esac
   exit 0
 fi
 
