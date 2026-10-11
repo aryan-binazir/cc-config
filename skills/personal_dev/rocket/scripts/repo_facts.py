@@ -160,7 +160,7 @@ def repo_facts(
     context_path = (
         str(repo / "_scratch" / "_context" / f"{context_key}.md") if context_key else None
     )
-    suggested_branch = f"aryan-binazir/{ticket_key}" if ticket_key else None
+    suggested_branch = f"amb/{ticket_key}" if ticket_key else None
     branch_setup_command = None
     if ticket_key:
         branch_setup_command = command_string(

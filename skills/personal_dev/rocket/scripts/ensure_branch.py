@@ -382,7 +382,7 @@ def main() -> int:
     parser.add_argument("--ticket-key")
     parser.add_argument("--input", default="")
     parser.add_argument("--branch-name")
-    parser.add_argument("--prefix", default="aryan-binazir")
+    parser.add_argument("--prefix", default="amb")
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--base-branch", default="main")
     parser.add_argument("--checkout-mode", choices=("branch", "worktree"), default="worktree")

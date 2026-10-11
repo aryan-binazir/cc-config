@@ -19,8 +19,8 @@ Inputs:
 - **Task** (required): an issue ID or URL from the configured tracker only, or
   an explicit `no ticket` description. Absent an explicit `no ticket`, ask for
   an issue.
-- **Branch** (optional): honored exactly. Default: `aryan-binazir/<issue-key>`,
-  or `aryan-binazir/<task-slug>` (short kebab-case) for no-ticket work.
+- **Branch** (optional): honored exactly. Default: `amb/<issue-key>`,
+  or `amb/<task-slug>` (short kebab-case) for no-ticket work.
 - **Modifiers** (optional): `grill`, `hunk-review`, `implementer`.
 
 Throughout: resolve material ambiguity before acting, run every configured
@@ -72,7 +72,7 @@ briefing, planning, or code exploration.
    ```
 
    `--branch-name`: a user-supplied branch exactly; always
-   `aryan-binazir/<task-slug>` for no-ticket work, keeping the synthetic key
+   `amb/<task-slug>` for no-ticket work, keeping the synthetic key
    out of the branch; omitted for tracked work without a supplied branch, so
    the helper derives the default.
 3. Require `ok: true`, `checkout_mode` matching config, and `branch` equal to
