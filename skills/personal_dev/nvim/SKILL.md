@@ -25,10 +25,12 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 ~/repos/cc-config/skills/personal_dev/nvim/scripts/open_nvim_tmux.sh "$repo_root" path/to/file.go 150 14
 ```
 
-Inside Herdr or tmux, it opens a new tab or window and prints nothing; reply with only the location:
+Inside Herdr or tmux, open or reuse nvim on the agent’s left and focus it. The helper prints nothing; reply with the location:
 
 ```text
 Opened internal/api/server/routes.go at line 84.
 ```
+
+Claude Code: add once per session: `Run /ide to link nvim.`
 
 Elsewhere (GUI apps such as t3code, plain shells) you cannot see the user's terminal, so it prints a paste-able command targeting the tmux session named after the repo: relay its output verbatim in a bash code block. When no session matches, it prints one option per session; show them and ask which. Add explanation only when the user asks.
