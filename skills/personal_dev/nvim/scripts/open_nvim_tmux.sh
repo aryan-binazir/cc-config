@@ -84,7 +84,17 @@ jump_to_file() {
     sleep 0.05
   done
   local path=${file_path//\'/\'\'}
+  local root=${repo_root//\'/\'\'}
+  local workspace="(function()
+  vim.api.nvim_set_current_dir(_A)
+  local cc = package.loaded.claudecode
+  if cc and cc.state.server then
+    assert(cc.state.auth_token, 'claudecode server has no authentication token')
+    assert(require('claudecode.lockfile').create(cc.state.port, cc.state.auth_token))
+  end
+end)()"
   local jump="if resolve(expand('%:p')) !=# resolve('$path') | execute 'edit ' .. fnameescape('$path') | endif"
+  jump+=" | call luaeval('${workspace//\'/\'\'}', '$root')"
   [ -n "$line" ] && jump+=" | call cursor($line, ${column:-1}) | normal! zz"
   nvim --server "$socket" --remote-send '<C-\><C-N>'
   nvim --server "$socket" --remote-expr "execute('${jump//\'/\'\'}')" >/dev/null
@@ -143,6 +153,9 @@ if [ "$print_only" -eq 0 ] && [ -n "${TMUX:-}" ] && [ -n "${TMUX_PANE:-}" ]; the
   exit 0
 fi
 
+if [ -n "$line" ] && [ -z "$column" ]; then
+  nvim_cmd=(nvim "+$line" -- "$file")
+fi
 printf -v command '%q ' "${nvim_cmd[@]}"
 command=${command% }
 

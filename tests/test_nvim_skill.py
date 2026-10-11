@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+import socket
 import shutil
 import subprocess
 import tempfile
@@ -9,6 +11,7 @@ import unittest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "skills/personal_dev/nvim/scripts/open_nvim_tmux.sh"
+CLAUDECODE = Path.home() / ".local/share/nvim/lazy/claudecode.nvim"
 
 
 def wait_for(predicate, timeout: float = 5.0):
@@ -42,6 +45,7 @@ class TmuxSplitTest(unittest.TestCase):
             "XDG_DATA_HOME": str(self.tmp / "data"),
             "XDG_STATE_HOME": str(self.tmp / "state"),
             "XDG_RUNTIME_DIR": str(self.tmp / "run"),
+            "CLAUDE_CONFIG_DIR": str(self.tmp / "claude"),
         }
         (self.tmp / "run").mkdir(mode=0o700)
         subprocess.run(
@@ -126,12 +130,15 @@ class TmuxSplitTest(unittest.TestCase):
         self.assertEqual(self.nvim_eval("getline(1) .. ':' .. &modified"), "unsaved:1")
         self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), "25:2")
 
-    def test_first_open_honors_column_and_line_defaults(self) -> None:
+    def test_first_open_and_reuse_honor_column_and_line_defaults(self) -> None:
         (self.repo / "a.txt").write_text("    abcdef\n" * 100)
         for args, column in ((('60', '6'), '6'), (('60',), '1')):
             with self.subTest(args=args):
                 self.assertEqual(self.open("a.txt", *args).returncode, 0)
                 self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), '60:' + column)
+                self.assertLess(abs(int(self.nvim_eval("winline()")) - 24), 3)
+                self.assertEqual(self.open("a.txt", "70", *args[1:]).returncode, 0)
+                self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), '70:' + column)
                 self.assertLess(abs(int(self.nvim_eval("winline()")) - 24), 3)
                 subprocess.run(["nvim", "--server", self.editor()["@agent_nvim_socket"],
                                 "--remote-send", "<C-\\><C-N>:qa!<CR>"], check=True, env=self.env)
@@ -214,6 +221,91 @@ class TmuxSplitTest(unittest.TestCase):
         self.assertEqual(result.stdout, "# opens in tmux session repo\n"
                          f'tmux new-window -t repo: -c {self.repo} \\; send-keys "nvim -- a.txt" Enter \\; switch-client -t repo\n')
         self.assertEqual(len(self.panes()), 1)
+
+    def test_print_mode_keeps_line_only_session_command(self) -> None:
+        self.tmux("rename-session", "repo")
+        result = subprocess.run([str(SCRIPT), "--print", str(self.repo), "a.txt", "12"],
+                                capture_output=True, text=True, env=self.env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "# opens in tmux session repo\n"
+                         f'tmux new-window -t repo: -c {self.repo} \\; send-keys "nvim +12 -- a.txt" Enter \\; switch-client -t repo\n')
+        self.assertEqual(len(self.panes()), 1)
+
+    def test_root_switch_without_plugin_preserves_unsaved_buffer(self) -> None:
+        self.assertEqual(self.open("a.txt").returncode, 0)
+        self.nvim_eval("setline(1, 'unsaved')")
+        original = self.repo
+        self.repo = self.tmp / "sibling"
+        self.repo.mkdir()
+        result = self.open(str(original / "a.txt"), "25", "2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.nvim_eval("getcwd()"), str(self.repo))
+        self.assertEqual(self.nvim_eval("getline(1) .. ':' .. &modified"), "unsaved:1")
+        self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), "25:2")
+        self.assertEqual(len(self.panes()), 2)
+
+    @unittest.skipUnless(CLAUDECODE.is_dir(), "needs installed claudecode.nvim")
+    def test_worktree_switch_refreshes_live_plugin_lock_without_restarting(self) -> None:
+        config = self.tmp / "config/nvim/init.lua"
+        config.parent.mkdir(parents=True)
+        config.write_text(
+            f"vim.opt.rtp:append({json.dumps(str(CLAUDECODE))})\n"
+            "require('claudecode').setup({ terminal = { provider = 'none' } })\n"
+        )
+        subprocess.run(["git", "init", "-q", str(self.repo)], check=True, env=self.env)
+        subprocess.run(["git", "-C", str(self.repo), "add", "."], check=True, env=self.env)
+        subprocess.run(["git", "-C", str(self.repo), "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                        "-c", "commit.gpgsign=false", "commit", "-qm", "fixture"], check=True, env=self.env)
+        worktree = self.tmp / "sibling's worktree"
+        subprocess.run(["git", "-C", str(self.repo), "worktree", "add", "-q", "--detach", str(worktree)],
+                       check=True, env=self.env)
+        result = self.open("a.txt", "12")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        editor = self.editor()
+        lock_dir = self.tmp / "claude/ide"
+        lock_path = wait_for(lambda: next(lock_dir.glob("*.lock"), None))
+        before = json.loads(lock_path.read_text())
+        self.assertEqual(before["workspaceFolders"], [str(self.repo)])
+        self.assertTrue(before["authToken"])
+        self.assertEqual(self.nvim_eval("getcwd()"), str(self.repo))
+        original = self.repo
+        old_buffer = self.nvim_eval("bufnr('%')")
+        self.nvim_eval("setline(1, 'unsaved')")
+        self.repo = worktree
+        self.tmux("select-pane", "-t", self.agent)
+        result = self.open("a.txt", "30", "2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.editor()["pane_id"], editor["pane_id"])
+        self.assertEqual(self.editor()["@agent_nvim_socket"], editor["@agent_nvim_socket"])
+        self.assertEqual(len(self.panes()), 2)
+        self.assertEqual(self.nvim_eval("expand('%:p') .. ':' .. line('.') .. ':' .. col('.')"),
+                         f"{worktree / 'a.txt'}:30:2")
+        self.assertEqual(self.nvim_eval(f"getbufline({old_buffer}, 1)[0] .. ':' .. getbufvar({old_buffer}, '&modified')"),
+                         "unsaved:1")
+        after = json.loads(lock_path.read_text())
+        self.assertEqual(after["workspaceFolders"], [str(worktree)])
+        self.assertEqual(self.nvim_eval("getcwd()"), str(worktree))
+        self.assertEqual(after["authToken"], before["authToken"])
+        self.assertEqual(after["pid"], before["pid"])
+        self.assertEqual(list(lock_dir.glob("*.lock")), [lock_path])
+        self.assertEqual(self.nvim_eval("luaeval('require(\"claudecode\").state.port')"), lock_path.stem)
+        self.assertEqual((original / "a.txt").read_text().splitlines()[0], "a1")
+        self.repo = original
+        result = self.open("a.txt", "25", "2")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.nvim_eval("getcwd()"), str(original))
+        self.assertEqual(self.nvim_eval("getline(1) .. ':' .. &modified"), "unsaved:1")
+        self.assertEqual(self.nvim_eval("line('.') .. ':' .. col('.')"), "25:2")
+        restored = json.loads(lock_path.read_text())
+        self.assertEqual(restored["workspaceFolders"], [str(original)])
+        self.assertEqual(restored["authToken"], before["authToken"])
+        with socket.create_connection(("127.0.0.1", int(lock_path.stem)), timeout=5) as connection:
+            connection.sendall((
+                "GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n"
+                f"x-claude-code-ide-authorization: {before['authToken']}\r\n\r\n"
+            ).encode())
+            self.assertIn(b"101 Switching Protocols", connection.recv(4096))
 
     def test_agent_pane_is_marked_for_nvim_sends(self) -> None:
         self.open("a.txt")
