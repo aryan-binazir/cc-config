@@ -197,9 +197,7 @@ every comment accounted for and the branch synced.
 
 **`rocket-review` runner:** follow the `rocket-review` skill with the resolved
 `review_profile.name` and the issue or task description as its spec source. It
-owns PR creation and resolution and replaces the verdict loop below. Afterward,
-run `verify-sandbox` against the final `HEAD`; on failure, report and await the
-user's direction.
+owns PR creation and resolution and replaces the verdict loop below.
 
 **Other runners:** stop unless a PR exists. Have the resolved `review` runner
 review the PR diff, given the full issue or task description, repo path, base

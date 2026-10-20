@@ -95,16 +95,15 @@ Resolve the PR non-interactively; stop if resolution fails.
   spelling out every push/fork decision in flags. Follow repo PR title/body
   rules and stop if they can't be met; when the title derives from commit
   prefixes, take it from consistent branch commit subjects and stop if they
-  disagree. Absent a repo body shape, use the fallback in
-  `<rocket-dir>/references/rocket-review-details.md`. Fill the body from the
-  spec, landed changes, and validation that actually ran. Then resolve the
-  number/URL and verify the head branch.
+  disagree. Write the body with the `pr` skill from the spec, landed changes,
+  and validation that actually ran. Then resolve the number/URL and verify the
+  head branch.
 
 ## Completion Shortcut
 
 Once the PR exists, scan its comments. If one contains the configured summary
 line — `<summary>Rocket Review Summary</summary>` for
-`summary_title: Rocket Review Summary` — stop and report
+`summary_title: Rocket Review Summary` — run step 9, then stop and report
 `review already complete`. One rocket review per PR is intentional; only the
 user deleting the summary comment opens a fresh one.
 
@@ -124,9 +123,11 @@ user deleting the summary comment opens a fresh one.
 8. Read and follow `comment-reaper` on the diff against the base branch so the
    code speaks for itself; commit and push any clearer shape and record it as
    post-round branch state.
-9. Post one final PR comment derived from the diary.
-10. With a Linear ticket, sync its managed region — the sole Linear write.
-11. Return the final status grouped by numbered PR, naming every reviewer
+9. Sandbox once per PR, approvals or not: follow `verify-sandbox` on `HEAD`;
+   an earlier sandbox result counts.
+10. Post one final PR comment derived from the diary.
+11. With a Linear ticket, sync its managed region — the sole Linear write.
+12. Return the final status grouped by numbered PR, naming every reviewer
     beside each executed round's exact verdict; a short implementation or
     testing summary may follow.
 

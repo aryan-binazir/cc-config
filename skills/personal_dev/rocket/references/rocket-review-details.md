@@ -1,23 +1,5 @@
 # Rocket Review Details
 
-## PR Body Fallback
-
-When repo rules leave the PR body shape open, use:
-
-```md
-### Problem
-
-### Changes
-
-### Decisions
-
-### Testing
-How it was tested, or how to test it.
-```
-
-Populate it from the spec, actual code changes, and validation that actually
-ran.
-
 ## Reviewer Prompts
 
 Round 1 prompt, or an equivalent:
