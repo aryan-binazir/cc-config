@@ -123,8 +123,7 @@ user deleting the summary comment opens a fresh one.
 8. Read and follow `comment-reaper` on the diff against the base branch so the
    code speaks for itself; commit and push any clearer shape and record it as
    post-round branch state.
-9. Sandbox once per PR, approvals or not: follow `verify-sandbox` on `HEAD`;
-   an earlier sandbox result counts.
+9. Read and follow `verify-sandbox` if it has not already run for this PR.
 10. Post one final PR comment derived from the diary.
 11. With a Linear ticket, sync its managed region — the sole Linear write.
 12. Return the final status grouped by numbered PR, naming every reviewer
@@ -147,8 +146,7 @@ untouched.
 Prompts carry the spec, branch, PR, repo path, and slash command (template in
 details), and invite non-blocking edge cases and hardening alongside approval.
 Reviewers stay read-only: prompts require preserving reviewed source and Git
-state, isolated temporary fixtures and caches, and cleanup of only what they
-create. You patch.
+state. You patch.
 
 A **blocker** shows the branch cannot safely deliver the core ticket: broken
 goal or acceptance behavior, a concrete realistic in-scope edge case with

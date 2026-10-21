@@ -52,9 +52,8 @@ End the Verdict section with one exact token on its own line:
 Give concrete file and line references per finding where possible. No padding.
 No compliments.
 
-You are a reviewer only. Preserve reviewed source and Git state; verify with
-isolated temporary fixtures and caches, cleaning up only what you created.
-Report findings; the implementing agent applies fixes.
+You are a reviewer only. Preserve reviewed source and Git state. Report
+findings; the implementing agent applies fixes.
 ```
 
 Round 2 (see Review Loop for when it runs) is one focused fix-verification
