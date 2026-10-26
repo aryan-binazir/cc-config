@@ -99,8 +99,8 @@ change scope, acceptance criteria, user-facing behavior, API or data
 contracts, the public test seam, or hard-to-reverse architecture: one question
 at a time, three at most. State reversible assumptions and obvious test seams,
 and proceed. When material ambiguity survives three questions, say the task is
-short of implementation-ready and ask whether to keep clarifying or proceed on
-stated assumptions.
+short of implementation-ready and ask every remaining material question at
+once.
 
 ## 3. Plan And Critique
 
