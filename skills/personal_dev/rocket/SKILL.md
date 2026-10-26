@@ -25,10 +25,14 @@ Inputs, ahead of the task:
 Examples: `$rocket BBA-359` · `$rocket gpt lift-off BBA-359` ·
 `$rocket fix stale cache invalidation`
 
-Throughout: write the failing test before production code, and take
-hard-to-undo, user-facing, or scope-changing decisions to the user. Ask through
-the harness question tool (`AskUserQuestion`, `request_user_input`) with full
-context: the PR link, the blocker, and options with your recommendation first.
+Throughout: write the failing test before production code. After alignment,
+own every call: decide, state it as an assumption, and keep moving. Stop and
+ask only when you cannot continue: the change can't be proven, the merge gate
+can't pass and you can't fix it, the next step touches data, production,
+anything outside the repo, closing a PR, or another branch, or another PR makes
+this one obsolete. Ask through the harness question tool (`AskUserQuestion`,
+`request_user_input`) with full context: the PR link, the blocker, and options
+with your recommendation first.
 
 ## Config
 
@@ -109,13 +113,13 @@ and scope in a few lines and continue. Otherwise brief the user — **Problem**,
 **Outcome**, **Scope and constraints** — and continue once they confirm or
 correct it.
 
-From here, run autonomously. Ask only what inspection can't answer and could
-change scope, acceptance criteria, user-facing behavior, API or data
-contracts, the public test seam, or hard-to-reverse architecture: one question
-at a time, three at most. State reversible assumptions and obvious test seams,
-and proceed. When material ambiguity survives three questions, say the task is
+Settle open questions now, while the user is here. Ask only what inspection
+can't answer and could change scope, acceptance criteria, user-facing behavior,
+API or data contracts, the public test seam, or hard-to-reverse architecture:
+one question at a time, three at most. State reversible assumptions and obvious
+test seams. When material ambiguity survives three questions, say the task is
 short of implementation-ready and ask every remaining material question at
-once.
+once. From here, run autonomously.
 
 ## 3. Plan And Critique
 
@@ -131,15 +135,14 @@ instructions. Keep it read-only and ask, in order:
 4. What gaps and risks remain?
 
 Run tests and baseline checks while it works; start production code once its
-critique is folded in. Take material decisions to the user and state
-reversible assumptions. One round, unless the run fails or the user asks for
-more.
+critique is folded in, stating each call it prompts as an assumption. One
+round, unless the run fails or the user asks for more.
 
 ## 4. Implement Test-First
 
 Read the `tdd` skill fully and follow it, with Rocket's seam rule replacing its
-seam confirmation. Stay within the plan and scope; stop on new material
-ambiguity.
+seam confirmation. Stay within the plan and scope; meet new ambiguity with a
+stated assumption.
 
 When the change has a visible frontend result and the environment can capture
 it, take before/after screenshots for the PR.
@@ -158,7 +161,7 @@ Confirm you're on the resolved branch, commit per repo conventions, push to
 
 Follow `rocket-review` with the resolved `review_profile.name`, the issue or
 task as its spec, and any screenshots to attach. It opens the draft PR and owns
-review. Take any `[open: blocker]` it leaves to the user before babysitting.
+review. Any `[open: blocker]` it leaves holds the merge and leads the report.
 
 ## 7. Babysit
 
@@ -166,11 +169,13 @@ Follow `babysit-pr` on the PR.
 
 - **Default:** keep the draft; babysit until checks are green, bots are done,
   and comments are handled.
-- **`lift-off`:** mark it ready, babysit to the merge gate, and merge.
+- **`lift-off`:** mark it ready, babysit to the merge gate, and merge. An
+  assumption that changed user-facing behavior or scope holds the merge for the
+  user.
 
 ## Report
 
-With a tracker ticket, follow `context-sync`. Then report checkout path,
-branch, PR URL, delivered behavior, commits, verification and screenshots,
-review ledger, babysit outcome, and caveats, ending with the merge commit or
-the PR's open state.
+With a tracker ticket, follow `context-sync`. Then report, leading with every
+assumption made after alignment: checkout path, branch, PR URL, delivered
+behavior, commits, verification and screenshots, review ledger, babysit
+outcome, and caveats, ending with the merge commit or the PR's open state.
