@@ -2,27 +2,27 @@
 name: rocket
 description: >-
   Ship a Linear/Jira issue or no-ticket task end to end: critique the plan,
-  build test-first, review, babysit the PR, and merge on `send`. Use when the
-  user invokes rocket.
+  build test-first, review, babysit the PR, and merge on `lift-off`. Use when
+  the user invokes rocket.
 disable-model-invocation: true
 ---
 
 # Rocket
 
-Take a task from intake to a reviewed, green PR.
+Take a task from its current state to a reviewed, green PR.
 
 Inputs, ahead of the task:
 
 - **Profile:** `gpt` selects the GPT profile; otherwise `claude`.
-- **`send`:** authorizes marking the PR ready and merging once the merge gate
-  passes.
+- **`lift-off`:** authorizes marking the PR ready and merging once the merge
+  gate passes, whether given up front or mid-run.
 - **Task** (required): an issue key or URL from the configured tracker makes
   tracked work; anything else is no-ticket work, defined by the request and
   the conversation leading up to it.
 - **Branch** (optional): honored exactly. Default: `amb/<issue-key>`,
   or `amb/<task-slug>` (short kebab-case) for no-ticket work.
 
-Examples: `$rocket BBA-359` · `$rocket gpt send BBA-359` ·
+Examples: `$rocket BBA-359` · `$rocket gpt lift-off BBA-359` ·
 `$rocket fix stale cache invalidation`
 
 Throughout: write the failing test before production code, and take
@@ -44,6 +44,21 @@ passing configured `model`, `effort`, `reasoning_effort`, and `timeout_ms` as
 `--model`, `--effort`, `--reasoning-effort`, and `--timeout-ms`; omit absent
 ones. Use exactly the configured runner and model; stop when either is
 unavailable.
+
+## 0. Pick Up The Current State
+
+Own the work from its current state. Read the task and repo instructions, then
+resume at the first step whose result is missing:
+
+- nothing started → 1
+- work on the default branch → `git switch -c <branch>`, then as below
+- feature branch with work, no PR → finish the change test-first, then 5
+- PR without a Rocket Review summary → 6
+- reviewed PR → 7, verifying commits pushed after its summary and reporting
+  them as unreviewed
+
+Past step 1, the current branch and checkout are the resolved branch and
+`checkout_path`. Report where Rocket entered and which steps ran before it.
 
 ## 1. Prepare The Checkout First
 
@@ -151,7 +166,7 @@ Follow `babysit-pr` on the PR.
 
 - **Default:** keep the draft; babysit until checks are green, bots are done,
   and comments are handled.
-- **`send`:** mark it ready, babysit to the merge gate, and merge.
+- **`lift-off`:** mark it ready, babysit to the merge gate, and merge.
 
 ## Report
 

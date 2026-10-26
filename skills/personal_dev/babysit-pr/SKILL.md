@@ -8,7 +8,7 @@ description: >-
 # Babysit PR
 
 Own one PR until its checks are green and its review comments are handled.
-Merge when the request includes `send` or an explicit merge; otherwise hand
+Merge when the request includes `lift-off` or an explicit merge; otherwise hand
 back the PR open.
 
 ## Setup

@@ -1,4 +1,4 @@
 interface:
   display_name: "Rocket"
   short_description: "Move a tracker issue or task quickly into a reviewed PR"
-  default_prompt: "Use $rocket with this tracker issue or task, optionally with gpt or send, to go from its configured checkout through critique, TDD implementation, review, and PR babysitting."
+  default_prompt: "Use $rocket with this tracker issue or task, optionally with gpt or lift-off, to go from its configured checkout through critique, TDD implementation, review, and PR babysitting."
