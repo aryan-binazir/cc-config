@@ -19,24 +19,41 @@ NAMES = (
 
 class SkillConfigTest(unittest.TestCase):
     def test_model_effort_defaults(self) -> None:
-        def check(config: dict) -> None:
+        def check(config: dict, opus_effort: str) -> None:
             if config.get("model") == "gpt-6.1-sol":
                 self.assertEqual(config["reasoning_effort"], "xhigh")
             elif config.get("model") == "claude-opus-5-5":
-                self.assertEqual(config["effort"], "high")
+                self.assertEqual(config["effort"], opus_effort)
             for value in config.values():
                 if isinstance(value, dict):
-                    check(value)
+                    check(value, opus_effort)
                 elif isinstance(value, list):
                     for item in value:
                         if isinstance(item, dict):
-                            check(item)
+                            check(item, opus_effort)
 
         for name in ("call-codex", "call-claude", "ask-adversary-in-block", "rocket"):
             with self.subTest(skill=name):
-                check(yaml.safe_load((SKILLS / name / f"{name}.example.yaml").read_text()))
+                check(
+                    yaml.safe_load((SKILLS / name / f"{name}.example.yaml").read_text()),
+                    "xhigh" if name == "rocket" else "high",
+                )
         settings = json.loads((SKILLS.parents[1] / "settings.json").read_text())
         self.assertEqual(settings["modelSettings"]["claude-opus-5-5"]["effortLevel"], "high")
+
+    def test_rocket_lists_review_profiles_by_runner(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "rocket_config", SKILLS / "rocket/scripts/resolve_config.py",
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / "rocket.example.yaml").write_text(
+                (SKILLS / "rocket/rocket.example.yaml").read_text()
+            )
+            result = module.resolve_profiles(directory, None, None)
+        self.assertEqual(result["review_profiles"], {"sol": ["codex"], "opus": ["claude"]})
 
     def test_lead_worker_efforts(self) -> None:
         config = yaml.safe_load((SKILLS / "lead/lead.example.yaml").read_text())

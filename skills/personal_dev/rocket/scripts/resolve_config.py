@@ -14,7 +14,6 @@ from typing import Any
 import yaml
 
 RUNNERS = {"claude", "codex", "cursor-agent"}
-REVIEW_RUNNERS = RUNNERS | {"rocket-review"}
 TRACKERS = {"jira", "linear"}
 CHECKOUTS = {"branch", "worktree"}
 DEFAULT_TIMEOUT_MS = 1_500_000
@@ -44,10 +43,9 @@ def apply_timeout_defaults(config: dict[str, Any]) -> None:
     for profile in (config.get("plan_profiles") or {}).values():
         if not isinstance(profile, dict):
             continue
-        for key in ("critic", "review"):
-            runner = profile.get(key)
-            if isinstance(runner, dict) and runner.get("runner") in RUNNERS:
-                runner.setdefault("timeout_ms", DEFAULT_TIMEOUT_MS)
+        critic = profile.get("critic")
+        if isinstance(critic, dict) and critic.get("runner") in RUNNERS:
+            critic.setdefault("timeout_ms", DEFAULT_TIMEOUT_MS)
 
     for profile in (config.get("review_profiles") or {}).values():
         if not isinstance(profile, dict):
@@ -67,20 +65,14 @@ def validate_timeout(config: dict[str, Any], key: str, errors: list[str]) -> Non
         errors.append(f"{key}.timeout_ms must be a positive integer")
 
 
-def validate_runner(
-    config: dict[str, Any],
-    key: str,
-    allowed: set[str],
-    errors: list[str],
-) -> None:
-    value = config.get(key)
-    if not isinstance(value, dict):
-        errors.append(f"{key} must be a YAML object")
-        return
-    if value.get("runner") not in allowed:
-        errors.append(f"{key}.runner must be one of: {', '.join(sorted(allowed))}")
-    elif value["runner"] in RUNNERS:
-        validate_timeout(value, key, errors)
+def validate_critic(config: dict[str, Any], errors: list[str]) -> None:
+    critic = config.get("critic")
+    if not isinstance(critic, dict):
+        errors.append("critic must be a YAML object")
+    elif critic.get("runner") not in RUNNERS:
+        errors.append(f"critic.runner must be one of: {', '.join(sorted(RUNNERS))}")
+    else:
+        validate_timeout(critic, "critic", errors)
 
 
 def validate_plan_profile(config: dict[str, Any], errors: list[str]) -> None:
@@ -89,8 +81,7 @@ def validate_plan_profile(config: dict[str, Any], errors: list[str]) -> None:
     if config.get("tracker") not in TRACKERS:
         errors.append(f"tracker must be one of: {', '.join(sorted(TRACKERS))}")
 
-    validate_runner(config, "critic", RUNNERS, errors)
-    validate_runner(config, "review", REVIEW_RUNNERS, errors)
+    validate_critic(config, errors)
 
 
 def validate_review_profile(config: dict[str, Any], errors: list[str]) -> None:
@@ -141,6 +132,10 @@ def resolve_profiles(
         "defaults": defaults,
         "plan_profile": {"name": plan_name, "config": plan},
         "review_profile": {"name": review_name, "config": review},
+        "review_profiles": {
+            name: [r.get("runner") for r in (profile or {}).get("reviewers") or [] if isinstance(r, dict)]
+            for name, profile in review_profiles.items()
+        },
     }
 
 

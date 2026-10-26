@@ -27,8 +27,10 @@ reviewers. It reads `rocket.local.yaml` over `rocket.example.yaml`; once it
 succeeds, its output is the only config source.
 
 The profile is the literal `rocket-review <profile>` argument, else
-`defaults.review_profile`; stop if the resolver fails or
-`review_profiles.<profile>` is missing.
+`defaults.review_profile`. When that profile's reviewer runs on your own
+provider, rerun the resolver with `--review-profile <name>`, picking from its
+`review_profiles` output the profile whose reviewer is the other provider.
+Stop if the resolver fails or the profile is missing.
 
 Invoke reviewers through exactly these runner commands:
 - `claude`: `claude --permission-mode auto -p "$PROMPT"`
@@ -89,10 +91,12 @@ state; commit it only on explicit request.
 Resolve the PR non-interactively; stop if resolution fails.
 
 - Existing PR: `gh pr view --json number,url,headRefName`; stop if its head
-  differs from the checked-out branch.
+  differs from the checked-out branch. Attach supplied screenshots with
+  `gh pr edit <pr> --attach <file>`.
 - No PR: push and freshness-check first, then
   `gh pr create --draft --head <current-branch> --title ... --body-file ...`,
-  spelling out every push/fork decision in flags. Follow repo PR title/body
+  spelling out every push/fork decision in flags and adding `--attach <file>`
+  per supplied screenshot. Follow repo PR title/body
   rules and stop if they can't be met; when the title derives from commit
   prefixes, take it from consistent branch commit subjects and stop if they
   disagree. Write the body with the `pr` skill from the spec, landed changes,
@@ -116,7 +120,7 @@ user deleting the summary comment opens a fresh one.
 5. Check the completion shortcut.
 6. Read `<rocket-dir>/references/rocket-review-details.md`; it governs reviewer
    prompts, output parsing, runner execution and failures, the diary, the PR
-   comment, Linear sync, and the completion report.
+   comment, and the completion report.
 7. Run configured reviewers in order. After each round: decide patch/skip/open,
    commit and push fixes, re-verify upstream, then update the diary with the
    exact verdict and any post-round branch state.
@@ -125,23 +129,27 @@ user deleting the summary comment opens a fresh one.
    post-round branch state.
 9. Read and follow `verify-sandbox` if it has not already run for this PR.
 10. Post one final PR comment derived from the diary.
-11. With a Linear ticket, sync its managed region — the sole Linear write.
-12. Return the final status grouped by numbered PR, naming every reviewer
+11. Return the final status grouped by numbered PR, naming every reviewer
     beside each executed round's exact verdict; a short implementation or
     testing summary may follow.
 
 ## Review Rounds
 
-Run reviewers in strict order, at most two rounds each whatever the config
-says. Round 1 is the one exhaustive discovery pass over the whole pushed
-branch. `APPROVE` and `APPROVE WITH FIXES` end a reviewer's rounds. Round 2
-runs only after a non-approval round 1 whose accepted fixes are pushed, with
-`max_rounds` above `1`: one focused follow-up that hands back the full round 1
-output plus patch decisions and commit, and asks whether the fixes hold —
-verification of round 1 findings plus regressions from the patches, never fresh
-discovery. When the slash command is `/code-review-ar`, round 2 uses
-`/code-review-ar single`, a round-scoped prompt change that leaves saved config
-untouched.
+Run reviewers in strict order. Each loops until an approval verdict or its
+budget ends:
+
+- **Round 1** is the one exhaustive discovery pass over the whole pushed
+  branch.
+- **Later rounds** run after a `NEEDS FIXES` round whose accepted fixes are
+  pushed. Each hands back every prior round's output, dispositions, and patch
+  commits, and covers open findings plus code changed since the last round.
+  With `/code-review-ar`, they use `/code-review-ar single`, a round-scoped
+  prompt change that leaves saved config untouched.
+- `APPROVE` and `APPROVE WITH FIXES` end a reviewer's loop.
+- **Budget:** `max_rounds`, extended to 5 while a Critical or High finding on
+  security, auth, data loss, or concurrency awaits a clean round. The loop
+  ends early when only Low and Uncertain findings remain. A finding still
+  disputed after two rounds becomes `[open: blocker]` with both sides stated.
 
 Prompts carry the spec, branch, PR, repo path, and slash command (template in
 details), and invite non-blocking edge cases and hardening alongside approval.
@@ -157,8 +165,11 @@ beyond expected scale, and out-of-scope improvements are non-blocking, yet
 still reportable and patchable.
 
 Patch only findings validated against a credible code path that improve the
-branch; a mere possibility raised to satisfy a reviewer stays unpatched. Decide
-the whole round, then batch accepted fixes into its single follow-up commit.
+branch, with the smallest fix; prefer deleting or narrowing code. Non-blocking
+findings earn a patch when it is small and clearly better; decline the rest in
+one line as follow-ups. Decide the whole round, then batch accepted fixes into
+its single follow-up commit. Compare `git diff --shortstat <base>` after each
+round; when review grew the diff, cut first.
 Preserve reviewer severity buckets, ranking, and exact verdict tokens,
 normalizing only the priority labels in details. Runner failures follow
 details' recovery rules; stop if a round stays unresolved after its one

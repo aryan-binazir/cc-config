@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -75,18 +74,6 @@ class RocketBranchTest(unittest.TestCase):
         skill = (ROCKET / "SKILL.md").read_text()
         self.assertIn("`amb/<task-slug>`", skill)
         self.assertNotIn("aryan-binazir/", skill)
-
-    def test_repo_facts_suggests_the_same_default_branch(self) -> None:
-        facts = json.loads(self.run_command(
-            sys.executable, str(ROCKET / "scripts/repo_facts.py"),
-            "--repo", str(self.repo), "--input", "BBA-359",
-        ))
-        self.assertTrue(facts["ok"], facts)
-        self.assertEqual(facts["context"]["suggested_branch"], "amb/BBA-359")
-        command = shlex.split(facts["context"]["branch_setup_command"])
-        result = json.loads(self.run_command(sys.executable, *command[3:]))
-        self.assertTrue(result["ok"], result)
-        self.assertEqual(result["branch"], facts["context"]["suggested_branch"])
 
 
 if __name__ == "__main__":

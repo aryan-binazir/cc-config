@@ -5,73 +5,48 @@
 Round 1 prompt, or an equivalent:
 
 ```text
-You are <reviewer.name>, reviewing work completed on this branch. Run the
-`<slash_command>` slash command for this review.
+You are <reviewer.name>, reviewing this branch with `<slash_command>`.
 
-Review target:
-- Repo/worktree: <absolute path>
-- Branch: <branch>
-- PR: #<number> <url>
+Target: <absolute path> · <branch> · PR #<number> <url>
 
 Spec:
 <the resolved ticket or spec text>
 
-Review against Goal, Accepted scope, Assumptions, and Validation approach.
-Out of scope items are intentional, not missing work.
+Judge it against Goal, Accepted scope, Assumptions, and Validation approach;
+Out of scope items are intentional. Ask first whether each change is necessary
+and the simplest repo-idiomatic path, naming existing patterns, helpers, or
+integration points it should use; then whether it is correct.
 
-Review implementation quality too: flag sloppy, overcomplicated,
-non-idiomatic, or brittle solutions, and name the simpler existing repo
-patterns, helpers, abstractions, or integration points that should have been
-used.
+This is the one exhaustive discovery round: inventory every issue you can
+substantiate across the whole target.
 
-Review only this branch's changes; the slash command handles scoping. The
-canonical `/code-review-ar` command runs parallel review by default; only
-`/code-review-ar single` runs the single-pass alternative.
-
-Be brutally honest about whether the branch satisfies the spec via the
-simplest repo-idiomatic path.
-
-This is the exhaustive discovery round: inspect the complete review target and
-find every issue you can substantiate against the spec and quality criteria.
-Do not stop after the first actionable, blocking, or high-severity finding. The
-implementer gets one discovery pass from you, so return the full inventory now.
-
-Return findings grouped exactly as:
+Return exactly:
 ## Critical
 ## High
 ## Low
 ## Uncertain
 ## Verdict
 
-End the Verdict section with one exact token on its own line:
+Cite file:line per finding. End Verdict with one token on its own line:
 - APPROVE: ready to merge as-is
-- APPROVE WITH FIXES: acceptable once the specific fixes you request are
-  applied before merge
-- NEEDS FIXES: not yet acceptable
+- APPROVE WITH FIXES: ready once the listed fixes land
+- NEEDS FIXES: needs changes and another round
 
-Give concrete file and line references per finding where possible. No padding.
-No compliments.
-
-You are a reviewer only. Preserve reviewed source and Git state. Report
-findings; the implementing agent applies fixes.
+Keep source and Git state as you found them; isolated temp files for
+verification are fine. Report findings; the implementer patches.
 ```
 
-Round 2 (see Review Loop for when it runs) is one focused fix-verification
-pass. Give the reviewer its complete round 1 output, every finding's
-disposition, the patch commit, and a concise patch summary. When the slash
-command is `/code-review-ar`, label this round `/code-review-ar single`:
-parallel discovery suits round 1, not fix verification; config stays
-unchanged. Open with:
+Later rounds (see `Review Rounds` in `rocket-review`) give the reviewer every
+prior round's complete output, each finding's disposition, the patch commits,
+and a concise patch summary. With `/code-review-ar`, label the round
+`/code-review-ar single`. Open with:
 
 ```text
-You gave me these findings in round 1. I patched the accepted findings. Are you
-happy with the fixes?
+Round <n>. Your earlier findings, my dispositions, and patch commits are below.
+On the current pushed branch, confirm each patched finding holds, recheck open
+and skipped classifications, and review code changed since round <n-1> for
+regressions. Use round 1's sections and verdict tokens.
 ```
-
-Have the reviewer inspect the current pushed branch, verify every patched
-finding, confirm skipped and open findings remain correctly classified, and
-report any unresolved finding or regression the patches caused, read-only, in
-round 1's sections and verdict tokens. Discovery belongs to round 1.
 
 ## Output Normalization
 
@@ -94,24 +69,20 @@ stays distinct from `APPROVE`.
 
 ## Review Loop
 
-Run only the selected profile's reviewers. For each:
+Each round:
 
-1. Run round 1 against the current pushed branch.
-2. Validate each finding against a credible code path and the spec, then
-   mark it `[patched]`, `[skipped: not actionable]`, `[skipped: reason]`,
+1. Run the reviewer against the current pushed branch.
+2. Validate each finding against a credible code path and the spec, then mark
+   it `[patched]`, `[skipped: not actionable]`, `[skipped: reason]`,
    `[open: blocker]`, or `[open: non-blocking]`.
 3. Put the round's patches in one follow-up commit, push, and re-verify
    upstream matches local `HEAD`.
 4. Update the diary for that round.
-5. Run round 2 only when round 1 was non-approval, its fixes are pushed, and
-   `max_rounds` allows it. Otherwise the reviewer phase ends with its open
-   findings; record fixes pushed after it as post-round branch state, stated
-   as not re-reviewed.
-6. Round 2 is the last. A reviewer runs at most twice, within `max_rounds`,
-   and reruns only against a newly pushed `HEAD`.
 
-After all reviewer phases, mark every unresolved, unskipped finding that still
-matters `[open: blocker]` or `[open: non-blocking]`.
+When a reviewer's loop ends, record fixes pushed after its last round as
+post-round branch state, not re-reviewed. After every reviewer, mark each
+unresolved, unskipped finding that still matters `[open: blocker]` or
+`[open: non-blocking]`.
 
 ## Runner Execution
 
@@ -152,11 +123,10 @@ reviewer and round under a compact ledger:
 # Rocket Review: <branch>
 
 ## Review Ledger
-- Cursor - `NEEDS FIXES` - 1st round
-- Cursor - `APPROVE WITH FIXES` - 2nd round
-- Codex - `APPROVE` - 1st round
+- Sol - `NEEDS FIXES` - round 1
+- Sol - `APPROVE WITH FIXES` - round 2
 
-## Cursor Round 1
+## Sol Round 1
 ### Verdict: NEEDS FIXES
 
 ### Critical
@@ -173,7 +143,7 @@ reviewer and round under a compact ledger:
 
 ## Post-Review Branch State
 ### Post-Round Patches
-- [file:line] - description [patched after Cursor round 2; not re-reviewed] (commit def456; validation: <command>)
+- [file:line] - description [patched after Sol round 2; not re-reviewed] (commit def456; validation: <command>)
 
 ### Unresolved Blockers
 - (none)
@@ -188,13 +158,11 @@ Rules:
 - A new issue caused by an earlier patch says so in its finding text, under an
   existing status.
 - Update the ledger after every round: one line per executed round, with its
-  exact verdict token (`APPROVE`, `APPROVE WITH FIXES`, `NEEDS FIXES`) and
-  label (`1st round`, `2nd round`), never collapsed to each reviewer's final
-  round.
+  exact verdict token and `round <n>` label.
 - Verdicts live per round, per reviewer; there is no overall Rocket verdict.
-- A fix patched after an approving round 1 keeps `[patched]` in that round and
-  also appears under `Post-Round Patches` as
-  `[patched after <reviewer> round 1; not re-reviewed]`.
+- A fix patched after a reviewer's last round keeps `[patched]` in that round
+  and also appears under `Post-Round Patches` as
+  `[patched after <reviewer> round <n>; not re-reviewed]`.
 - End with `Post-Review Branch State` when post-round patches or unresolved
   blockers exist. Post-round patches stay apart from reviewer rounds and leave
   every recorded verdict unchanged.
@@ -211,16 +179,15 @@ derived strictly from the diary:
 **Profile:** <profile>
 **Rounds:** <reviewer round count>
 **Review ledger:**
-- Cursor - `NEEDS FIXES` - 1st round
-- Cursor - `APPROVE WITH FIXES` - 2nd round
-- Codex - `APPROVE` - 1st round
+- Sol - `NEEDS FIXES` - round 1
+- Sol - `APPROVE WITH FIXES` - round 2
 
 **Unresolved blockers:** None.
-**Post-round branch state:** One accepted finding patched after Cursor round 2
-and validated at commit def456. Cursor round 2 remains `APPROVE WITH FIXES`.
-Not re-reviewed by Cursor.
+**Post-round branch state:** One accepted finding patched after Sol round 2
+and validated at commit def456. Sol round 2 remains `APPROVE WITH FIXES`. Not
+re-reviewed by Sol.
 
-### Cursor
+### Sol
 #### Critical
 - [file:line] - description [patched]
 
@@ -229,10 +196,6 @@ Not re-reviewed by Cursor.
 
 #### Low
 - [file:line] - description [open: non-blocking]
-
-### Codex
-#### Critical
-- (none)
 
 </details>
 ```
@@ -257,15 +220,9 @@ verdict:
 
 ```md
 PR 1 — <repo or service> #<number>: <url>
-- <reviewer name> — 1st round: `<verdict>`; 2nd round: `<verdict>`
-- <reviewer name> — 1st round: `<verdict>`; 2nd round: `<verdict>`
-- Post-review patch — <finding> patched after <reviewer name> 2nd round at
+- <reviewer name> — round 1: `<verdict>`; round 2: `<verdict>`
+- Post-review patch — <finding> patched after <reviewer name> round 2 at
   <commit>; not re-reviewed by <reviewer name>
-- Unresolved blockers — None
-
-PR 2 — <repo or service> #<number>: <url>
-- <reviewer name> — 1st round: `<verdict>`; 2nd round: `<verdict>`
-- <reviewer name> — 1st round: `<verdict>`; 2nd round: `<verdict>`
 - Unresolved blockers — None
 ```
 
@@ -273,38 +230,7 @@ Requirements:
 
 - Number PR groups in task order, even for a single PR, and keep each PR's
   ledger, post-review status, and blockers inside its own group.
-- Name the reviewer and round on every verdict (never a bare "final-round
-  `NEEDS FIXES`"), showing every executed round and omitting only rounds that
-  did not run.
+- Name the reviewer and round on every verdict, showing every executed round.
 - A post-round patch line names the PR, reviewer, round, patch commit, and
   whether that reviewer re-reviewed it; claim reviewer approval only for
   patches the reviewer re-reviewed.
-
-## Linear Ticket Sync
-
-Skip without a Linear ticket. After the review rounds and final PR comment,
-update the ticket description, the sole Linear write, inside the shared
-marker-bounded region:
-
-- `<!-- managed:rocket-start -->`
-- `<!-- managed:rocket-end -->`
-
-With both markers present, replace everything between them, inclusive;
-otherwise (none or one), append a fresh region. Content outside the markers
-stays untouched.
-
-When rebuilding:
-
-- Always emit both markers.
-- Lead with any existing `## Rocket Plan Contract` block from the current
-  description, preserved inside the markers.
-- Then include exactly one Rocket Review section, keeping one managed region.
-
-Verify collapsible syntax (`>>>`, `<details>`) against current official Linear
-editor docs in this session, not memory. If clearly verified, use a collapsed
-section titled `Rocket Review`; otherwise a plain `## Rocket Review` heading.
-
-Include each reviewer's findings, patched items, skipped items with reasons,
-open items, and every round's exact verdict, plus post-round branch state
-separately when applicable, with no overall Rocket verdict. The description
-ends as the final reviewed state.

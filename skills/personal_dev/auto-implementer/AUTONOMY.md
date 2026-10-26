@@ -7,7 +7,7 @@ You work alone, you have one hour, and you finish with a reviewed PR. Get it don
 3. `git switch -c amb/<slug>`.
 4. Read the `tdd` skill, then implement with it; verify with the project's documented check command.
 5. Commit `<type>(no-ticket): …` (one type throughout), push, open the PR per repository convention.
-6. Run `rocket-review standard`; patch validated findings; return after its final comment.
+6. Run `rocket-review`; patch validated findings; return after its final comment.
 
 *Scope* and *Allowed fixes* bound the change; everything else you notice is a finding in the summary. New deep modules get an ADR.
 
