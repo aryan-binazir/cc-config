@@ -1,6 +1,6 @@
 ---
 name: explorer
-description: Delegate read-only codebase recon — mapping a subsystem, answering "where/how does X happen", surveying call sites — to the fan-out explore worker. Use when the user invokes /explorer, or a /lead or /rocket session wants recon without spending its own context.
+description: Delegate read-only codebase recon — mapping a subsystem, answering "where/how does X happen", surveying call sites — to the fan-out explore worker. Use when the user invokes /explorer, or a /lead session wants recon without spending its own context.
 disable-model-invocation: true
 ---
 

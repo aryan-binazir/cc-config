@@ -1,28 +1,11 @@
 # Copy this file to rocket.local.yaml and edit the copy.
 # The gitignored local file is used instead of this example when it exists.
-# Name plan profiles after their executor, such as `codex` or `claude`.
+# Rocket runs the `claude` plan profile unless invoked with `gpt`.
 
 defaults:
-  plan_profile: codex
   review_profile: standard
 
 plan_profiles:
-  codex:
-    # Git checkout mode: branch or worktree.
-    checkout: worktree
-    tracker: linear
-    critic:
-      name: Opus
-      runner: claude
-      model: claude-opus-5-5
-      effort: high
-      timeout_ms: 1500000
-    grill:
-      skill: grill-with-docs
-    review:
-      runner: rocket-review
-    review_profile: standard
-
   claude:
     # Git checkout mode: branch or worktree.
     checkout: worktree
@@ -33,8 +16,20 @@ plan_profiles:
       model: gpt-6.1-sol
       reasoning_effort: xhigh
       timeout_ms: 1500000
-    grill:
-      skill: grill-with-docs
+    review:
+      runner: rocket-review
+    review_profile: standard
+
+  gpt:
+    # Git checkout mode: branch or worktree.
+    checkout: worktree
+    tracker: linear
+    critic:
+      name: Opus
+      runner: claude
+      model: claude-opus-5-5
+      effort: high
+      timeout_ms: 1500000
     review:
       runner: rocket-review
     review_profile: standard

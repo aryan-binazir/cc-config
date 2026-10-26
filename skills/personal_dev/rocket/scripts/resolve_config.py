@@ -17,7 +17,6 @@ RUNNERS = {"claude", "codex", "cursor-agent"}
 REVIEW_RUNNERS = RUNNERS | {"rocket-review"}
 TRACKERS = {"jira", "linear"}
 CHECKOUTS = {"branch", "worktree"}
-GRILL_SKILLS = {"grill-with-docs"}
 DEFAULT_TIMEOUT_MS = 1_500_000
 
 
@@ -92,15 +91,6 @@ def validate_plan_profile(config: dict[str, Any], errors: list[str]) -> None:
 
     validate_runner(config, "critic", RUNNERS, errors)
     validate_runner(config, "review", REVIEW_RUNNERS, errors)
-
-    grill = config.get("grill")
-    if grill is not None:
-        if not isinstance(grill, dict):
-            errors.append("grill must be a YAML object")
-        elif grill.get("skill") not in GRILL_SKILLS:
-            errors.append(
-                f"grill.skill must be one of: {', '.join(sorted(GRILL_SKILLS))}"
-            )
 
 
 def validate_review_profile(config: dict[str, Any], errors: list[str]) -> None:

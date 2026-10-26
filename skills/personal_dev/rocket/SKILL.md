@@ -3,7 +3,7 @@ name: rocket
 description: >-
   Ship a Linear/Jira issue or no-ticket task end to end: clarify, critique the
   plan, build test-first, verify, push, and run configured review. Use when the
-  user invokes rocket, rocket codex, or rocket claude.
+  user invokes rocket or rocket gpt.
 disable-model-invocation: true
 ---
 
@@ -14,28 +14,26 @@ persisted contract.
 
 Inputs:
 
-- **Profile** (optional): literal `codex` or `claude` right after `$rocket`;
-  omitted means the configured default.
-- **Task** (required): an issue ID or URL from the configured tracker only, or
-  an explicit `no ticket` description. Absent an explicit `no ticket`, ask for
-  an issue.
+- **Profile**: `gpt` when the user passes a `gpt` argument before the task;
+  otherwise `claude`.
+- **Task** (required): an issue key or URL from the configured tracker makes
+  tracked work; anything else is no-ticket work, defined by the request and
+  the conversation leading up to it.
 - **Branch** (optional): honored exactly. Default: `amb/<issue-key>`,
   or `amb/<task-slug>` (short kebab-case) for no-ticket work.
-- **Modifiers** (optional): `grill`, `hunk-review`, `implementer`.
 
 Throughout: resolve material ambiguity before acting, run every configured
 critique, write the failing test before production code, and merge only on the
 user's explicit request.
 
-Examples: `$rocket BBA-359` · `$rocket implementer BBA-359` ·
-`$rocket claude BBA-359 grill` · `$rocket BBA-359 hunk-review` ·
-`$rocket no ticket: fix stale cache invalidation`
+Examples: `$rocket BBA-359` · `$rocket gpt BBA-359` ·
+`$rocket fix stale cache invalidation`
 
 ## Config
 
 Before interpreting the task, resolve `<rocket-skill-dir>` (the absolute
-directory of this `SKILL.md`) and run, passing a literal `codex`/`claude`
-profile as the positional argument:
+directory of this `SKILL.md`) and run, passing the profile (`claude` or `gpt`)
+as the positional argument:
 
 ```bash
 uv run --script "<rocket-skill-dir>/scripts/resolve_config.py" [profile]
@@ -79,10 +77,7 @@ briefing, planning, or code exploration.
    the expected branch — the **resolved branch**. The returned absolute
    `checkout_path` is authoritative, even outside the default
    `<repo>/_scratch/worktrees/<ticket-key>`.
-4. Immediately tell the user the checkout mode, resolved branch, and path. With
-   `hunk-review`, also say, without blocking: `Hunk Review requested. Please
-   ensure the Hunk TUI is running for this checkout: cd <checkout_path> && hunk
-   diff origin/main...HEAD --watch`.
+4. Immediately tell the user the checkout mode, resolved branch, and path.
 5. Stop and ask the user on a dirty target, path collision, unavailable `main`,
    failed setup, branch checked out elsewhere in `branch` mode, mode or branch
    mismatch, or a checkout off the resolved branch.
@@ -100,11 +95,7 @@ issue or, for no-ticket work, the task slug.
 
 ## 2. Brief, Align, And Clarify
 
-With `grill`: read and follow the resolved `grill.skill` in place of this
-section (stop if the block or skill is missing), and plan only once the user
-confirms shared understanding.
-
-Otherwise, brief the user from the task and repo evidence:
+Brief the user from the task and repo evidence:
 
 - **Problem:** what is wrong or missing.
 - **Outcome:** what the task makes true.
@@ -152,17 +143,7 @@ its seam confirmation. Slice vertically through the chosen public seams: one
 failing behavior test, watch it fail as expected, just enough production code
 to pass, repeat.
 
-By default, implement directly. With `implementer`, read the `implementer` and
-`explorer` skills and delegate: explorer recon first — before planning and
-before any handoff needing code context — citing its findings file in later
-prompts; implementer workers make every file change, with prompts carrying the
-plan, test seam, and repo instructions. Keep commits, pushes, PRs, and
-validation yourself; inspect status and diff after each handoff, and rerun
-below-bar work with a tighter prompt or stronger worker. If the skills or
-workers are unavailable, stop and report.
-
-Either way, stay within the plan and scope, and stop on any new material
-ambiguity.
+Stay within the plan and scope, and stop on any new material ambiguity.
 
 ## 5. Verify, Commit, And Push
 
@@ -178,22 +159,7 @@ setting upstream as needed, and confirm the branch is **synced**: upstream
 Rocket always commits and pushes and otherwise leaves PRs untouched; creation
 belongs to Rocket Review.
 
-## 6. Hunk Review (`hunk-review` only)
-
-Read and follow the skill at the path `hunk skill path` prints. Require a live
-session for the checkout, reloading it to `diff origin/main...HEAD` if it shows anything else.
-
-Review the diff against the task and seed one small batch of focused comments,
-then hand the session to the user. Each time they ask you to process comments,
-account for every current user comment before patching or committing —
-`--watch` may reload, so the conversation is the durable ledger — then answer,
-patch agreed changes, verify, commit, push, and reload, for as many rounds as
-they want.
-
-Move to review only when the user says so (e.g. `Rocket Review it now`), with
-every comment accounted for and the branch synced.
-
-## 7. Run Configured Review
+## 6. Run Configured Review
 
 **`rocket-review` runner:** follow the `rocket-review` skill with the resolved
 `review_profile.name` and the issue or task description as its spec source. It
