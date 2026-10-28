@@ -167,8 +167,8 @@ review. Any `[open: blocker]` it leaves holds the merge and leads the report.
 
 Follow `babysit-pr` on the PR.
 
-- **Default:** keep the draft; babysit until checks are green, bots are done,
-  and comments are handled.
+- **Default:** keep the draft; babysit until checks are green, the bot window
+  passed, and comments are handled.
 - **`lift-off`:** mark it ready, babysit to the merge gate, and merge. An
   assumption that changed user-facing behavior or scope holds the merge for the
   user.

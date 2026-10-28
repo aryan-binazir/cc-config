@@ -19,20 +19,21 @@ and work in a clean checkout of its head branch, pulled to the PR head.
 ## Wait
 
 Run one watcher per PR, owned by the thread that owns the PR; delegated child
-tasks leave watching to their parent. Review bots get 20 minutes once the
-head's checks go green.
+tasks leave watching to their parent. Handle current checks and comments
+first; a watcher reports only what arrives after its first run. Each head gets
+a 30-minute bot window once its checks go green.
 
-- **T3 Code:** handle current checks and comments, call `watch_pull_request`,
-  and end the turn. Each wake is news; check the PR yourself. When a wake shows
-  the head green with a review bot unfinished, call `unwatch_pull_request` and
-  wait out the bot window with `pr-wait`.
+- **T3 Code:** call `watch_pull_request` and end the turn. Each wake is news;
+  check the PR yourself. When a wake shows the head green, call
+  `unwatch_pull_request` and wait out the bot window with `pr-wait`.
 - **Elsewhere:** run `<skill-dir>/scripts/pr-wait <pr> --until ready`
   (absolute path) through Claude Code's Monitor tool (`timeout_ms: 1800000`,
-  re-armed on expiry), or as one long command. Exit 0: green, bots done or
-  timed out, no unresolved threads, or merged. Exit 1: it needs you. Restart
-  it after each push, each handled exit, and each resume.
+  re-armed on expiry), or as one long command. Exit 0: green, bot window
+  passed, no unresolved threads, or merged. Exit 1: it needs you, including
+  each new comment. Restart it after each push, each handled exit, and each
+  resume.
 
-Events needing no action: end the turn silently.
+Exit 0 alone ends the wait. Events needing no action: end the turn silently.
 
 ## Act
 
@@ -59,8 +60,8 @@ Ready means all of these hold on the latest head:
 
 - proof covers every change in the diff
 - required checks are green
-- review bots finished, or their 20 minutes passed, and each finding is fixed
-  or dismissed with a written reason
+- the bot window passed, and each finding is fixed or dismissed with a written
+  reason
 - required approvals are in, and no review requests changes
 - the branch is up to date with its base and GitHub reports it mergeable
 
