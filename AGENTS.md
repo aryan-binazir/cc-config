@@ -22,7 +22,7 @@
 - Commit message format: `type(PROJECT): description` (e.g. `fix(BBA): Added logging package`). Use only the Jira project key, not the full ticket key. Types: `feat`, `fix`, `chore`, `refactor`, `test`, `docs`, `build`, `ci`, `revert`. If there is no ticket, use `type(no-ticket): description`.
   - The type is determined by the ticket's overall purpose and MUST stay consistent across ALL commits and the PR title for that ticket (CI depends on this). A stack is one larger change split for review, so a `refactor` commit inside a `feat` ticket is still `feat`. Check existing commits on the branch before committing.
 - Use the pr skill when creating pull requests.
-- If ticketed, include `<Type> <ticket ID>` in the PR body (`Fixes` for `fix`, otherwise capitalize the commit type).
+- If ticketed, end the PR body with `<Type> <ticket ID>` (`Fixes` for `fix`, otherwise capitalize the commit type).
 - PR descriptions use this structure. Testing is optional — omit if not applicable:
   ### Problem
   ### Changes
