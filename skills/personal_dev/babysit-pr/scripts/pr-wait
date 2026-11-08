@@ -1,10 +1,14 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["PyYAML>=6.0.2"]
+# ///
 """pr-wait: watch one GitHub pull request and print one line per real event.
 
 Adapted from t3dotgg/tstack (MIT, see pr-wait.LICENSE): `ready` holds a
 --bot-wait window after green so review bots land.
 
-  pr-wait <pr> [--repo owner/name] [--until green|ready|any-change] [--interval 60] [--bot-wait 30]
+  pr-wait <pr> [--repo owner/name] [--until green|ready|any-change] [--interval 60] [--bot-wait MIN]
 
 <pr> is a PR number or PR URL. Without --repo, the repo comes from the URL or
 from the current checkout. Stdout carries only events, one line each, so a
@@ -13,7 +17,9 @@ Progress and errors that do not end the run go to stderr.
 
 --until
   green       required checks passed on the current head (every CI check when
-              the base branch requires none)
+              the base branch requires none). A head with no CI checks and no
+              required checks is green after a 2-minute grace for checks to
+              register.
   ready       green, --bot-wait minutes passed since the head went green, and
               no review thread is unresolved (default). Each new comment,
               review, or thread exits 1 so the agent handles it.
@@ -43,6 +49,10 @@ never holds the checks line. Comment edits are never events, and top-level
 comments from CI and deploy bots (github-actions, Vercel) are skipped, because
 checks already carry that news.
 
+--bot-wait defaults to 30 minutes, or 0 when the skill config sets
+`bot_window: false`. Config: babysit-pr.local.yaml, or babysit-pr.example.yaml
+when local is absent.
+
 State lives in ~/.local/state/pr-wait/. A lock makes a second watcher for the
 same PR exit at once. A state file lets a restarted watcher report what arrived
 while no watcher ran. The first run for a PR records what already exists and
@@ -70,6 +80,11 @@ ADVISORY_BOTS = ("coderabbit",)
 # CI and deploy bots report through checks. Their PR comments are status reports.
 STATUS_BOTS = ("github-actions", "vercel", "netlify", "railway", "cloudflare")
 STATE_DIR = Path.home() / ".local" / "state" / "pr-wait"
+SKILL_DIR = Path(__file__).resolve().parents[1]
+BOT_WAIT_MINUTES = 30
+# Checks register a few seconds after a push. A head with none after this long
+# has no CI.
+NO_CI_GRACE_SECONDS = 120
 # A state file older than this describes an old session. Start a fresh baseline
 # instead of replaying hours of comments as new events.
 STALE_STATE_SECONDS = 6 * 3600
@@ -262,6 +277,7 @@ class Watcher:
         self.baseline = state is None
         self.state: Json = state or {"reported": [], "summaries": {}, "base_oid": None, "merge_state": None}
         self.state.setdefault("green_at", {})
+        self.state.setdefault("seen_at", {})
         self.reported: set[str] = set(self.state["reported"])
         self.printed: set[str] = set()
         self.events = 0
@@ -392,7 +408,9 @@ class Watcher:
         snapshot = sorted((name, c["bucket"]) for name, c in watched.items())
         stable = snapshot == self.prev_snapshot
         self.prev_snapshot = snapshot
-        green = gate_done and stable and not fail_lines
+        self.state["seen_at"].setdefault(head, time.time())
+        no_ci = not gate and time.time() - self.state["seen_at"][head] >= NO_CI_GRACE_SECONDS
+        green = (gate_done or no_ci) and stable and not fail_lines
 
         # People and bots talking. Edits are never events.
         quiet = self.events
@@ -497,6 +515,8 @@ class Watcher:
             f"{len(unresolved)} unresolved threads",
             f"merge state {merge_state}",
         ]
+        if no_ci:
+            parts.insert(0, "no CI checks")
         summary = "; ".join(p for p in parts if p)
         checks_key = f"checks:{head}"
 
@@ -550,14 +570,25 @@ class Watcher:
             time.sleep(self.interval)
 
 
+def default_bot_wait() -> int:
+    import yaml
+
+    local = SKILL_DIR / "babysit-pr.local.yaml"
+    path = local if local.exists() else SKILL_DIR / "babysit-pr.example.yaml"
+    config = yaml.safe_load(path.read_text()) if path.exists() else None
+    return BOT_WAIT_MINUTES if (config or {}).get("bot_window", True) else 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="pr-wait", description="Watch a GitHub PR and print one line per real event.")
     parser.add_argument("pr", nargs="?", help="PR number or URL")
     parser.add_argument("--repo", help="owner/name (default: from the URL or the current checkout)")
     parser.add_argument("--until", choices=("green", "ready", "any-change"), default="ready")
     parser.add_argument("--interval", type=int, default=60, help="seconds between polls (default 60, min 5)")
-    parser.add_argument("--bot-wait", type=int, default=30, help="minutes `ready` holds for review bots after green (default 30)")
+    parser.add_argument("--bot-wait", type=int, help="minutes `ready` holds for review bots after green (default from config)")
     args = parser.parse_args()
+    if args.bot_wait is None:
+        args.bot_wait = default_bot_wait()
     repo, pr = parse_target(args.pr, args.repo)
     _lock = lock(repo, pr)
     Watcher(repo, pr, args.until, max(args.interval, 5), max(args.bot_wait, 0) * 60).run()

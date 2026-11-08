@@ -21,11 +21,13 @@ and work in a clean checkout of its head branch, pulled to the PR head.
 Run one watcher per PR, owned by the thread that owns the PR; delegated child
 tasks leave watching to their parent. Handle current checks and comments
 first; a watcher reports only what arrives after its first run. Each head gets
-a 30-minute bot window once its checks go green.
+the configured bot window (`bot_window`, default 30 minutes) once its checks
+go green; a head without CI counts as green.
 
 - **T3 Code:** call `watch_pull_request` and end the turn. Each wake is news;
   check the PR yourself. When a wake shows the head green, call
-  `unwatch_pull_request` and wait out the bot window with `pr-wait`.
+  `unwatch_pull_request` and wait out the bot window with `pr-wait`. A head
+  without checks goes straight to `pr-wait`.
 - **Elsewhere:** run `<skill-dir>/scripts/pr-wait <pr> --until ready`
   (absolute path) through Claude Code's Monitor tool (`timeout_ms: 1800000`,
   re-armed on expiry), or as one long command. Exit 0: green, bot window

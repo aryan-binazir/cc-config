@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "skills/personal_dev/babysit-pr/scripts/pr-wait"
 HEAD = "abc1234def"
+CI = ({"name": "ci", "bucket": "pass", "link": "l", "description": ""},)
 
 
 def load():
@@ -22,7 +23,7 @@ def load():
     return module
 
 
-def fake_gh(module, comments=(), threads=()):
+def fake_gh(module, comments=(), threads=(), checks=CI):
     pr = {
         "url": "https://github.com/o/r/pull/7", "state": "OPEN", "headRefOid": HEAD,
         "baseRefName": "main", "mergeStateStatus": "CLEAN", "author": {"login": "me"},
@@ -35,7 +36,7 @@ def fake_gh(module, comments=(), threads=()):
         if args[:2] == ["api", "graphql"]:
             out = json.dumps({"data": {"viewer": {"login": "me"}, "repository": {"pullRequest": pr}}})
         elif args[:2] == ["pr", "checks"]:
-            out = json.dumps([{"name": "ci", "bucket": "pass", "link": "l", "description": ""}])
+            out = json.dumps(list(checks))
         elif args[0] == "api" and "/compare/" in args[1]:
             out = "0"
         else:
@@ -52,10 +53,10 @@ class PrWaitBotWaitTest(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.module.STATE_DIR = Path(temp.name)
 
-    def poll_twice(self, bot_wait: int, comments=(), threads=(), now: float = 1000.0) -> tuple[int | None, str]:
+    def poll_twice(self, bot_wait: int, comments=(), threads=(), now: float = 1000.0, checks=CI) -> tuple[int | None, str]:
         watcher = self.module.Watcher("o/r", 7, "ready", 5, bot_wait)
         out = io.StringIO()
-        with patch.object(self.module, "gh", fake_gh(self.module, comments, threads)), \
+        with patch.object(self.module, "gh", fake_gh(self.module, comments, threads, checks)), \
                 patch.object(self.module.time, "time", return_value=now), \
                 contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
             try:
@@ -97,6 +98,33 @@ class PrWaitBotWaitTest(unittest.TestCase):
         code, out = self.poll_twice(bot_wait=30 * 60, threads=[thread], now=1600.0)
         self.assertEqual(code, 1)
         self.assertIn("new thread from work-bot on a.go:3", out)
+
+    def test_no_ci_is_green_after_grace(self) -> None:
+        self.assertIsNone(self.poll_twice(bot_wait=0, checks=(), now=1000.0)[0])
+        code, out = self.poll_twice(bot_wait=0, checks=(), now=1120.0)
+        self.assertEqual(code, 0)
+        self.assertIn("ready on abc1234: no CI checks", out)
+
+    def test_no_ci_still_holds_the_bot_window(self) -> None:
+        self.assertIsNone(self.poll_twice(bot_wait=30 * 60, checks=(), now=1000.0)[0])
+        self.assertIsNone(self.poll_twice(bot_wait=30 * 60, checks=(), now=1120.0)[0])
+        code, out = self.poll_twice(bot_wait=30 * 60, checks=(), now=1120.0 + 30 * 60)
+        self.assertEqual(code, 0)
+        self.assertIn("30m bot window passed", out)
+
+
+class PrWaitConfigTest(unittest.TestCase):
+    def test_bot_wait_default_comes_from_local_then_example(self) -> None:
+        module = load()
+        example = (module.SKILL_DIR / "babysit-pr.example.yaml").read_text()
+        self.assertIn("\nbot_window: true\n", example)
+        with tempfile.TemporaryDirectory() as temp:
+            module.SKILL_DIR = Path(temp)
+            self.assertEqual(module.default_bot_wait(), 30)
+            (module.SKILL_DIR / "babysit-pr.example.yaml").write_text("bot_window: true\n")
+            self.assertEqual(module.default_bot_wait(), 30)
+            (module.SKILL_DIR / "babysit-pr.local.yaml").write_text("bot_window: false\n")
+            self.assertEqual(module.default_bot_wait(), 0)
 
 
 if __name__ == "__main__":

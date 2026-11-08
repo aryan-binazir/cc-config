@@ -1,0 +1,5 @@
+# Copy this file to babysit-pr.local.yaml and edit the copy.
+# The gitignored local file is used instead of this example when it exists.
+# true holds each green head 30 minutes for review bots and coworkers.
+# false moves on once checks are green or the PR has no CI.
+bot_window: true
