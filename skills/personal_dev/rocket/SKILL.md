@@ -134,9 +134,10 @@ instructions. Keep it read-only and ask, in order:
 3. Which code outside the plan depends on what changes?
 4. What gaps and risks remain?
 
-Run tests and baseline checks while it works; start production code once its
-critique is folded in, stating each call it prompts as an assumption. One
-round, unless the run fails or the user asks for more.
+Run tests and baseline checks while it works; step 4 begins once its full
+critique is in. Weigh every point as a senior engineer's review, then own the
+call: fold in what strengthens the plan, stating each decision as an
+assumption. One round, unless the run fails or the user asks for more.
 
 ## 4. Implement Test-First
 
