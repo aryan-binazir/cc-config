@@ -1,6 +1,6 @@
 # Copy this file to call-codex.local.yaml and edit the copy.
 # The gitignored local file is used instead of this example when it exists.
 
-model: gpt-6.1-sol
+model: gpt-6.1
 reasoning_effort: xhigh
 timeout_ms: 1800000
