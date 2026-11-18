@@ -20,7 +20,7 @@ NAMES = (
 class SkillConfigTest(unittest.TestCase):
     def test_model_effort_defaults(self) -> None:
         def check(config: dict, opus_effort: str) -> None:
-            if config.get("model") == "gpt-6.1":
+            if config.get("model") == "gpt-6.2-sol":
                 self.assertEqual(config["reasoning_effort"], "xhigh")
             elif config.get("model") == "claude-opus-5-5":
                 self.assertEqual(config["effort"], opus_effort)
