@@ -69,7 +69,8 @@ Ready means all of these hold on the latest head:
 
 With merge authorized: run `gh pr ready` on a draft, `git fetch`, recheck the
 gate, and merge with the repo's method (its allowed methods and recently
-merged PRs show which). Merge through branch protection as configured; with a
+merged PRs show which), passing `--match-head-commit <head-sha>` for the head
+you verified. Merge through branch protection as configured; with a
 merge queue or auto-merge, stay until GitHub reports the PR merged. When only
 required human approvals remain, hand back the PR as waiting for approval.
 

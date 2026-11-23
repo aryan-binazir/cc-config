@@ -8,12 +8,14 @@ as `CLAUDE.md` can symlink back to it when needed.
 
 ## Hooks
 
-`hooks/block-agy.sh` stops agents from launching the Antigravity CLI in any
-mode (print, ACP, or driven through tmux), which Google's consumer-plan terms
-forbid. Running agy yourself in a terminal is unaffected. It is a
-`PreToolUse` hook for Claude Code (`~/.claude/settings.json`) and Codex
-(`~/.codex/hooks.json`), and `hooks/block-agy.pi.ts` runs it in pi.
-Both files are symlinked into place:
+[`agent-hooks/`](agent-hooks/README.md) is one Go binary that enforces agent
+guardrails as `PreToolUse`/`PostToolUse` hooks in Claude Code, Codex, and the
+Antigravity CLI. It blocks agents from launching agy, and it enforces draft
+and assigned PRs, safe merges, commit-message format, and no secrets,
+production pushes, or destructive git. `make -C agent-hooks install` builds it
+to `~/.local/bin/agent-hooks` and wires it into `~/.claude/settings.json`,
+`~/.codex/hooks.json`, and `~/.gemini/config/hooks.json`. Codex then needs the
+new entries approved in `/hooks`.
 
-- `~/.claude/hooks/block-agy.sh` -> `hooks/block-agy.sh`
-- `~/.pi/agent/extensions/block-agy.ts` -> `hooks/block-agy.pi.ts`
+`hooks/block-agy.pi.ts` is a pi extension that runs the block-agy check through
+`agent-hooks pre --only=block-agy`.
