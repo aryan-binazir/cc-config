@@ -54,6 +54,13 @@ func TestBadSwitchesAreAFault(t *testing.T) {
 	}
 }
 
+func TestInstallRefusesBadSwitches(t *testing.T) {
+	var out, errb bytes.Buffer
+	if code := wire("install", "hooks:\n  x: maybe\n", t.TempDir(), &out, &errb); code != 1 || !strings.Contains(errb.String(), "hooks.yaml") {
+		t.Errorf("exit %d stderr %q", code, errb.String())
+	}
+}
+
 func BenchmarkParseSwitches(b *testing.B) {
 	for b.Loop() {
 		if _, err := parseSwitches(hooksYAML); err != nil {
@@ -169,8 +176,8 @@ func TestBinaryInstallRoundTrip(t *testing.T) {
 	if p := runBinary(t, env, "", "uninstall"); p.exit != 0 {
 		t.Fatalf("uninstall: %+v", p)
 	}
-	if _, err := os.Stat(filepath.Join(home, ".gemini", "config", "hooks.json")); !os.IsNotExist(err) {
-		t.Errorf("agy file left: %v", err)
+	if agy, _ := os.ReadFile(filepath.Join(home, ".gemini", "config", "hooks.json")); strings.Contains(string(agy), "agent-hooks") {
+		t.Errorf("agy entry left: %s", agy)
 	}
 }
 

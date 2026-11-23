@@ -262,7 +262,7 @@ func TestInstallRemovesLegacyBlockAgyAndKeepsOtherHooks(t *testing.T) {
 	}
 	claude := decode(t, read(t, p.Claude))
 	pre := handlers(t, claude, "PreToolUse")
-	if len(pre) != 2 || pre[0]["command"] != "other-hook" || pre[1]["command"] != "'"+bin+"' pre" {
+	if len(pre) != 2 || pre[0]["command"] != "'"+bin+"' pre" || pre[1]["command"] != "other-hook" {
 		t.Errorf("claude pre: %v", pre)
 	}
 	codex := decode(t, read(t, p.Codex))
@@ -297,7 +297,7 @@ func TestUninstallRestoresTheOriginal(t *testing.T) {
 	}
 }
 
-func TestUninstallRemovesAnAgyFileItCreated(t *testing.T) {
+func TestUninstallEmptiesAnAgyFileItCreated(t *testing.T) {
 	p := setup(t, "", "", "")
 	if _, err := Install(p, bin, now); err != nil {
 		t.Fatal(err)
@@ -305,8 +305,8 @@ func TestUninstallRemovesAnAgyFileItCreated(t *testing.T) {
 	if _, err := Uninstall(p, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(p.Agy); !os.IsNotExist(err) {
-		t.Errorf("agy hooks file left behind: %v", err)
+	if got := read(t, p.Agy); got != "{}\n" {
+		t.Errorf("agy hooks file: %q", got)
 	}
 	if got := read(t, p.Claude); got != "{}\n" {
 		t.Errorf("claude: %q", got)
@@ -445,5 +445,76 @@ func TestBinaryPathIsQuotedAndNamed(t *testing.T) {
 	}
 	if _, err := Install(p, "/usr/local/bin/ah", now); err == nil {
 		t.Error("accepted a binary not named agent-hooks, which uninstall could not find")
+	}
+}
+
+func TestInstallKeepsOtherGroupsAndHandlers(t *testing.T) {
+	codex := `{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "bash ~/.claude/hooks/block-agy.sh",
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "command": "custom",
+            "type": "command"
+          },
+          {
+            "command": "'/x/agent-hooks' pre",
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "'/x/agent-hooks' pre --only=block-agy",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}`
+	p := setup(t, "", codex, "")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	cfg := decode(t, read(t, p.Codex))
+	groups := cfg["hooks"].(map[string]any)["PreToolUse"].([]any)
+	if len(groups) != 3 {
+		t.Fatalf("groups: %v", groups)
+	}
+	first := groups[0].(map[string]any)
+	if first["matcher"] != "Bash" || first["hooks"].([]any)[0].(map[string]any)["command"] != "'"+bin+"' pre" {
+		t.Errorf("the legacy group should become ours in place: %v", first)
+	}
+	second := groups[1].(map[string]any)
+	if second["matcher"] != "Write" || len(second["hooks"].([]any)) != 1 {
+		t.Errorf("shared group changed: %v", second)
+	}
+	if third := groups[2].(map[string]any); third["hooks"].([]any)[0].(map[string]any)["command"] != "'/x/agent-hooks' pre --only=block-agy" {
+		t.Errorf("custom --only handler touched: %v", third)
+	}
+}
+
+func TestUninstallKeepsAPreexistingEmptyAgyFile(t *testing.T) {
+	p := setup(t, "", "", "{}")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Uninstall(p, now); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, p.Agy); got != "{}" {
+		t.Errorf("agy file: %q", got)
 	}
 }

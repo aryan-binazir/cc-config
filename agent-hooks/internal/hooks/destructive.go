@@ -35,7 +35,11 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if o.has("-f", "--mirror") {
 			return "Don't force-push: use --force-with-lease (without --force, which overrides it) so you cannot overwrite commits you haven't seen. If the user asked for a force push, rerun with AGENT_HOOKS_ALLOW=destructive."
 		}
-		for _, refspec := range pushRefspecs(o) {
+		refspecs := pushRefspecs(o)
+		if len(refspecs) == 0 {
+			refspecs = configuredRefspecs(c, g, o)
+		}
+		for _, refspec := range refspecs {
 			// A + forces that ref even when a lease is given for another.
 			if strings.HasPrefix(refspec, "+") {
 				return "A +refspec force-pushes. Push without the + and use --force-with-lease, or rerun with AGENT_HOOKS_ALLOW=destructive if the user asked for it."
@@ -46,19 +50,24 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if o.has("-n", "-i") {
 			return ""
 		}
-		if !o.has("-f") {
-			if out, ok := c.git(g, "config", "--type=bool", "--get", "clean.requireForce"); !ok || strings.TrimSpace(out) != "false" {
-				return "" // git refuses to clean without -f
-			}
+		if !o.has("-f") && !requireForceOff(c, g) {
+			return "" // git refuses to clean without -f
 		}
 		// git's own dry run knows its excludes, -d, and nested repositories.
-		out, ok := c.git(g, append([]string{"clean", "-n"}, cleanDryRunArgs(g.args)...)...)
+		out, ok := c.git(g, cleanDryRun(o)...)
 		if first, _, _ := strings.Cut(strings.TrimSpace(out), "\n"); ok && first != "" {
 			return "git clean would delete untracked files (" + strings.TrimPrefix(first, "Would remove ") + ", ...). " + discardAdvice
 		}
 	case "reset":
-		if o := parseOpts(g.args, "", nil, nil); o.has("--hard") && c.dirty(g, nil, false) {
+		o := parseOpts(g.args, "", nil, nil)
+		if !o.has("--hard") {
+			return ""
+		}
+		if c.dirty(g, nil, false) {
 			return "git reset --hard would discard uncommitted changes. " + discardAdvice
+		}
+		if len(o.pos) > 0 && c.overwritesUntracked(g, o.pos[0].Val) {
+			return "git reset --hard " + o.pos[0].Val + " would overwrite untracked files that the target tracks. " + discardAdvice
 		}
 	case "checkout", "restore":
 		o := parseOpts(g.args, "s", []string{"--source"}, map[string]string{"--staged": "-S", "--worktree": "-W"})
@@ -105,25 +114,56 @@ func (c *ctx) dirty(g *gitCmd, specs []shell.Word, worktreeOnly bool) bool {
 	return false
 }
 
-// cleanDryRunArgs drops -f and -i from git clean's arguments so `git clean -n`
-// reports what the real command would remove.
-func cleanDryRunArgs(args []shell.Word) []string {
-	var out []string
-	for i, w := range args {
-		a := w.Val
-		switch {
-		case a == "--":
-			return append(append(out, "--"), values(args[i+1:])...)
-		case a == "--force" || a == "--interactive":
-		case strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && !strings.Contains(a, "e"):
-			if a = strings.NewReplacer("f", "", "i", "").Replace(a); a != "-" {
-				out = append(out, a)
-			}
-		default:
-			out = append(out, a)
+// cleanDryRun builds `git clean -n` from the parsed flags only, never the
+// agent's own arguments, so the lookup cannot delete anything.
+func cleanDryRun(o opts) []string {
+	args := []string{"clean", "-n"}
+	if o.has("-d") {
+		args = append(args, "-d")
+	}
+	if o.set["-f"] > 1 {
+		args = append(args, "-f", "-f") // -ff also removes nested repositories
+	}
+	for _, flag := range []string{"-x", "-X"} {
+		if o.has(flag) {
+			args = append(args, flag)
 		}
 	}
-	return out
+	for _, e := range o.vals["-e"] {
+		args = append(args, "-e", e.Val)
+	}
+	if specs := append(o.pos, o.paths...); len(specs) > 0 {
+		args = append(append(args, "--"), values(specs)...)
+	}
+	return args
+}
+
+func requireForceOff(c *ctx, g *gitCmd) bool {
+	if v, ok := g.config["clean.requireforce"]; ok {
+		return v == "false" || v == "no" || v == "off" || v == "0"
+	}
+	out, ok := c.git(g, "config", "--type=bool", "--get", "clean.requireForce")
+	return ok && strings.TrimSpace(out) == "false"
+}
+
+// overwritesUntracked reports whether resetting to target would replace an
+// untracked file with one target tracks.
+func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
+	entries, ok := c.status(g, "--untracked-files=all")
+	if !ok {
+		return false
+	}
+	var paths []string
+	for _, e := range entries {
+		if e.xy == "??" && len(paths) < 500 {
+			paths = append(paths, e.path)
+		}
+	}
+	if len(paths) == 0 {
+		return false
+	}
+	out, ok := c.git(g, append([]string{"ls-tree", "-r", "--name-only", target, "--"}, paths...)...)
+	return ok && strings.TrimSpace(out) != ""
 }
 
 var homeVar = regexp.MustCompile(`^\$(HOME|\{HOME\})/?(\*)?$`)

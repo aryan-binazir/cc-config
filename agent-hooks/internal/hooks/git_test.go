@@ -454,3 +454,55 @@ func TestLookupsDoNotRunRepositoryHelpers(t *testing.T) {
 		t.Error("a lookup ran the repository's fsmonitor hook")
 	}
 }
+
+func TestLookupsNeverChangeTheRepository(t *testing.T) {
+	r := newRepo(t)
+	r.write(".env", "x")
+	r.write("scratch.txt", "x")
+	r.expect("no-secrets-commit", true, "git add -A --no-dry-run", "git add --dry-run --no-dry-run -A")
+	r.expect("destructive-git", true, "git clean -fd --no-dry-run", "git clean -n --no-dry-run -fd")
+	if got := r.git("status", "--porcelain"); !strings.Contains(got, "?? .env") || !strings.Contains(got, "?? scratch.txt") {
+		t.Fatalf("a hook lookup changed the repository:\n%s", got)
+	}
+	r.expect("destructive-git", true, "git push -n --no-dry-run --force", "git push --force-with-lease --no-force-with-lease origin +main")
+}
+
+func TestConfiguredAndMappedRefspecs(t *testing.T) {
+	r := newRepo(t)
+	r.git("config", "remote.origin.push", "+refs/heads/main:refs/heads/main")
+	r.expect("destructive-git", true, "git push", "git push origin")
+	r.git("config", "--unset", "remote.origin.push")
+	r.git("branch", "staging/production")
+	r.expect("no-production", true, "git push origin 'refs/heads/staging/*:refs/heads/*'", "git push --prune origin main", "git update-ref -d -- refs/heads/production")
+	r.git("branch", "production", "origin/production")
+	r.expect("no-production", true, "git push --repo=origin --all")
+	r.expect("no-production", false, "git push origin 'refs/tags/*:refs/tags/*'", "git push origin 'refs/heads/feature/*:refs/heads/feature/*'")
+}
+
+func TestReviewRoundTwoGitCases(t *testing.T) {
+	r := newRepo(t)
+	r.write(".env", "x")
+	r.write("list.txt", ".env\n")
+	r.expect("no-secrets-commit", true, "git add --pathspec-from-file=list.txt", "cd /nonexistent-dir || git add -A")
+	r.write("nested/README", "n")
+	gitIn(t, filepath.Join(r.dir, "nested"), "init", "-q")
+	r.expect("destructive-git", true, "git clean -ffd nested", "git -c clean.requireForce=false clean -d")
+	r.expect("destructive-git", false, "git clean -fd nested")
+	r.git("switch", "-q", "-c", "other")
+	r.write("collide.txt", "tracked on other")
+	r.git("add", "collide.txt")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Collide")
+	r.git("switch", "-q", "main")
+	r.write("collide.txt", "untracked work")
+	r.expect("destructive-git", true, "git reset --hard other")
+	r.expect("destructive-git", false, "git reset --hard")
+	r.expect("commit-format", false, "git commit -F - <<'EOF' < msg.txt\nbad\nEOF")
+}
+
+func TestReviewRoundTwoShellAndPayload(t *testing.T) {
+	expectBlocked(t, "draft-prs", "bash -o pipefail <<'EOF'\ngh pr create\nEOF")
+	expectAllowed(t, "no-admin-merge", "gh api --help=true -X PUT repos/o/r/pulls/1/merge")
+	if res := run(t, "block-agy", map[string]any{"tool_name": "Mystery", "tool_input": map[string]any{"command": "agy -p hi"}}); res.Exit != 0 {
+		t.Errorf("unknown tool blocked: %+v", res)
+	}
+}

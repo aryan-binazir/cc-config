@@ -220,7 +220,7 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 		arg := rest[i]
 		name, value, hasValue := strings.Cut(arg, "=")
 		switch {
-		case arg == "--help" || arg == "-h":
+		case name == "--help" && (!hasValue || value != "false"), arg == "-h":
 			return nil
 		case strings.HasPrefix(arg, "--") && slices.Contains(ghAPIValueLong, name):
 			if !hasValue && i+1 < len(rest) {

@@ -10,10 +10,11 @@ import (
 
 // gitCmd is a `git <subcommand>` invocation with its global options applied.
 type gitCmd struct {
-	sub  string
-	args []shell.Word
-	dir  string   // effective working directory; "" when unknown
-	env  []string // GIT_DIR and friends that select the repository
+	sub    string
+	args   []shell.Word
+	dir    string            // effective working directory; "" when unknown
+	env    []string          // GIT_DIR and friends that select the repository
+	config map[string]string // -c key=value, keys lower-cased
 }
 
 var gitGlobalValues = []string{"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix", "--exec-path"}
@@ -53,6 +54,13 @@ func parseGit(inv shell.Invocation, home string) *gitCmd {
 			word = args[i]
 		}
 		switch name {
+		case "-c":
+			if k, v, ok := strings.Cut(word.Val, "="); ok {
+				if g.config == nil {
+					g.config = map[string]string{}
+				}
+				g.config[strings.ToLower(k)] = v
+			}
 		case "-C":
 			g.dir = ""
 			if !word.Dynamic {
@@ -114,6 +122,11 @@ func parseOpts(args []shell.Word, shortValues string, longValues []string, alias
 			return o
 		case strings.HasPrefix(a, "--"):
 			name, value, hasValue := strings.Cut(a, "=")
+			if negated, ok := strings.CutPrefix(name, "--no-"); ok {
+				// --no-X cancels an earlier --X, as git's option parser does.
+				delete(o.set, canon("--"+negated))
+				delete(o.vals, canon("--"+negated))
+			}
 			name = canon(name)
 			o.set[name]++
 			if hasValue {

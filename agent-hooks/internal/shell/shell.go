@@ -126,8 +126,16 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd string) string {
 	case *syntax.CallExpr:
 		return f.call(w, c, s, cwd)
 	case *syntax.BinaryCmd:
-		if c.Op == syntax.AndStmt || c.Op == syntax.OrStmt {
+		switch c.Op {
+		case syntax.AndStmt:
 			return f.stmt(w, c.Y, f.stmt(w, c.X, cwd))
+		case syntax.OrStmt:
+			// Y runs only when X failed, so a cd in X did not happen for Y.
+			afterX := f.stmt(w, c.X, cwd)
+			if afterY := f.stmt(w, c.Y, cwd); afterY != afterX {
+				return ""
+			}
+			return afterX
 		}
 		f.stmt(w, c.X, cwd)
 		f.stmt(w, c.Y, cwd)
@@ -221,6 +229,9 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd string) s
 		case syntax.WordHdoc:
 			body = f.word(r.Word)
 			body.Val += "\n"
+		case syntax.RdrIn, syntax.RdrInOut:
+			inv.Stdin, inv.StdinDynamic = nil, false // the last stdin redirect wins
+			continue
 		default:
 			continue
 		}
@@ -266,8 +277,11 @@ func (f frame) emit(w *walker, inv Invocation) {
 			}
 			return
 		}
-		if inv.Stdin != nil && !hasOperand(args) {
-			f.nested(w, *inv.Stdin, inv)
+		if i < len(args) && args[i].Val == "--" {
+			i++
+		}
+		if inv.Stdin != nil && i == len(args) {
+			f.nested(w, *inv.Stdin, inv) // no script operand, so the shell reads stdin
 		}
 	case "eval":
 		if len(args) > 0 && args[0].Val == "--" {
@@ -306,16 +320,6 @@ func (f frame) nested(w *walker, src string, parent Invocation) {
 	inner.out = w.out
 	inner.script(src, parent.Cwd, parent.Assigns, f.depth+1)
 	w.out = inner.out
-}
-
-// hasOperand reports whether a shell invocation names a script file to run.
-func hasOperand(args []Word) bool {
-	for _, a := range args {
-		if !strings.HasPrefix(a.Val, "-") {
-			return true
-		}
-	}
-	return false
 }
 
 func (f frame) cd(inv Invocation, cwd string) string {

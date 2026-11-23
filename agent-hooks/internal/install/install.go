@@ -36,9 +36,9 @@ const (
 )
 
 var (
-	// owned matches the commands Install writes: a single-quoted path ending in
-	// /agent-hooks, then pre or post.
-	owned = regexp.MustCompile(`^'(?:[^']|'\\'')*/agent-hooks' (pre|post)( |$)`)
+	// owned matches exactly the commands Install writes: a single-quoted path
+	// ending in /agent-hooks, then pre, post, or pre --agy.
+	owned = regexp.MustCompile(`^'(?:[^']|'\\'')*/agent-hooks' (pre|post|pre --agy)$`)
 	// legacy matches the hook commands that ran block-agy.sh.
 	legacy = regexp.MustCompile(`^((ba)?sh\s+)?['"]?[^'"\s]*/block-agy\.sh['"]?$`)
 )
@@ -56,75 +56,70 @@ func Install(p Paths, bin string, now time.Time) ([]string, error) {
 		return nil, fmt.Errorf("the binary must be named %s so uninstall can find its entries, not %s", binaryName, filepath.Base(bin))
 	}
 	command := func(args string) string { return shellQuote(bin) + " " + args }
-	wire := func(root *object) (bool, bool, error) {
+	wire := func(root *object) (bool, error) {
 		before := encode(root)
 		hooks := hooksOf(root)
-		removeLegacy(hooks)
-		upsert(hooks, "PreToolUse", "Bash", command("pre"))
-		upsert(hooks, "PostToolUse", "Bash", command("post"))
-		return encode(root) != before, false, nil
+		upsert(hooks, "PreToolUse", "Bash", command("pre"), true)
+		upsert(hooks, "PostToolUse", "Bash", command("post"), false)
+		return encode(root) != before, nil
 	}
 	return apply(now, []edit{
 		{p.Claude, true, wire},
 		{p.Codex, true, wire},
-		{p.Agy, true, func(root *object) (bool, bool, error) {
+		{p.Agy, true, func(root *object) (bool, error) {
 			if v, ok := root.get(agyHookName); ok && !ownsAgyHook(v) {
-				return false, false, errors.New("an agy hook named agent-hooks exists and is not ours; rename or remove it first")
+				return false, errors.New("an agy hook named agent-hooks exists and is not ours; rename or remove it first")
 			}
 			before := encode(root)
 			spec := newObject()
 			spec.set("PreToolUse", []any{group("run_command|manage_task", command("pre --agy"))})
 			root.set(agyHookName, spec)
-			return encode(root) != before, false, nil
+			return encode(root) != before, nil
 		}},
 	})
 }
 
 // Uninstall removes this binary's hooks and the legacy entries, leaving
-// everything else as it was. It never creates a config, and it deletes an
-// Antigravity hooks file only when removing our hook emptied it.
+// everything else as it was. It never creates or deletes a config file.
 func Uninstall(p Paths, now time.Time) ([]string, error) {
-	unwire := func(root *object) (bool, bool, error) {
+	unwire := func(root *object) (bool, error) {
 		v, _ := root.get("hooks")
 		hooks, ok := v.(*object)
 		if !ok || !strip(hooks) {
-			return false, false, nil
+			return false, nil
 		}
 		if len(hooks.keys) == 0 {
 			root.del("hooks")
 		}
-		return true, false, nil
+		return true, nil
 	}
 	return apply(now, []edit{
 		{p.Claude, false, unwire},
 		{p.Codex, false, unwire},
-		{p.Agy, false, func(root *object) (bool, bool, error) {
+		{p.Agy, false, func(root *object) (bool, error) {
 			v, ok := root.get(agyHookName)
 			if !ok || !ownsAgyHook(v) {
-				return false, false, nil
+				return false, nil
 			}
 			root.del(agyHookName)
-			return true, len(root.keys) == 0, nil
+			return true, nil
 		}},
 	})
 }
 
-// edit changes a parsed config and reports whether it changed anything and
-// whether the file should be deleted.
+// edit changes a parsed config and reports whether it changed anything.
 type edit struct {
 	path   string
 	create bool // write the file when it does not exist yet
-	change func(*object) (changed, remove bool, err error)
+	change func(*object) (changed bool, err error)
 }
 
 type pending struct {
 	path     string // the real file, after following symlinks
-	link     bool   // the configured path is a symlink
 	existed  bool
 	mode     fs.FileMode
 	original []byte
 	updated  string
-	remove   bool
 }
 
 func apply(now time.Time, edits []edit) ([]string, error) {
@@ -146,13 +141,7 @@ func apply(now time.Time, edits []edit) ([]string, error) {
 				return changed, err
 			}
 		}
-		var err error
-		if plan.remove {
-			err = os.Remove(plan.path)
-		} else {
-			err = writeAtomic(plan.path, plan.updated, plan.mode)
-		}
-		if err != nil {
+		if err := writeAtomic(plan.path, plan.updated, plan.mode); err != nil {
 			return changed, fmt.Errorf("writing %s: %w", plan.path, err)
 		}
 		changed = append(changed, plan.path)
@@ -182,11 +171,8 @@ func backup(plan pending, stamp string) error {
 
 func prepare(e edit) (pending, bool, error) {
 	plan := pending{path: e.path, mode: 0o644}
-	if info, err := os.Lstat(e.path); err == nil && info.Mode()&fs.ModeSymlink != 0 {
-		plan.link = true
-		if real, err := filepath.EvalSymlinks(e.path); err == nil {
-			plan.path = real
-		}
+	if real, err := filepath.EvalSymlinks(e.path); err == nil {
+		plan.path = real
 	}
 	data, err := os.ReadFile(plan.path)
 	root := newObject()
@@ -212,15 +198,13 @@ func prepare(e edit) (pending, bool, error) {
 			trailing = ""
 		}
 	}
-	changed, remove, err := e.change(root)
+	changed, err := e.change(root)
 	if err != nil {
 		return plan, false, fmt.Errorf("%s: %w", plan.path, err)
 	}
 	if !changed {
 		return plan, false, nil
 	}
-	// A symlinked config keeps its link: empty it rather than deleting the target.
-	plan.remove = remove && !plan.link
 	plan.updated = encode(root) + trailing
 	return plan, true, nil
 }
@@ -285,10 +269,15 @@ func hooksOf(root *object) *object {
 	return hooks
 }
 
-// upsert points the first owned handler of event at command, in place so
-// Codex's index-keyed trust for other groups is untouched, and removes any
-// other owned handlers. With none, it appends a new group.
-func upsert(hooks *object, event, matcher, command string) {
+// upsert points event at command while keeping every other group where it is,
+// since Codex keys hook trust by group and handler index:
+//   - an owned or (with legacy) block-agy.sh handler alone in its group becomes
+//     ours in place, with our matcher;
+//   - one sharing a group with other handlers is removed from it, leaving the
+//     group and its matcher as they were;
+//   - with no group to reuse, a new one is appended.
+func upsert(hooks *object, event, matcher, command string, legacy bool) {
+	ours := func(h any) bool { return isOwned(h) || legacy && isLegacy(h) }
 	v, _ := hooks.get(event)
 	groups, _ := v.([]any)
 	placed := false
@@ -300,20 +289,21 @@ func upsert(hooks *object, event, matcher, command string) {
 			hv, _ := group.get("hooks")
 			handlers, _ = hv.([]any)
 		}
+		if len(handlers) == 1 && ours(handlers[0]) {
+			if placed {
+				continue // a duplicate of ours
+			}
+			handlers[0].(*object).set("command", command)
+			group.set("matcher", matcher)
+			placed = true
+			kept = append(kept, g)
+			continue
+		}
 		var keep []any
 		for _, h := range handlers {
-			switch {
-			case !isOwned(h):
+			if !ours(h) {
 				keep = append(keep, h)
-			case !placed:
-				h.(*object).set("command", command)
-				keep = append(keep, h)
-				group.set("matcher", matcher)
-				placed = true
 			}
-		}
-		if len(handlers) > 0 && len(keep) == 0 {
-			continue
 		}
 		if len(keep) != len(handlers) {
 			group.set("hooks", keep)
@@ -326,17 +316,10 @@ func upsert(hooks *object, event, matcher, command string) {
 	hooks.set(event, kept)
 }
 
-// removeLegacy drops block-agy.sh handlers, and groups and events they emptied.
-func removeLegacy(hooks *object) { filter(hooks, isLegacy) }
-
-// strip removes owned and legacy handlers and reports whether it removed any.
-func strip(hooks *object) bool {
-	return filter(hooks, func(h any) bool { return isOwned(h) || isLegacy(h) })
-}
-
-// filter removes handlers matching drop. Groups and events are deleted only
+// strip removes owned and legacy handlers, dropping groups and events only
 // when that removal emptied them. It reports whether it removed anything.
-func filter(hooks *object, drop func(any) bool) bool {
+func strip(hooks *object) bool {
+	drop := func(h any) bool { return isOwned(h) || isLegacy(h) }
 	removedAny := false
 	for _, event := range append([]string(nil), hooks.keys...) {
 		v, _ := hooks.get(event)

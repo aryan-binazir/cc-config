@@ -67,7 +67,8 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 		return names(o.vals["-B"], production) || names(o.vals["-C"], production)
 	case "update-ref":
 		o := parseOpts(g.args, "m", nil, nil)
-		return len(o.pos) > 0 && isProduction(o.pos[0].Val)
+		refs := append(append([]shell.Word{}, o.pos...), o.paths...)
+		return len(refs) > 0 && isProduction(refs[0].Val)
 	case "reset":
 		o := parseOpts(g.args, "", nil, nil)
 		moves := o.has("--hard", "--soft", "--keep", "--merge", "--mixed")
@@ -124,6 +125,9 @@ func pushesProduction(c *ctx, g *gitCmd) bool {
 	if o.has("--all", "--branches") && c.hasLocalProduction(g) {
 		return true
 	}
+	if o.has("--prune") && c.hasRemoteProduction(g, pushRemote(o)) && !c.hasLocalProduction(g) {
+		return true // pruning deletes remote branches with no local counterpart
+	}
 	if len(refspecs) == 0 {
 		if c.currentBranch(g) == production {
 			return true
@@ -137,14 +141,18 @@ func pushesProduction(c *ctx, g *gitCmd) bool {
 	}
 	for _, spec := range refspecs {
 		spec = strings.TrimPrefix(spec, "+")
-		dst := spec
-		if _, d, ok := strings.Cut(spec, ":"); ok && !o.has("-d") {
-			dst = d
+		src, dst := spec, spec
+		if s, d, ok := strings.Cut(spec, ":"); ok && !o.has("-d") {
+			src, dst = s, d
 		}
 		switch {
-		case dst == "" || strings.Contains(dst, "*"):
-			// `:` pushes every matching branch; a wildcard maps many.
+		case src == "" && dst == "":
+			// `:` pushes every branch that exists on both sides.
 			if c.hasLocalProduction(g) {
+				return true
+			}
+		case strings.Contains(dst, "*"):
+			if c.wildcardPushesProduction(g, src, dst) {
 				return true
 			}
 		case dst == "HEAD" || dst == "@":
@@ -166,19 +174,52 @@ func pushRefspecs(o opts) []string {
 	return values(append(append([]shell.Word{}, o.pos[min(1, len(o.pos)):]...), o.paths...))
 }
 
+// pushRemote returns the remote a push names, defaulting to origin.
+func pushRemote(o opts) string {
+	switch {
+	case len(o.vals["--repo"]) > 0:
+		return o.vals["--repo"][len(o.vals["--repo"])-1].Val
+	case len(o.pos) > 0:
+		return o.pos[0].Val
+	case len(o.paths) > 0:
+		return o.paths[0].Val
+	}
+	return "origin"
+}
+
 // configuredRefspecs returns the remote's configured push refspecs, which
 // git uses when the command names none.
 func configuredRefspecs(c *ctx, g *gitCmd, o opts) []string {
-	remote := "origin"
-	if len(o.pos) > 0 {
-		remote = o.pos[0].Val
-	}
-	out, _ := c.git(g, "config", "--get-all", "remote."+remote+".push")
+	out, _ := c.git(g, "config", "--get-all", "remote."+pushRemote(o)+".push")
 	return strings.Fields(out)
+}
+
+// wildcardPushesProduction reports whether a src:dst wildcard refspec maps an
+// existing local ref onto refs/heads/production.
+func (c *ctx) wildcardPushesProduction(g *gitCmd, src, dst string) bool {
+	full := func(ref string) string {
+		if strings.HasPrefix(ref, "refs/") {
+			return ref
+		}
+		return "refs/heads/" + ref
+	}
+	target := "refs/heads/" + production
+	prefix, suffix, _ := strings.Cut(full(dst), "*")
+	if !strings.HasPrefix(target, prefix) || !strings.HasSuffix(target, suffix) || len(target) < len(prefix)+len(suffix) {
+		return false
+	}
+	match := target[len(prefix) : len(target)-len(suffix)]
+	_, ok := c.git(g, "rev-parse", "--verify", "-q", strings.Replace(full(src), "*", match, 1))
+	return ok
 }
 
 func (c *ctx) hasLocalProduction(g *gitCmd) bool {
 	_, ok := c.git(g, "rev-parse", "--verify", "-q", "refs/heads/"+production)
+	return ok
+}
+
+func (c *ctx) hasRemoteProduction(g *gitCmd, remote string) bool {
+	_, ok := c.git(g, "rev-parse", "--verify", "-q", "refs/remotes/"+remote+"/"+production)
 	return ok
 }
 

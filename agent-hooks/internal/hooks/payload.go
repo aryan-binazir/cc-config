@@ -14,10 +14,10 @@ type call struct {
 	cwd      string   // "" when unknown
 }
 
-// fileTools take a "command" field that is not a shell command.
-var fileTools = map[string]bool{
-	"Write": true, "Edit": true, "MultiEdit": true, "NotebookEdit": true,
-	"apply_patch": true, "write": true, "edit": true,
+// shellTools are the tool names whose input runs in, or types into, a shell:
+// Claude Code's Bash, Codex's Bash/exec_command/shell/write_stdin, pi's bash.
+var shellTools = map[string]bool{
+	"Bash": true, "bash": true, "shell": true, "local_shell": true, "exec_command": true, "write_stdin": true,
 }
 
 type payload struct {
@@ -41,7 +41,7 @@ func decode(data []byte) call {
 		return decodeAgy(p.ToolCall.Name, p.ToolCall.Args)
 	}
 	c := call{cwd: p.Cwd}
-	if fileTools[p.ToolName] {
+	if !shellTools[p.ToolName] {
 		return c
 	}
 	for _, key := range []string{"command", "cmd", "chars"} {

@@ -41,13 +41,13 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 	switch g.sub {
 	case "add":
 		o := parseOpts(g.args, "", []string{"--chmod", "--pathspec-from-file"}, addAliases)
-		if o.has("-n", "-p", "-i", "-e", "--pathspec-from-file") {
+		if o.has("-n", "-p", "-i", "-e") {
 			return ""
 		}
 		specs := append(o.pos, o.paths...)
 		found = c.explicitSecrets(g, specs)
-		if o.has("-A", "-u") || broad(g.dir, specs, c.opts.Home) {
-			found = append(found, c.wouldAdd(g)...)
+		if o.has("-A", "-u", "--pathspec-from-file") || broad(g.dir, specs, c.opts.Home) {
+			found = append(found, c.wouldAdd(g, o, specs)...)
 		}
 	case "commit":
 		o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
@@ -83,10 +83,23 @@ func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 	return found
 }
 
-// wouldAdd asks `git add --dry-run` with the same arguments which files it
-// would stage, so ignore rules, -f, -u, and pathspec magic match git exactly.
-func (c *ctx) wouldAdd(g *gitCmd) []string {
-	out, ok := c.git(g, append([]string{"add", "--dry-run"}, values(g.args)...)...)
+// wouldAdd asks `git add --dry-run` which files the add would stage, so ignore
+// rules, -f, -u, and pathspec magic match git exactly. It passes only flags it
+// understands, never the agent's own arguments, so the lookup cannot write.
+func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
+	args := []string{"add", "--dry-run"}
+	for _, f := range [][2]string{{"-f", "--force"}, {"-A", "--all"}, {"-u", "--update"}, {"--pathspec-file-nul", "--pathspec-file-nul"}} {
+		if o.has(f[0]) {
+			args = append(args, f[1])
+		}
+	}
+	for _, file := range o.vals["--pathspec-from-file"] {
+		args = append(args, "--pathspec-from-file="+file.Val)
+	}
+	if len(specs) > 0 {
+		args = append(append(args, "--"), values(specs)...)
+	}
+	out, ok := c.git(g, args...)
 	if !ok {
 		return nil
 	}

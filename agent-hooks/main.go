@@ -46,7 +46,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, "agent-hooks: cannot find the home directory:", homeErr)
 			return 1
 		}
-		return wire(args[0], home, stdout, stderr)
+		return wire(args[0], hooksYAML, home, stdout, stderr)
 	}
 	fmt.Fprintln(stderr, usage)
 	return 64
@@ -97,7 +97,11 @@ func stateDir(home string) string {
 	return filepath.Join(home, ".local", "state", "agent-hooks")
 }
 
-func wire(action, home string, stdout, stderr io.Writer) int {
+func wire(action, switches, home string, stdout, stderr io.Writer) int {
+	if _, err := parseSwitches(switches); err != nil && action == "install" {
+		fmt.Fprintln(stderr, "agent-hooks: refusing to install: hooks.yaml:", err)
+		return 1
+	}
 	paths := install.DefaultPaths(home)
 	var changed []string
 	var err error
