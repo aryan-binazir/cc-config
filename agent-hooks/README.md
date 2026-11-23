@@ -25,8 +25,11 @@ into the binary, so run `make install` after editing it.
 | `rg-replace-flag` | Nothing. After `rg -r`, it adds a note that `-r` means `--replace` (Claude Code and Codex only) | n/a |
 
 To let one command through, put the override at its front:
-`AGENT_HOOKS_ALLOW=production git push origin production`. Separate several
-names with commas. Each use is logged as a JSON line to
+`AGENT_HOOKS_ALLOW=production git push origin production`. Exporting it
+earlier in the same tool call also works, as it would in the shell:
+`export AGENT_HOOKS_ALLOW=production && gh pr merge 5 …`. An export inside a
+subshell, pipeline, or `$(...)` does not carry over. Separate several names
+with commas. Each use is logged as a JSON line to
 `~/.local/state/agent-hooks/overrides.log` (or under `$XDG_STATE_HOME`).
 
 ## Install

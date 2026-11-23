@@ -208,6 +208,40 @@ func TestNoSecretsOverrideIsLogged(t *testing.T) {
 			t.Errorf("%q should be allowed: %+v", command, res)
 		}
 	}
+}
+
+func TestOverrideExportedEarlierInTheCommand(t *testing.T) {
+	r := newRepo(t)
+	r.expect("no-secrets-commit", false,
+		"export AGENT_HOOKS_ALLOW=secrets; git add .env",
+		"export AGENT_HOOKS_ALLOW=secrets && git add .env",
+		"declare -x AGENT_HOOKS_ALLOW=secrets; git add .env",
+		"typeset -gx AGENT_HOOKS_ALLOW=secrets; git add .env",
+		"export AGENT_HOOKS_ALLOW; AGENT_HOOKS_ALLOW=secrets; git add .env",
+		"export AGENT_HOOKS_ALLOW=destructive; AGENT_HOOKS_ALLOW+=,secrets; git add .env",
+		"{ export AGENT_HOOKS_ALLOW=secrets; }; git add .env",
+		"if true; then export AGENT_HOOKS_ALLOW=secrets; fi; git add .env",
+		"export AGENT_HOOKS_ALLOW=secrets; bash -c 'git add .env'",
+		"bash -c 'export AGENT_HOOKS_ALLOW=secrets; git add .env'",
+	)
+	r.expect("no-secrets-commit", true,
+		"AGENT_HOOKS_ALLOW=secrets; git add .env",
+		"declare AGENT_HOOKS_ALLOW=secrets; git add .env",
+		"git add .env; export AGENT_HOOKS_ALLOW=secrets",
+		"(export AGENT_HOOKS_ALLOW=secrets); git add .env",
+		"echo $(export AGENT_HOOKS_ALLOW=secrets); git add .env",
+		"export AGENT_HOOKS_ALLOW=secrets | true; git add .env",
+		"export AGENT_HOOKS_ALLOW=secrets & git add .env",
+		"f() { export AGENT_HOOKS_ALLOW=secrets; }; git add .env",
+		"export AGENT_HOOKS_ALLOW=secrets; unset AGENT_HOOKS_ALLOW; git add .env",
+		"export AGENT_HOOKS_ALLOW=secrets; export -n AGENT_HOOKS_ALLOW; git add .env",
+		"bash -c 'export AGENT_HOOKS_ALLOW=secrets'; git add .env",
+	)
+}
+
+func TestOverrideLogSkipsNoOps(t *testing.T) {
+	r := newRepo(t)
+	state := t.TempDir()
 	before := len(overrideLog(t, state))
 	runOpts(t, Options{Phase: "pre", Enabled: switches("no-secrets-commit"), StateDir: state}, bashIn(r.dir, "AGENT_HOOKS_ALLOW=secrets git add README.md"))
 	if len(overrideLog(t, state)) != before {
@@ -302,7 +336,8 @@ func TestNoProductionPRBase(t *testing.T) {
 	if res := run(t, "no-production", bash("gh pr merge 5")); res.Exit != 0 {
 		t.Errorf("unknown cwd should skip the lookup: %+v", res)
 	}
-	r.expect("no-production", false, "AGENT_HOOKS_ALLOW=production gh pr merge 5", "gh pr merge 5 --disable-auto")
+	r.expect("no-production", false, "AGENT_HOOKS_ALLOW=production gh pr merge 5", "gh pr merge 5 --disable-auto",
+		"export AGENT_HOOKS_ALLOW=production && gh pr ready 5 && gh pr merge 5 --merge --match-head-commit abc")
 	t.Setenv("PATH", t.TempDir())
 	r.expect("no-production", false, "gh pr merge 5")
 }
