@@ -17,5 +17,8 @@ export default function (pi) {
       timeout: 10_000,
     });
     if (run.status === 2) return { block: true, reason: run.stderr.trim() };
+    if (run.status !== 0 && /\b(agy|antigravity|acg)\b/.test(JSON.stringify(input))) {
+      return { block: true, reason: `block-agy check could not run (${run.error?.message ?? `exit ${run.status}`}); not running anything that mentions agy.` };
+    }
   });
 }
