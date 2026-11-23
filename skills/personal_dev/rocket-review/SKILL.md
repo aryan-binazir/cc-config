@@ -94,7 +94,7 @@ Resolve the PR non-interactively; stop if resolution fails.
   differs from the checked-out branch. Attach supplied screenshots with
   `gh pr edit <pr> --attach <file>`.
 - No PR: push and freshness-check first, then
-  `gh pr create --draft --head <current-branch> --title ... --body-file ...`,
+  `gh pr create --draft --assignee @me --head <current-branch> --title ... --body-file ...`,
   spelling out every push/fork decision in flags and adding `--attach <file>`
   per supplied screenshot. Follow repo PR title/body
   rules and stop if they can't be met; when the title derives from commit

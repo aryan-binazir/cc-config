@@ -1,18 +1,19 @@
 // Blocks agent-run commands that launch the Antigravity CLI (agy / antigravity / acg)
-// in any mode. The check lives in the shared Claude Code / Codex hook script.
+// in any mode. The check lives in agent-hooks (cc-config/agent-hooks), shared with
+// Claude Code, Codex and agy.
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 
-const script = path.join(os.homedir(), ".claude/hooks/block-agy.sh");
+const bin = path.join(os.homedir(), ".local/bin/agent-hooks");
 
 export default function (pi) {
-  pi.on("tool_call", async (event) => {
+  pi.on("tool_call", async (event, ctx) => {
     const input = event.input ?? {};
     if (input.command === undefined && input.cmd === undefined && input.chars === undefined) return;
 
-    const run = spawnSync("bash", [script], {
-      input: JSON.stringify({ tool_name: event.toolName, tool_input: input }),
+    const run = spawnSync(bin, ["pre", "--only=block-agy"], {
+      input: JSON.stringify({ tool_name: event.toolName, tool_input: input, cwd: ctx?.cwd }),
       encoding: "utf8",
       timeout: 10_000,
     });
