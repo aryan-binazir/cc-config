@@ -45,20 +45,16 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 			return ""
 		}
 		specs := append(o.pos, o.paths...)
-		found = explicitSecrets(specs)
+		found = c.explicitSecrets(g, specs)
 		if o.has("-A", "-u") || broad(g.dir, specs, c.opts.Home) {
-			untracked := "--untracked-files=all"
-			if o.has("-u") {
-				untracked = "--untracked-files=no"
-			}
-			found = append(found, c.secretChanges(g.dir, withPaths([]string{untracked}, specs), false)...)
+			found = append(found, c.wouldAdd(g)...)
 		}
 	case "commit":
 		o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
 		specs := append(o.pos, o.paths...)
-		found = explicitSecrets(specs)
+		found = c.explicitSecrets(g, specs)
 		if o.has("-a") || broad(g.dir, specs, c.opts.Home) {
-			found = append(found, c.secretChanges(g.dir, withPaths([]string{"--untracked-files=no"}, specs), true)...)
+			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs), true)...)
 		}
 	default:
 		return ""
@@ -69,11 +65,35 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 	return fmt.Sprintf("Don't stage credentials: %s. Unstage or .gitignore them. If the user explicitly asked to commit them, rerun with AGENT_HOOKS_ALLOW=secrets.", strings.Join(dedupe(found), ", "))
 }}
 
-func explicitSecrets(specs []shell.Word) []string {
+// explicitSecrets lists named paths that look like credentials, except
+// tracked files gone from disk: staging those records a deletion.
+func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 	var found []string
 	for _, s := range specs {
-		if !strings.ContainsAny(s.Val, "*?[") && isSecret(s.Val) {
-			found = append(found, s.Val)
+		if strings.ContainsAny(s.Val, "*?[") || !isSecret(s.Val) {
+			continue
+		}
+		if full := shell.Resolve(g.dir, s.Val, c.opts.Home); full != "" && !exists(full) {
+			if _, tracked := c.git(g, "ls-files", "--error-unmatch", "--", s.Val); tracked {
+				continue
+			}
+		}
+		found = append(found, s.Val)
+	}
+	return found
+}
+
+// wouldAdd asks `git add --dry-run` with the same arguments which files it
+// would stage, so ignore rules, -f, -u, and pathspec magic match git exactly.
+func (c *ctx) wouldAdd(g *gitCmd) []string {
+	out, ok := c.git(g, append([]string{"add", "--dry-run"}, values(g.args)...)...)
+	if !ok {
+		return nil
+	}
+	var found []string
+	for _, line := range strings.Split(out, "\n") {
+		if p, ok := strings.CutPrefix(line, "add '"); ok && isSecret(strings.TrimSuffix(p, "'")) {
+			found = append(found, strings.TrimSuffix(p, "'"))
 		}
 	}
 	return found
@@ -90,16 +110,17 @@ func broad(dir string, specs []shell.Word, home string) bool {
 }
 
 // secretChanges lists changed, non-deleted files that look like credentials.
-// worktreeOnly limits it to changes `git commit -a` would stage.
-func (c *ctx) secretChanges(dir string, statusArgs []string, worktreeOnly bool) []string {
-	entries, ok := c.status(dir, statusArgs...)
+// tracked limits it to what `git commit -a` commits: staged and modified
+// tracked files.
+func (c *ctx) secretChanges(g *gitCmd, statusArgs []string, tracked bool) []string {
+	entries, ok := c.status(g, statusArgs...)
 	if !ok {
 		return nil
 	}
 	var found []string
 	for _, e := range entries {
 		x, y := e.xy[0], e.xy[1]
-		if y == 'D' || (x == 'D' && y == ' ') || (worktreeOnly && y == ' ') {
+		if y == 'D' || (x == 'D' && y == ' ') || (tracked && x == '?') {
 			continue
 		}
 		if isSecret(e.path) {

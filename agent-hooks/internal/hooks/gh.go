@@ -87,6 +87,7 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 		arg := rest[i]
 		switch {
 		case arg == "--":
+			pr.positionals = append(pr.positionals, rest[i+1:]...)
 			i = len(rest)
 		case strings.HasPrefix(arg, "--"):
 			name, value, hasValue := strings.Cut(arg, "=")
@@ -142,13 +143,14 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 	return pr
 }
 
+// has reports whether the last value given for a flag is non-empty, as gh
+// keeps only the last value of a scalar flag.
 func (pr *ghPr) has(name string) bool {
-	for _, v := range pr.values[name] {
-		if v != "" {
-			return true
-		}
+	vals := pr.values[name]
+	if name == "--assignee" {
+		return slices.ContainsFunc(vals, func(v string) bool { return v != "" })
 	}
-	return false
+	return len(vals) > 0 && vals[len(vals)-1] != ""
 }
 
 var draftPrs = hook{name: "draft-prs", phase: "pre", check: func(_ *ctx, inv shell.Invocation) string {
@@ -206,43 +208,53 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 	args := inv.Strings()
 	i := 0
 	for i < len(args) && strings.HasPrefix(args[i], "-") {
-		i++ // global flags such as --repo are not valid before api; skip anything flag-like
+		i++ // gh takes no global options with values before a command
 	}
 	if i >= len(args) || args[i] != "api" {
 		return nil
 	}
+	rest := args[i+1:]
 	api := &ghAPI{}
 	body := false
-	for i++; i < len(args); i++ {
-		arg := args[i]
+	for i := 0; i < len(rest); i++ {
+		arg := rest[i]
 		name, value, hasValue := strings.Cut(arg, "=")
 		switch {
+		case arg == "--help" || arg == "-h":
+			return nil
 		case strings.HasPrefix(arg, "--") && slices.Contains(ghAPIValueLong, name):
-			if !hasValue && i+1 < len(args) {
+			if !hasValue && i+1 < len(rest) {
 				i++
-				value = args[i]
+				value = rest[i]
 			}
-			if name == "--method" {
+			switch name {
+			case "--method":
 				api.method = strings.ToUpper(value)
-			} else if name != "--header" && name != "--jq" && name != "--template" && name != "--preview" && name != "--hostname" && name != "--cache" {
+			case "--raw-field", "--field", "--input":
 				body = true
 			}
 		case strings.HasPrefix(arg, "--"):
 		case strings.HasPrefix(arg, "-") && len(arg) > 1:
-			flag := arg[1]
-			if strings.IndexByte(ghAPIValueShort, flag) < 0 {
-				continue
-			}
-			value := arg[2:]
-			if value == "" && i+1 < len(args) {
-				i++
-				value = args[i]
-			}
-			switch flag {
-			case 'X':
-				api.method = strings.ToUpper(value)
-			case 'f', 'F':
-				body = true
+			for j := 1; j < len(arg); j++ {
+				flag := arg[j]
+				if flag == 'h' {
+					return nil
+				}
+				if strings.IndexByte(ghAPIValueShort, flag) < 0 {
+					continue
+				}
+				value := strings.TrimPrefix(arg[j+1:], "=")
+				if j == len(arg)-1 && i+1 < len(rest) {
+					i++
+					value = rest[i]
+				}
+				switch flag {
+				case 'X':
+					api.method = strings.ToUpper(value)
+				case 'f', 'F':
+					body = true
+				}
+				break
 			}
 		default:
 			if api.endpoint == "" {

@@ -41,21 +41,22 @@ func newCtx(c call, o Options) *ctx {
 	return x
 }
 
-// git runs a read-only git command in dir, cached for the call. ok is false
-// when it fails, times out, or lookups are off; callers then allow.
-func (c *ctx) git(dir string, args ...string) (string, bool) {
-	return c.run(gitTimeout, dir, "git", args...)
+// git runs a read-only git command for g's repository, cached for the call.
+// ok is false when it fails, times out, overflows, or lookups are off;
+// callers then allow. Repository hooks such as fsmonitor are disabled.
+func (c *ctx) git(g *gitCmd, args ...string) (string, bool) {
+	return c.run(gitTimeout, g.dir, g.env, "git", append([]string{"-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"}, args...)...)
 }
 
-func (c *ctx) gh(dir string, args ...string) (string, bool) {
-	return c.run(ghTimeout, dir, "gh", args...)
+func (c *ctx) gh(dir string, env []string, args ...string) (string, bool) {
+	return c.run(ghTimeout, dir, env, "gh", args...)
 }
 
-func (c *ctx) run(timeout time.Duration, dir, name string, args ...string) (string, bool) {
+func (c *ctx) run(timeout time.Duration, dir string, env []string, name string, args ...string) (string, bool) {
 	if c.lookupsOff || dir == "" {
 		return "", false
 	}
-	key := dir + "\x00" + name + "\x00" + strings.Join(args, "\x00")
+	key := dir + "\x00" + strings.Join(env, "\x00") + "\x00" + name + "\x00" + strings.Join(args, "\x00")
 	if hit, ok := c.cache[key]; ok {
 		return hit.out, hit.ok
 	}
@@ -63,11 +64,13 @@ func (c *ctx) run(timeout time.Duration, dir, name string, args ...string) (stri
 	defer cancel()
 	cmd := exec.CommandContext(cx, name, args...)
 	cmd.Dir = dir
-	cmd.Env = append(cmd.Environ(), "GIT_OPTIONAL_LOCKS=0", "GH_PROMPT_DISABLED=1", "GIT_TERMINAL_PROMPT=0")
+	cmd.Env = append(append(cmd.Environ(), "GIT_OPTIONAL_LOCKS=0", "GH_PROMPT_DISABLED=1", "GIT_TERMINAL_PROMPT=0"), env...)
+	cmd.WaitDelay = 100 * time.Millisecond // a child holding stdout open cannot outlive the timeout
 	var out bytes.Buffer
-	cmd.Stdout = &limited{w: &out, n: 4 << 20}
+	capped := &limited{w: &out, n: 64 << 20}
+	cmd.Stdout = capped
 	err := cmd.Run()
-	res := lookup{out: out.String(), ok: err == nil}
+	res := lookup{out: out.String(), ok: err == nil && !capped.overflow}
 	if c.cache == nil {
 		c.cache = map[string]lookup{}
 	}
@@ -76,18 +79,20 @@ func (c *ctx) run(timeout time.Duration, dir, name string, args ...string) (stri
 }
 
 // limited stops buffering after n bytes so a huge output cannot exhaust memory.
+// An overflowing lookup counts as failed rather than as a complete answer.
 type limited struct {
-	w *bytes.Buffer
-	n int
+	w        *bytes.Buffer
+	n        int
+	overflow bool
 }
 
 func (l *limited) Write(p []byte) (int, error) {
-	if room := l.n - l.w.Len(); room > 0 {
-		if len(p) > room {
-			l.w.Write(p[:room])
-		} else {
-			l.w.Write(p)
-		}
+	n := len(p)
+	room := l.n - l.w.Len()
+	if len(p) > room {
+		l.overflow = true
+		p = p[:max(room, 0)]
 	}
-	return len(p), nil
+	l.w.Write(p)
+	return n, nil
 }

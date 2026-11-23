@@ -54,10 +54,11 @@ and writes a `.bak-<timestamp>` copy before any change. It also removes the old
   - A block exits 2 with the reason on stderr.
   - Advice is `{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": …}}` on stdout.
   - Shell commands arrive in `tool_input.command` (a string or an argv array), `.cmd`, or `.chars`.
+  - Codex 0.171 sends the shell as `Bash`, including commands nested in code mode. It never sends `write_stdin` to hooks, so input typed into a running terminal isn't checked there.
 - **agy** (`pre --agy`): the payload is camelCase, `{toolCall: {name: "run_command", args: {CommandLine, Cwd}}, …}`.
   - The answer is always JSON on stdout: `{"decision": "allow"}` or `{"decision": "deny", "reason": …}`.
 - A malformed or unknown payload is allowed.
-- An internal fault exits 1. Claude Code and Codex report that without blocking, and the pi wrapper treats it as a failure.
+- An internal fault, including an invalid embedded `hooks.yaml`, exits 1. Claude Code and Codex report that without blocking, and the pi wrapper treats it as a failure.
 - Each `git` / `gh` lookup times out after 1–2 s, and a failed lookup allows the call.
 
 ## Performance

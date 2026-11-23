@@ -49,7 +49,7 @@ func parseObject(data []byte) (*object, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := dec.Token(); err == nil {
+	if rest := bytes.TrimSpace(data[dec.InputOffset():]); len(rest) > 0 {
 		return nil, errors.New("trailing data after the JSON object")
 	}
 	o, ok := v.(*object)

@@ -24,24 +24,25 @@ var commitFormat = hook{name: "commit-format", phase: "pre", check: func(c *ctx,
 		return ""
 	}
 	o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
-	if o.has("--no-edit", "--fixup", "--squash", "-C", "-c", "--dry-run") {
+	if o.has("--fixup", "--squash", "-C", "-c", "--dry-run") {
 		return ""
 	}
 	var message string
+	dynamic := false
 	switch {
 	case len(o.vals["-m"]) > 0:
 		w := o.vals["-m"][0]
-		if w.Dynamic {
-			return ""
-		}
-		message = w.Val
+		message, dynamic = w.Val, w.Dynamic
 	case len(o.vals["-F"]) > 0 && o.vals["-F"][0].Val == "-" && inv.Stdin != nil:
-		message = *inv.Stdin
+		message, dynamic = *inv.Stdin, inv.StdinDynamic
 	default:
-		return "" // the editor writes the message
+		return "" // the editor, a file, or --no-edit supplies the message
 	}
 	subject, _, _ := strings.Cut(strings.TrimLeft(message, " \t\n"), "\n")
 	subject = strings.TrimRight(subject, " \t\r")
+	if dynamic && strings.ContainsAny(subject, "$`") {
+		return "" // the subject depends on an expansion
+	}
 	for _, p := range []string{"fixup! ", "squash! ", "amend! "} {
 		if strings.HasPrefix(subject, p) {
 			return ""
@@ -50,7 +51,7 @@ var commitFormat = hook{name: "commit-format", phase: "pre", check: func(c *ctx,
 	if !commitSubject.MatchString(subject) {
 		return fmt.Sprintf("Commit messages must look like `type(PROJECT): description`: type is one of feat, fix, chore, refactor, test, docs, build, ci, revert; PROJECT is the Jira project key (e.g. BBA) or no-ticket. Got %q.", subject)
 	}
-	first, count := c.firstBranchCommit(g.dir)
+	first, count := c.firstBranchCommit(g)
 	if count == 0 || (o.has("--amend") && count == 1) {
 		return ""
 	}
@@ -64,11 +65,11 @@ var commitFormat = hook{name: "commit-format", phase: "pre", check: func(c *ctx,
 
 // firstBranchCommit returns the subject of the oldest commit on HEAD's
 // first-parent chain since the default branch, and how many there are.
-func (c *ctx) firstBranchCommit(dir string) (string, int) {
+func (c *ctx) firstBranchCommit(g *gitCmd) (string, int) {
 	for _, base := range []string{"origin/HEAD", "origin/main", "origin/master", "main", "master"} {
-		out, ok := c.git(dir, "log", "--first-parent", "--reverse", "--format=%s", base+"..HEAD")
+		out, ok := c.git(g, "log", "--first-parent", "--reverse", "--format=%s", base+"..HEAD")
 		if !ok {
-			if c.lookupsOff || dir == "" {
+			if c.lookupsOff || g.dir == "" {
 				return "", 0
 			}
 			continue

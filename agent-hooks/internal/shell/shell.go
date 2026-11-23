@@ -26,9 +26,11 @@ type Word struct {
 type Invocation struct {
 	Assigns map[string]string // leading NAME=value pairs, inherited by wrapped and nested commands
 	Args    []Word            // Args[0] is the command name
-	Stdin   *string           // here-document or here-string body, when literal
-	Cwd     string            // directory it runs in; "" when unknown
-	Source  string            // the source text of the whole command
+	Stdin   *string           // here-document or here-string body on fd 0
+	// StdinDynamic marks a Stdin that contains expansions, kept as source text.
+	StdinDynamic bool
+	Cwd          string // directory it runs in; "" when unknown
+	Source       string // the source text of the whole command
 }
 
 // Name is the basename of the command word.
@@ -145,6 +147,9 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd string) string {
 	case *syntax.CaseClause:
 		f.substs(w, c.Word, cwd)
 		for _, item := range c.Items {
+			for _, pattern := range item.Patterns {
+				f.substs(w, pattern, cwd)
+			}
 			f.stmts(w, item.Stmts, cwd)
 		}
 	case *syntax.FuncDecl:
@@ -206,17 +211,20 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd string) s
 		inv.Args = append(inv.Args, f.word(arg))
 	}
 	for _, r := range s.Redirs {
+		if r.N != nil && r.N.Value != "0" {
+			continue
+		}
+		var body Word
 		switch r.Op {
 		case syntax.Hdoc, syntax.DashHdoc:
-			if body := f.word(r.Hdoc); !body.Dynamic {
-				inv.Stdin = &body.Val
-			}
+			body = f.heredoc(r)
 		case syntax.WordHdoc:
-			if body := f.word(r.Word); !body.Dynamic {
-				v := body.Val + "\n"
-				inv.Stdin = &v
-			}
+			body = f.word(r.Word)
+			body.Val += "\n"
+		default:
+			continue
 		}
+		inv.Stdin, inv.StdinDynamic = &body.Val, body.Dynamic
 	}
 	f.emit(w, inv)
 	if inv.Args[0].Val == "cd" {
@@ -235,30 +243,51 @@ func (f frame) emit(w *walker, inv Invocation) {
 	args := inv.Args[1:]
 	switch name {
 	case "bash", "sh", "zsh", "dash", "ksh", "fish":
-		for i, a := range args {
-			if a.Val == "--" || !strings.HasPrefix(a.Val, "-") {
+		command := false
+		i := 0
+		for ; i < len(args); i++ {
+			a := args[i].Val
+			if a == "--" || a == "-" || !(strings.HasPrefix(a, "-") || strings.HasPrefix(a, "+")) {
 				break
 			}
-			if !strings.HasPrefix(a.Val, "--") && strings.Contains(a.Val, "c") {
-				if i+1 < len(args) && !args[i+1].Dynamic {
-					f.nested(w, args[i+1].Val, inv)
-				}
-				return
+			switch {
+			case a == "-o" || a == "+o" || a == "-O" || a == "+O":
+				i++ // the option name
+			case !strings.HasPrefix(a, "--") && strings.Contains(a, "c"):
+				command = true
 			}
+		}
+		if command {
+			if i < len(args) && args[i].Val == "--" {
+				i++
+			}
+			if i < len(args) && !args[i].Dynamic {
+				f.nested(w, args[i].Val, inv)
+			}
+			return
 		}
 		if inv.Stdin != nil && !hasOperand(args) {
 			f.nested(w, *inv.Stdin, inv)
 		}
 	case "eval":
+		if len(args) > 0 && args[0].Val == "--" {
+			args = args[1:]
+		}
 		parts := make([]string, 0, len(args))
 		for _, a := range args {
 			parts = append(parts, a.Val)
 		}
 		f.nested(w, strings.Join(parts, " "), inv)
 	default:
-		if rest, env, ok := unwrap(name, args); ok && len(rest) > 0 {
+		if rest, env, chdir, ok := unwrap(name, args); ok && len(rest) > 0 {
 			inner := inv
 			inner.Args = rest
+			if chdir != nil {
+				inner.Cwd = ""
+				if !chdir.Dynamic {
+					inner.Cwd = Resolve(inv.Cwd, chdir.Val, f.home)
+				}
+			}
 			if len(env) > 0 {
 				inner.Assigns = copyEnv(inv.Assigns)
 				for k, v := range env {

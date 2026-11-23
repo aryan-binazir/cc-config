@@ -342,3 +342,108 @@ func TestMalformedConfigIsLeftAlone(t *testing.T) {
 		t.Errorf("malformed file was modified: %q", got)
 	}
 }
+
+func TestBackupsNeverOverwriteEachOther(t *testing.T) {
+	p := setup(t, claudeOriginal, codexOriginal, "")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Uninstall(p, now); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, p.Claude+".bak-20261123T120000Z"); got != claudeOriginal {
+		t.Errorf("original backup overwritten: %q", got)
+	}
+	if _, err := os.Stat(p.Claude + ".bak-20261123T120000Z-2"); err != nil {
+		t.Errorf("second backup missing: %v", err)
+	}
+}
+
+func TestOnlyOwnedAndLegacyEntriesAreTouched(t *testing.T) {
+	mention := strings.Replace(claudeOriginal, `"bash '/home/ar/.claude/hooks/herdr-agent-state.sh' session"`, `"echo see block-agy.sh docs"`, 1)
+	p := setup(t, mention, codexOriginal, `{"agent-hooks": {"PreToolUse": [{"matcher": "", "hooks": [{"command": "./mine.sh"}]}]}}`)
+	if _, err := Install(p, bin, now); err == nil || !strings.Contains(err.Error(), "agent-hooks") {
+		t.Fatalf("want a refusal to replace someone else's agent-hooks entry, got %v", err)
+	}
+	p = setup(t, mention, codexOriginal, "")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(read(t, p.Claude), "echo see block-agy.sh docs") {
+		t.Error("removed a command that only mentions block-agy.sh")
+	}
+}
+
+func TestTrailingGarbageIsRejected(t *testing.T) {
+	p := setup(t, `{}x`, codexOriginal, "")
+	if _, err := Install(p, bin, now); err == nil {
+		t.Fatal("accepted trailing garbage")
+	}
+}
+
+func TestReinstallKeepsGroupPositions(t *testing.T) {
+	codex := `{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/old/agent-hooks' pre",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "custom",
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}`
+	p := setup(t, "", codex, "")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	pre := handlers(t, decode(t, read(t, p.Codex)), "PreToolUse")
+	if len(pre) != 2 || pre[0]["command"] != "'"+bin+"' pre" || pre[1]["command"] != "custom" {
+		t.Errorf("groups moved: %v", pre)
+	}
+}
+
+func TestUninstallLeavesUntouchedHomesAlone(t *testing.T) {
+	odd := "{\"hooks\":{\"SessionStart\":[]},\"x\":1}"
+	p := setup(t, "", odd, "{}")
+	changed, err := Uninstall(p, now)
+	if err != nil || len(changed) != 0 {
+		t.Fatalf("changed %v (%v)", changed, err)
+	}
+	if _, err := os.Stat(p.Claude); !os.IsNotExist(err) {
+		t.Error("created a Claude config")
+	}
+	if read(t, p.Codex) != odd || read(t, p.Agy) != "{}" {
+		t.Error("rewrote configs without our entries")
+	}
+}
+
+func TestBinaryPathIsQuotedAndNamed(t *testing.T) {
+	p := setup(t, "", "", "")
+	odd := "/home/o'brien/my bin/agent-hooks"
+	if _, err := Install(p, odd, now); err != nil {
+		t.Fatal(err)
+	}
+	if hs := handlers(t, decode(t, read(t, p.Claude)), "PreToolUse"); hs[0]["command"] != `'/home/o'\''brien/my bin/agent-hooks' pre` {
+		t.Errorf("quoting: %v", hs[0]["command"])
+	}
+	if _, err := Uninstall(p, now); err != nil || strings.Contains(read(t, p.Claude), "agent-hooks") {
+		t.Errorf("uninstall missed the quoted entry: %v", err)
+	}
+	if _, err := Install(p, "/usr/local/bin/ah", now); err == nil {
+		t.Error("accepted a binary not named agent-hooks, which uninstall could not find")
+	}
+}

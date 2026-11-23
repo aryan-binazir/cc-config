@@ -37,18 +37,22 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, usage)
 		return 64
 	}
-	home, _ := os.UserHomeDir()
+	home, homeErr := os.UserHomeDir()
 	switch args[0] {
 	case "pre", "post":
-		return check(args[0], args[1:], home, stdin, stdout, stderr)
+		return check(args[0], args[1:], hooksYAML, home, stdin, stdout, stderr)
 	case "install", "uninstall":
+		if homeErr != nil {
+			fmt.Fprintln(stderr, "agent-hooks: cannot find the home directory:", homeErr)
+			return 1
+		}
 		return wire(args[0], home, stdout, stderr)
 	}
 	fmt.Fprintln(stderr, usage)
 	return 64
 }
 
-func check(phase string, flags []string, home string, stdin io.Reader, stdout, stderr io.Writer) int {
+func check(phase string, flags []string, switches, home string, stdin io.Reader, stdout, stderr io.Writer) int {
 	o := hooks.Options{Phase: phase, Home: home, StateDir: stateDir(home)}
 	for _, f := range flags {
 		switch {
@@ -66,9 +70,14 @@ func check(phase string, flags []string, home string, stdin io.Reader, stdout, s
 		fmt.Fprintln(stderr, "agent-hooks: timed out; allowing the call")
 		os.Exit(1)
 	})
-	enabled, err := parseSwitches(hooksYAML)
+	enabled, err := parseSwitches(switches)
 	if err != nil {
+		// A fault, not a silent allow: Claude Code and Codex show it, and pi fails closed.
+		if o.Agy && phase == "pre" {
+			fmt.Fprintln(stdout, `{"decision":"allow"}`)
+		}
 		fmt.Fprintln(stderr, "agent-hooks: hooks.yaml:", err)
+		return 1
 	}
 	o.Enabled = enabled
 	o.Stdin, _ = io.ReadAll(io.LimitReader(stdin, maxPayload))

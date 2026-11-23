@@ -46,6 +46,14 @@ func TestParseSwitches(t *testing.T) {
 	}
 }
 
+func TestBadSwitchesAreAFault(t *testing.T) {
+	var out, errb bytes.Buffer
+	code := check("pre", nil, "hooks:\n  block-agy: maybe\n", "", strings.NewReader(payload("agy")), &out, &errb)
+	if code != 1 || !strings.Contains(errb.String(), "hooks.yaml") {
+		t.Errorf("exit %d stderr %q", code, errb.String())
+	}
+}
+
 func BenchmarkParseSwitches(b *testing.B) {
 	for b.Loop() {
 		if _, err := parseSwitches(hooksYAML); err != nil {

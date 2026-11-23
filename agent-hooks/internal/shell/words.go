@@ -72,11 +72,37 @@ func catHeredoc(f frame, c *syntax.CmdSubst) (string, bool) {
 	if r.Op != syntax.Hdoc && r.Op != syntax.DashHdoc {
 		return "", false
 	}
-	body := f.word(r.Hdoc)
+	body := f.heredoc(r)
 	if body.Dynamic {
 		return "", false
 	}
 	return strings.TrimRight(body.Val, "\n"), true
+}
+
+// heredoc decodes a here-document body. A quoted delimiter keeps the body
+// literal; otherwise backslashes and expansions work as inside double quotes.
+func (f frame) heredoc(r *syntax.Redirect) Word {
+	if r.Hdoc == nil {
+		return Word{}
+	}
+	quoted := false
+	if r.Word != nil {
+		for _, part := range r.Word.Parts {
+			if lit, ok := part.(*syntax.Lit); !ok || strings.Contains(lit.Value, `\`) {
+				quoted = true
+			}
+		}
+	}
+	var b strings.Builder
+	dynamic := false
+	for _, part := range r.Hdoc.Parts {
+		if lit, ok := part.(*syntax.Lit); ok && quoted {
+			b.WriteString(lit.Value)
+		} else if !f.part(&b, part, true) {
+			dynamic = true
+		}
+	}
+	return Word{Val: b.String(), Dynamic: dynamic}
 }
 
 // unescape removes shell backslash quoting from literal text.

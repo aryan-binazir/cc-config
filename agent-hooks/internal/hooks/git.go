@@ -12,39 +12,78 @@ import (
 type gitCmd struct {
 	sub  string
 	args []shell.Word
-	dir  string // effective working directory; "" when unknown
+	dir  string   // effective working directory; "" when unknown
+	env  []string // GIT_DIR and friends that select the repository
 }
 
 var gitGlobalValues = []string{"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix", "--exec-path"}
+
+// gitRepoEnv are the variables that point git at a different repository or index.
+var gitRepoEnv = []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"}
 
 func parseGit(inv shell.Invocation, home string) *gitCmd {
 	if inv.Name() != "git" {
 		return nil
 	}
 	g := &gitCmd{dir: inv.Cwd}
+	repo := map[string]shell.Word{}
+	for _, name := range gitRepoEnv {
+		if v, ok := inv.Assigns[name]; ok {
+			repo[name] = shell.Word{Val: v}
+		}
+	}
 	args := inv.Args[1:]
 	for i := 0; i < len(args); i++ {
 		a := args[i].Val
 		if !strings.HasPrefix(a, "-") {
 			g.sub = a
 			g.args = args[i+1:]
-			return g
+			break
 		}
-		if strings.Contains(a, "=") || !contains(gitGlobalValues, a) {
+		name, value, hasValue := strings.Cut(a, "=")
+		if !contains(gitGlobalValues, name) {
 			continue
 		}
-		if i+1 < len(args) {
-			i++
-			if a == "-C" {
-				if args[i].Dynamic {
-					g.dir = ""
-				} else {
-					g.dir = shell.Resolve(g.dir, args[i].Val, home)
-				}
+		word := shell.Word{Val: value, Dynamic: args[i].Dynamic}
+		if !hasValue {
+			if i+1 >= len(args) {
+				break
 			}
+			i++
+			word = args[i]
+		}
+		switch name {
+		case "-C":
+			g.dir = ""
+			if !word.Dynamic {
+				g.dir = shell.Resolve(inv.Cwd, word.Val, home)
+			}
+			inv.Cwd = g.dir
+		case "--git-dir":
+			repo["GIT_DIR"] = word
+		case "--work-tree":
+			repo["GIT_WORK_TREE"] = word
 		}
 	}
-	return nil
+	if g.sub == "" {
+		return nil
+	}
+	for _, name := range gitRepoEnv {
+		w, ok := repo[name]
+		if !ok {
+			continue
+		}
+		full := ""
+		if !w.Dynamic {
+			full = shell.Resolve(g.dir, w.Val, home)
+		}
+		if full == "" {
+			g.dir = "" // the repository is unknowable, so skip lookups
+			return g
+		}
+		g.env = append(g.env, name+"="+full)
+	}
+	return g
 }
 
 // opts is a parsed argument list. Flags are keyed by their canonical spelling.
@@ -128,8 +167,8 @@ type entry struct {
 	path string
 }
 
-func (c *ctx) status(dir string, extra ...string) ([]entry, bool) {
-	out, ok := c.git(dir, append([]string{"status", "--porcelain=v1", "-z"}, extra...)...)
+func (c *ctx) status(g *gitCmd, extra ...string) ([]entry, bool) {
+	out, ok := c.git(g, append([]string{"status", "--porcelain=v1", "-z"}, extra...)...)
 	if !ok {
 		return nil, false
 	}
@@ -156,8 +195,8 @@ func withPaths(args []string, paths []shell.Word) []string {
 	return append(append(args, "--"), values(paths)...)
 }
 
-func (c *ctx) currentBranch(dir string) string {
-	out, _ := c.git(dir, "symbolic-ref", "--short", "-q", "HEAD")
+func (c *ctx) currentBranch(g *gitCmd) string {
+	out, _ := c.git(g, "symbolic-ref", "--short", "-q", "HEAD")
 	return strings.TrimSpace(out)
 }
 

@@ -206,3 +206,18 @@ func TestMergeHeadMatch(t *testing.T) {
 		"gh pr ready 42", "gh pr create --draft", "gh pr merge --help",
 	)
 }
+
+func TestGhEffectiveValues(t *testing.T) {
+	expectBlocked(t, "merge-head-match", `gh pr merge 1 --match-head-commit abc --match-head-commit ""`)
+	expectAllowed(t, "merge-head-match", `gh pr merge 1 --match-head-commit "" --match-head-commit abc`)
+	expectBlocked(t, "no-admin-merge", "gh api -X=PUT repos/o/r/pulls/1/merge", "gh api -iXPUT repos/o/r/pulls/1/merge", "gh api -XPUT repos/o/r/pulls/1/merge")
+	expectAllowed(t, "no-admin-merge", "gh api --help -X PUT repos/o/r/pulls/1/merge", "gh api -X PUT repos/o/r/pulls/1/merge -h")
+}
+
+func TestShellFormsFromReview(t *testing.T) {
+	expectBlocked(t, "block-agy",
+		"case x in $(agy -p hi)) ;; esac", "bash -o pipefail -c 'agy -p hi'", "bash -c -- 'agy -p hi'",
+		"eval -- 'agy -p hi'", "bash +O extglob -c 'agy'",
+	)
+	expectBlocked(t, "draft-prs", "bash -o pipefail -c 'gh pr create'", "eval -- gh pr create", "case x in $(gh pr create)) ;; esac")
+}

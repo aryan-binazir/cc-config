@@ -78,11 +78,16 @@ func (r *repo) expect(hooks string, wantBlock bool, commands ...string) {
 	}
 }
 
-// fakeGh puts a gh on PATH that reports baseRefName for gh pr view.
+// fakeGh puts a gh on PATH whose `gh pr view` reports "<base> <head>".
 func fakeGh(t *testing.T, base string) {
 	t.Helper()
+	fakeGhScript(t, `case "$*" in *'pr view'*baseRefName*) echo `+base+` feature ;; *) exit 1 ;; esac`)
+}
+
+func fakeGhScript(t *testing.T, body string) {
+	t.Helper()
 	bin := t.TempDir()
-	script := "#!/bin/sh\ncase \"$*\" in *'pr view'*baseRefName*) echo " + base + " ;; *) exit 1 ;; esac\n"
+	script := "#!/bin/sh\n" + body + "\n"
 	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -217,13 +222,13 @@ func TestNoSecretsOverrideIsLogged(t *testing.T) {
 func TestDestructiveGitPushAndRm(t *testing.T) {
 	r := newRepo(t)
 	r.expect("destructive-git", true,
-		"git push --force", "git push -f origin x", "git push -fu origin x", "git push --force --force-with-lease",
+		"git push --force", "git push -f origin x", "git push -fu origin x", "git push --force --force-with-lease", "git push --force-with-lease origin +x",
 		"git push origin +x", "git push origin +HEAD:x", "git push --mirror",
 		"rm -rf /", "rm -fr ~", "rm -r -f $HOME", `rm -Rf "$HOME"`, "rm --recursive --force /*", "rm -rf ~/", "rm -rf ${HOME}",
 		"sudo rm -rf /", "rm -rf "+r.dir, "rm -rf "+r.dir+"/", "rm -rf .", "cd "+r.dir+"/sub && rm -rf ..", "rm -rf -- ~/*",
 	)
 	r.expect("destructive-git", false,
-		"git push --force-with-lease", "git push origin x", "git push --force-with-lease origin +x", "git push -n -f",
+		"git push --force-with-lease", "git push origin x", "git push -n -f",
 		"rm -rf node_modules", "rm -rf /tmp/agent-hooks-x/build", "rm -r ~", "rm -f ~/.cache/x", "echo rm -rf /",
 		`rm -rf "$HOME/.cache/foo"`, "rm -rf build", "rm -rf "+r.root+"/elsewhere", "rm -rf ./src",
 	)
@@ -333,5 +338,119 @@ func TestOverrideLogFallsBackToThePayloadCwdAndKeepsShellText(t *testing.T) {
 	raw, _ := os.ReadFile(filepath.Join(state, "overrides.log"))
 	if !strings.Contains(string(raw), `"cwd":"/work/dir"`) || !strings.Contains(string(raw), `$X\" && AGENT`) {
 		t.Errorf("log line: %s", raw)
+	}
+}
+
+func TestNoProductionCoversEveryPushDestination(t *testing.T) {
+	r := newRepo(t)
+	r.git("branch", "production", "origin/production")
+	r.expect("no-production", true,
+		"git push origin :", "git push origin 'refs/heads/*:refs/heads/*'", "git push --mirror origin", "git push --all origin",
+		"git push origin -- production", "git branch -D -- production", "git fetch origin main:production",
+		"git fetch origin +refs/heads/main:refs/heads/production", "gh repo sync --branch production", "gh repo sync -b production",
+	)
+	r.expect("no-production", false,
+		"git fetch origin production", "git fetch origin production:refs/remotes/origin/production", "gh repo sync --branch main",
+		"git branch -c production backup", "git branch -C production prod-copy",
+	)
+	r.git("config", "remote.origin.push", "refs/heads/main:refs/heads/production")
+	r.expect("no-production", true, "git push", "git push origin")
+}
+
+func TestNoProductionOnTheProductionBranch(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "production", "--track", "origin/production")
+	r.expect("no-production", true, "git branch -m renamed", "git branch -M renamed")
+	r.expect("no-production", false, "git merge --abort", "git rebase --abort", "git rebase --continue", "git merge --continue", "git pull --abort 2>/dev/null; true", "git branch -c backup")
+}
+
+func TestNoProductionPRLookupKeepsSelectorAndRepository(t *testing.T) {
+	r := newRepo(t)
+	fakeGhScript(t, `case "$GH_REPO $*" in o/r*'pr view'*) echo production feature ;; *'pr view 7'*) echo production feature ;; *'pr view 9'*) echo main production ;; *'pr view'*) echo main feature ;; *) exit 1 ;; esac`)
+	r.expect("no-production", true, "GH_REPO=o/r gh pr merge 5", "gh pr merge --squash -- 7", "gh pr merge 9 --delete-branch", "gh pr merge 9 -d")
+	r.expect("no-production", false, "gh pr merge 5", "gh pr merge 9", "GH_REPO=x/y gh pr merge 5")
+}
+
+func TestDestructiveForceRefspecs(t *testing.T) {
+	r := newRepo(t)
+	r.expect("destructive-git", true, "git push --force-with-lease origin +main", "git push origin -- +main", "git push --force-with-lease=main:abc origin +main:main")
+}
+
+func TestGitLookupsFollowRepositorySelection(t *testing.T) {
+	r := newRepo(t)
+	r.write(".env", "x")
+	for _, command := range []string{
+		"git --git-dir=" + r.dir + "/.git --work-tree=" + r.dir + " add -A",
+		"git --git-dir " + r.dir + "/.git --work-tree " + r.dir + " add -A",
+		"GIT_DIR=" + r.dir + "/.git GIT_WORK_TREE=" + r.dir + " git add -A",
+		"env -C " + r.dir + " git add -A",
+		"env --chdir=" + r.dir + " git add -A",
+	} {
+		if res := run(t, "no-secrets-commit", bashIn("/", command)); res.Exit != 2 {
+			t.Errorf("%q: %+v", command, res)
+		}
+	}
+}
+
+func TestCommitFormatValidatesTheMessageGitUses(t *testing.T) {
+	r := newRepo(t)
+	r.expect("commit-format", true,
+		`git commit --no-edit -m "bad"`, `git commit --amend --no-edit -m bad`,
+		"git commit -F - <<EOF\nbad subject\n\n$BODY\nEOF",
+		"git commit -F - <<'EOF'\n\\feat(no-ticket): x\nEOF",
+	)
+	r.expect("commit-format", false,
+		"git commit -F - 3<<'EOF'\nbad\nEOF", "git commit -F - <<EOF\nfeat(no-ticket): $X\nEOF",
+		"git commit -F - <<EOF\nfeat(no-ticket): ok\n\n$BODY\nEOF",
+	)
+}
+
+func TestDestructiveCheckoutFromACommitAndClean(t *testing.T) {
+	r := newRepo(t)
+	r.write("README.md", "staged\n")
+	r.git("add", "README.md")
+	r.expect("destructive-git", true, "git checkout HEAD .", "git checkout HEAD -- .", "git restore --source=HEAD .")
+	r.git("commit", "-q", "-m", "chore(no-ticket): X")
+	r.write("nested/deep/file.txt", "x")
+	r.write("scratch.txt", "x")
+	r.expect("destructive-git", false, "git clean -fd -e scratch.txt -e nested", "git clean -f -e scratch.txt")
+	r.expect("destructive-git", true, "git clean -f", "git clean -fd nested", "git clean -f nested")
+	r.git("config", "clean.requireForce", "false")
+	r.expect("destructive-git", true, "git clean -d")
+}
+
+func TestNoSecretsCoversForcedAndStagedFiles(t *testing.T) {
+	r := newRepo(t)
+	r.write("build/.env", "x")
+	r.expect("no-secrets-commit", true, "git add -f build/", "git add -f -A")
+	r.expect("no-secrets-commit", false, "git add build/", "git add -A")
+	r.write("tracked.txt", "a")
+	r.write("key.pem", "k")
+	r.git("add", "tracked.txt")
+	r.git("add", "key.pem")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Seed")
+	r.write("key.pem", "rotated")
+	r.git("add", "key.pem")
+	r.write("tracked.txt", "b")
+	r.expect("no-secrets-commit", true, "git commit -am x")
+	r.git("reset", "-q")
+	if err := os.Remove(filepath.Join(r.dir, "key.pem")); err != nil {
+		t.Fatal(err)
+	}
+	r.expect("no-secrets-commit", false, "git add key.pem", "git add -A")
+}
+
+func TestLookupsDoNotRunRepositoryHelpers(t *testing.T) {
+	r := newRepo(t)
+	marker := filepath.Join(t.TempDir(), "ran")
+	script := filepath.Join(t.TempDir(), "fsmonitor.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\ntouch "+marker+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r.git("config", "core.fsmonitor", script)
+	r.write(".env", "x")
+	r.run("no-secrets-commit,destructive-git", "git add -A && git reset --hard")
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("a lookup ran the repository's fsmonitor hook")
 	}
 }

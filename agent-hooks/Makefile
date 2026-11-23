@@ -15,9 +15,11 @@ check:
 	go test -count=1 -run TestBinaryLatency -v .
 	go test ./... -run '^$$' -bench . -benchtime 200x
 
+# The built binary must accept its embedded hooks.yaml before it replaces the installed one.
 install: build
-	install -D -m 0755 bin/agent-hooks $(BIN)
-	$(BIN) install
+	echo '{}' | ./bin/agent-hooks pre
+	install -D -m 0755 bin/agent-hooks "$(BIN)"
+	"$(BIN)" install
 
 uninstall:
-	$(BIN) uninstall
+	"$(BIN)" uninstall

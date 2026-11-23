@@ -35,30 +35,29 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if o.has("-f", "--mirror") {
 			return "Don't force-push: use --force-with-lease (without --force, which overrides it) so you cannot overwrite commits you haven't seen. If the user asked for a force push, rerun with AGENT_HOOKS_ALLOW=destructive."
 		}
-		if !o.has("--force-with-lease") {
-			for _, refspec := range o.pos[min(1, len(o.pos)):] {
-				if strings.HasPrefix(refspec.Val, "+") {
-					return "A +refspec force-pushes. Use --force-with-lease instead, or rerun with AGENT_HOOKS_ALLOW=destructive if the user asked for it."
-				}
+		for _, refspec := range pushRefspecs(o) {
+			// A + forces that ref even when a lease is given for another.
+			if strings.HasPrefix(refspec, "+") {
+				return "A +refspec force-pushes. Push without the + and use --force-with-lease, or rerun with AGENT_HOOKS_ALLOW=destructive if the user asked for it."
 			}
 		}
 	case "clean":
 		o := parseOpts(g.args, "e", []string{"--exclude"}, map[string]string{"--force": "-f", "--dry-run": "-n", "--interactive": "-i"})
-		if !o.has("-f") || o.has("-n", "-i") {
+		if o.has("-n", "-i") {
 			return ""
 		}
-		args := []string{"--untracked-files=all"}
-		if o.has("-x", "-X") {
-			args = append(args, "--ignored=matching")
-		}
-		entries, ok := c.status(g.dir, withPaths(args, append(o.pos, o.paths...))...)
-		for _, e := range entries {
-			if ok && (e.xy == "??" && !o.has("-X") || e.xy == "!!" && o.has("-x", "-X")) {
-				return "git clean would delete untracked files (" + e.path + ", ...). " + discardAdvice
+		if !o.has("-f") {
+			if out, ok := c.git(g, "config", "--type=bool", "--get", "clean.requireForce"); !ok || strings.TrimSpace(out) != "false" {
+				return "" // git refuses to clean without -f
 			}
 		}
+		// git's own dry run knows its excludes, -d, and nested repositories.
+		out, ok := c.git(g, append([]string{"clean", "-n"}, cleanDryRunArgs(g.args)...)...)
+		if first, _, _ := strings.Cut(strings.TrimSpace(out), "\n"); ok && first != "" {
+			return "git clean would delete untracked files (" + strings.TrimPrefix(first, "Would remove ") + ", ...). " + discardAdvice
+		}
 	case "reset":
-		if o := parseOpts(g.args, "", nil, nil); o.has("--hard") && c.dirty(g.dir, nil, false) {
+		if o := parseOpts(g.args, "", nil, nil); o.has("--hard") && c.dirty(g, nil, false) {
 			return "git reset --hard would discard uncommitted changes. " + discardAdvice
 		}
 	case "checkout", "restore":
@@ -73,8 +72,9 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if !hasAll(specs) {
 			return ""
 		}
-		fromCommit := o.has("-s", "--source") || (g.sub == "checkout" && o.dashed && len(o.pos) > 0)
-		if c.dirty(g.dir, specs, !fromCommit) {
+		// Restoring from a commit also discards staged changes.
+		fromCommit := o.has("-s", "--source") || (g.sub == "checkout" && len(o.pos) > 0 && (o.dashed || !hasAll(o.pos[:1])))
+		if c.dirty(g, specs, !fromCommit) {
 			return fmt.Sprintf("git %s would discard uncommitted changes. %s", g.sub, discardAdvice)
 		}
 	}
@@ -92,8 +92,8 @@ func hasAll(specs []shell.Word) bool {
 }
 
 // dirty reports tracked changes; worktreeOnly ignores changes already staged.
-func (c *ctx) dirty(dir string, specs []shell.Word, worktreeOnly bool) bool {
-	entries, ok := c.status(dir, withPaths([]string{"--untracked-files=no"}, specs)...)
+func (c *ctx) dirty(g *gitCmd, specs []shell.Word, worktreeOnly bool) bool {
+	entries, ok := c.status(g, withPaths([]string{"--untracked-files=no"}, specs)...)
 	if !ok {
 		return false
 	}
@@ -103,6 +103,27 @@ func (c *ctx) dirty(dir string, specs []shell.Word, worktreeOnly bool) bool {
 		}
 	}
 	return false
+}
+
+// cleanDryRunArgs drops -f and -i from git clean's arguments so `git clean -n`
+// reports what the real command would remove.
+func cleanDryRunArgs(args []shell.Word) []string {
+	var out []string
+	for i, w := range args {
+		a := w.Val
+		switch {
+		case a == "--":
+			return append(append(out, "--"), values(args[i+1:])...)
+		case a == "--force" || a == "--interactive":
+		case strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && !strings.Contains(a, "e"):
+			if a = strings.NewReplacer("f", "", "i", "").Replace(a); a != "-" {
+				out = append(out, a)
+			}
+		default:
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 var homeVar = regexp.MustCompile(`^\$(HOME|\{HOME\})/?(\*)?$`)
