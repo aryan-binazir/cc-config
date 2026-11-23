@@ -506,3 +506,64 @@ func TestReviewRoundTwoShellAndPayload(t *testing.T) {
 		t.Errorf("unknown tool blocked: %+v", res)
 	}
 }
+
+func TestReviewRoundThreeGitCases(t *testing.T) {
+	r := newRepo(t)
+	marker := filepath.Join(t.TempDir(), "filtered")
+	r.git("config", "filter.mark.clean", "touch "+marker+"; cat")
+	r.write(".gitattributes", "*.txt filter=mark\n")
+	r.write("notes.txt", "x")
+	r.write(".env", "x")
+	r.expect("no-secrets-commit", true, "git add -A", "git add --no-dry -A", "git add ignored.env .env notes.txt")
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("a lookup ran the repository's clean filter")
+	}
+	r.git("branch", "production")
+	r.git("config", "push.default", "matching")
+	r.expect("no-production", true, "git push", "git push --prune origin 'refs/heads/staging/*:refs/heads/*'")
+	r.git("config", "--unset", "push.default")
+	r.git("config", "remote.backup.url", r.root+"/remote.git")
+	r.git("config", "remote.backup.push", "+refs/heads/main:refs/heads/main")
+	r.git("config", "branch.main.pushRemote", "backup")
+	r.expect("destructive-git", true, "git push", "git push -n --no-dry --force")
+}
+
+func TestResetHardKeepsUntrackedWork(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "other")
+	r.write("dir", "file on other")
+	r.write("sub/tracked.txt", "on other")
+	r.write("ignored.env", "on other")
+	r.git("add", "-f", "dir", "sub/tracked.txt", "ignored.env")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Other")
+	r.git("switch", "-q", "main")
+	r.write("dir/untracked.txt", "work")
+	r.expect("destructive-git", true, "git reset --hard other")
+	os.RemoveAll(filepath.Join(r.dir, "dir"))
+	r.write("ignored.env", "local secret")
+	r.expect("destructive-git", true, "git reset --hard other")
+	os.Remove(filepath.Join(r.dir, "ignored.env"))
+	r.write("sub/tracked.txt", "work")
+	if res := run(t, "destructive-git", bashIn(filepath.Join(r.dir, "sub"), "git reset --hard other")); res.Exit != 2 {
+		t.Errorf("subdirectory reset: %+v", res)
+	}
+}
+
+func TestReviewRoundThreeShellCases(t *testing.T) {
+	r := newRepo(t)
+	r.write(".env", "x")
+	r.write("sub/a.txt", "a")
+	r.expect("no-secrets-commit", true, "cd sub || exit 1; git add -A ..", "cd "+r.dir+" || exit 1; git add -A", "{ cd sub; false; } || git add -A ..")
+	expectBlocked(t, "draft-prs", "bash -s arg1 <<'EOF'\ngh pr create\nEOF")
+	expectBlocked(t, "no-admin-merge", "gh api --help=0 -X PUT repos/o/r/pulls/1/merge", "gh api --help=true --help=false -X PUT repos/o/r/pulls/1/merge")
+	r.expect("commit-format", false, "git commit -F - <<'EOF' 0<&3\nbad\nEOF")
+	clean := newRepo(t)
+	clean.write("scratch.txt", "x")
+	clean.expect("destructive-git", false, "git clean -f --exclude=scratch.txt", "git clean -f --exclude scratch.txt")
+	clean.expect("destructive-git", true, "git clean -f --exclude=other.txt")
+	r.git("config", "clean.requireForce", "FALSE")
+	r.expect("destructive-git", true, "git clean")
+	bare := filepath.Join(r.root, "bare.git")
+	gitIn(t, r.root, "init", "-q", "--bare", bare)
+	r.expect("destructive-git", true, "rm -rf "+bare)
+}

@@ -111,6 +111,19 @@ func parseOpts(args []shell.Word, shortValues string, longValues []string, alias
 		if c, ok := alias[name]; ok {
 			return c
 		}
+		// git accepts any unambiguous prefix of a long option.
+		match := ""
+		for long := range alias {
+			if len(name) > 3 && strings.HasPrefix(long, name) {
+				if match != "" {
+					return name
+				}
+				match = long
+			}
+		}
+		if match != "" {
+			return alias[match]
+		}
 		return name
 	}
 	for i := 0; i < len(args); i++ {

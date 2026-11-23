@@ -498,8 +498,8 @@ func TestInstallKeepsOtherGroupsAndHandlers(t *testing.T) {
 		t.Errorf("the legacy group should become ours in place: %v", first)
 	}
 	second := groups[1].(map[string]any)
-	if second["matcher"] != "Write" || len(second["hooks"].([]any)) != 1 {
-		t.Errorf("shared group changed: %v", second)
+	if hs := second["hooks"].([]any); second["matcher"] != "Write" || len(hs) != 2 || hs[0].(map[string]any)["command"] != "custom" || hs[1].(map[string]any)["command"] != "'"+bin+"' pre" {
+		t.Errorf("shared group should keep its matcher and handler positions: %v", second)
 	}
 	if third := groups[2].(map[string]any); third["hooks"].([]any)[0].(map[string]any)["command"] != "'/x/agent-hooks' pre --only=block-agy" {
 		t.Errorf("custom --only handler touched: %v", third)
@@ -516,5 +516,29 @@ func TestUninstallKeepsAPreexistingEmptyAgyFile(t *testing.T) {
 	}
 	if got := read(t, p.Agy); got != "{}" {
 		t.Errorf("agy file: %q", got)
+	}
+}
+
+func TestInstallNeverShiftsCodexIndices(t *testing.T) {
+	codex := `{"hooks": {"PreToolUse": [
+  {"matcher": "Write", "hooks": [{"command": "'/x/agent-hooks' pre", "type": "command"}, {"command": "custom", "type": "command"}]},
+  {"matcher": "Bash", "hooks": [{"command": "'/y/agent-hooks' pre", "type": "command"}]},
+  {"hooks": [{"command": "later", "type": "command"}]}
+], "PostToolUse": [{"hooks": [{"command": "bash ~/.claude/hooks/block-agy.sh"}]}]}}`
+	p := setup(t, "", codex, "")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	cfg := decode(t, read(t, p.Codex))
+	groups := cfg["hooks"].(map[string]any)["PreToolUse"].([]any)
+	commands := func(i int) []any { return groups[i].(map[string]any)["hooks"].([]any) }
+	if len(groups) != 3 || commands(0)[1].(map[string]any)["command"] != "custom" || commands(2)[0].(map[string]any)["command"] != "later" {
+		t.Errorf("indices shifted: %v", groups)
+	}
+	if groups[0].(map[string]any)["matcher"] != "Write" {
+		t.Errorf("shared matcher changed: %v", groups[0])
+	}
+	if strings.Contains(read(t, p.Codex), "block-agy.sh") || strings.Contains(read(t, p.Codex), "/x/agent-hooks") || strings.Contains(read(t, p.Codex), "/y/agent-hooks") {
+		t.Errorf("legacy or stale paths left:\n%s", read(t, p.Codex))
 	}
 }

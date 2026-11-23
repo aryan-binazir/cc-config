@@ -130,12 +130,19 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd string) string {
 		case syntax.AndStmt:
 			return f.stmt(w, c.Y, f.stmt(w, c.X, cwd))
 		case syntax.OrStmt:
-			// Y runs only when X failed, so a cd in X did not happen for Y.
 			afterX := f.stmt(w, c.X, cwd)
-			if afterY := f.stmt(w, c.Y, cwd); afterY != afterX {
-				return ""
+			// Y runs only when X failed. A failed plain cd changed nothing; any
+			// other X ran to its end first.
+			beforeY := afterX
+			if isCd(c.X) {
+				beforeY = cwd
 			}
-			return afterX
+			afterY := f.stmt(w, c.Y, beforeY)
+			switch {
+			case exits(c.Y), afterY == afterX:
+				return afterX // when Y exits, only the X path continues
+			}
+			return ""
 		}
 		f.stmt(w, c.X, cwd)
 		f.stmt(w, c.Y, cwd)
@@ -229,7 +236,7 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd string) s
 		case syntax.WordHdoc:
 			body = f.word(r.Word)
 			body.Val += "\n"
-		case syntax.RdrIn, syntax.RdrInOut:
+		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn:
 			inv.Stdin, inv.StdinDynamic = nil, false // the last stdin redirect wins
 			continue
 		default:
@@ -254,7 +261,7 @@ func (f frame) emit(w *walker, inv Invocation) {
 	args := inv.Args[1:]
 	switch name {
 	case "bash", "sh", "zsh", "dash", "ksh", "fish":
-		command := false
+		command, fromStdin := false, false
 		i := 0
 		for ; i < len(args); i++ {
 			a := args[i].Val
@@ -266,6 +273,8 @@ func (f frame) emit(w *walker, inv Invocation) {
 				i++ // the option name
 			case !strings.HasPrefix(a, "--") && strings.Contains(a, "c"):
 				command = true
+			case !strings.HasPrefix(a, "--") && strings.Contains(a, "s"):
+				fromStdin = true // -s: the script is stdin, operands are arguments
 			}
 		}
 		if command {
@@ -280,7 +289,7 @@ func (f frame) emit(w *walker, inv Invocation) {
 		if i < len(args) && args[i].Val == "--" {
 			i++
 		}
-		if inv.Stdin != nil && i == len(args) {
+		if inv.Stdin != nil && (i == len(args) || fromStdin) {
 			f.nested(w, *inv.Stdin, inv) // no script operand, so the shell reads stdin
 		}
 	case "eval":
@@ -334,6 +343,22 @@ func (f frame) cd(inv Invocation, cwd string) string {
 		return ""
 	}
 	return Resolve(cwd, args[0], f.home)
+}
+
+func isCd(s *syntax.Stmt) bool {
+	call, ok := s.Cmd.(*syntax.CallExpr)
+	return ok && len(call.Args) > 0 && call.Args[0].Lit() == "cd"
+}
+
+// exits reports whether s ends the shell: exit, or a group or list ending in it.
+func exits(s *syntax.Stmt) bool {
+	switch c := s.Cmd.(type) {
+	case *syntax.CallExpr:
+		return len(c.Args) > 0 && (c.Args[0].Lit() == "exit" || c.Args[0].Lit() == "return")
+	case *syntax.Block:
+		return len(c.Stmts) > 0 && exits(c.Stmts[len(c.Stmts)-1])
+	}
+	return false
 }
 
 // Resolve joins p onto cwd, expanding a leading ~. It returns "" when the

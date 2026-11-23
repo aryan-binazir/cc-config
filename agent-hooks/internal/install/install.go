@@ -60,7 +60,8 @@ func Install(p Paths, bin string, now time.Time) ([]string, error) {
 		before := encode(root)
 		hooks := hooksOf(root)
 		upsert(hooks, "PreToolUse", "Bash", command("pre"), true)
-		upsert(hooks, "PostToolUse", "Bash", command("post"), false)
+		upsert(hooks, "PostToolUse", "Bash", command("post"), true)
+		dropLegacy(hooks) // block-agy.sh only ever ran as PreToolUse; drop strays elsewhere
 		return encode(root) != before, nil
 	}
 	return apply(now, []edit{
@@ -269,57 +270,51 @@ func hooksOf(root *object) *object {
 	return hooks
 }
 
-// upsert points event at command while keeping every other group where it is,
-// since Codex keys hook trust by group and handler index:
-//   - an owned or (with legacy) block-agy.sh handler alone in its group becomes
-//     ours in place, with our matcher;
-//   - one sharing a group with other handlers is removed from it, leaving the
-//     group and its matcher as they were;
-//   - with no group to reuse, a new one is appended.
+// upsert points event at command without moving any group or handler, since
+// Codex keys hook trust by group and handler index. Owned and (with legacy)
+// block-agy.sh handlers get the new command in place, and a group holding only
+// ours gets our matcher; shared groups keep theirs. Only when no group holds
+// ours alone is a new group appended.
 func upsert(hooks *object, event, matcher, command string, legacy bool) {
-	ours := func(h any) bool { return isOwned(h) || legacy && isLegacy(h) }
 	v, _ := hooks.get(event)
 	groups, _ := v.([]any)
 	placed := false
-	var kept []any
 	for _, g := range groups {
 		group, _ := g.(*object)
-		var handlers []any
-		if group != nil {
-			hv, _ := group.get("hooks")
-			handlers, _ = hv.([]any)
-		}
-		if len(handlers) == 1 && ours(handlers[0]) {
-			if placed {
-				continue // a duplicate of ours
-			}
-			handlers[0].(*object).set("command", command)
-			group.set("matcher", matcher)
-			placed = true
-			kept = append(kept, g)
+		if group == nil {
 			continue
 		}
-		var keep []any
+		hv, _ := group.get("hooks")
+		handlers, _ := hv.([]any)
+		mine := 0
 		for _, h := range handlers {
-			if !ours(h) {
-				keep = append(keep, h)
+			if isOwned(h) || legacy && isLegacy(h) {
+				h.(*object).set("command", command)
+				mine++
 			}
 		}
-		if len(keep) != len(handlers) {
-			group.set("hooks", keep)
+		if mine > 0 && mine == len(handlers) {
+			group.set("matcher", matcher)
+			placed = true
 		}
-		kept = append(kept, g)
 	}
 	if !placed {
-		kept = append(kept, group(matcher, command))
+		groups = append(groups, group(matcher, command))
 	}
-	hooks.set(event, kept)
+	hooks.set(event, groups)
 }
 
 // strip removes owned and legacy handlers, dropping groups and events only
 // when that removal emptied them. It reports whether it removed anything.
 func strip(hooks *object) bool {
-	drop := func(h any) bool { return isOwned(h) || isLegacy(h) }
+	return filter(hooks, func(h any) bool { return isOwned(h) || isLegacy(h) })
+}
+
+func dropLegacy(hooks *object) { filter(hooks, isLegacy) }
+
+// filter removes handlers matching drop, dropping groups and events only when
+// that removal emptied them. It reports whether it removed anything.
+func filter(hooks *object, drop func(any) bool) bool {
 	removedAny := false
 	for _, event := range append([]string(nil), hooks.keys...) {
 		v, _ := hooks.get(event)

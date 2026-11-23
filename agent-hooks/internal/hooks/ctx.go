@@ -43,10 +43,14 @@ func newCtx(c call, o Options) *ctx {
 
 // git runs a read-only git command for g's repository, cached for the call.
 // ok is false when it fails, times out, overflows, or lookups are off;
-// callers then allow. Repository hooks such as fsmonitor are disabled.
+// callers then allow. Repository-configured programs stay off: fsmonitor,
+// and clean/smudge filters (attributes come from the empty tree).
 func (c *ctx) git(g *gitCmd, args ...string) (string, bool) {
-	return c.run(gitTimeout, g.dir, g.env, "git", append([]string{"-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"}, args...)...)
+	safe := []string{"--attr-source=" + emptyTree, "-c", "core.attributesFile=/dev/null", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"}
+	return c.run(gitTimeout, g.dir, g.env, "git", append(safe, args...)...)
 }
+
+const emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 func (c *ctx) gh(dir string, env []string, args ...string) (string, bool) {
 	return c.run(ghTimeout, dir, env, "gh", args...)

@@ -73,8 +73,7 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 	}
 	pr := &ghPr{action: action, flags: map[string]bool{}, values: map[string][]string{}}
 	record := func(name, value string, hasValue bool) {
-		switch value {
-		case "1", "t", "T", "true", "TRUE", "True":
+		if truthy(value) {
 			hasValue = false
 		}
 		if hasValue {
@@ -215,13 +214,15 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 	}
 	rest := args[i+1:]
 	api := &ghAPI{}
-	body := false
+	body, help := false, false
 	for i := 0; i < len(rest); i++ {
 		arg := rest[i]
 		name, value, hasValue := strings.Cut(arg, "=")
 		switch {
-		case name == "--help" && (!hasValue || value != "false"), arg == "-h":
-			return nil
+		case name == "--help":
+			help = !hasValue || truthy(value) // the last value wins
+		case arg == "-h":
+			help = true
 		case strings.HasPrefix(arg, "--") && slices.Contains(ghAPIValueLong, name):
 			if !hasValue && i+1 < len(rest) {
 				i++
@@ -262,6 +263,9 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 			}
 		}
 	}
+	if help {
+		return nil
+	}
 	if api.method == "" {
 		api.method = "GET"
 		if body {
@@ -270,4 +274,13 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 	}
 	api.endpoint = path.Clean("/" + api.endpoint)
 	return api
+}
+
+// truthy matches the boolean spellings gh's flag parser accepts as true.
+func truthy(v string) bool {
+	switch v {
+	case "1", "t", "T", "true", "TRUE", "True":
+		return true
+	}
+	return false
 }

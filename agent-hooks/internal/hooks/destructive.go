@@ -46,7 +46,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 			}
 		}
 	case "clean":
-		o := parseOpts(g.args, "e", []string{"--exclude"}, map[string]string{"--force": "-f", "--dry-run": "-n", "--interactive": "-i"})
+		o := parseOpts(g.args, "e", []string{"-e"}, map[string]string{"--force": "-f", "--dry-run": "-n", "--interactive": "-i", "--exclude": "-e"})
 		if o.has("-n", "-i") {
 			return ""
 		}
@@ -140,30 +140,50 @@ func cleanDryRun(o opts) []string {
 
 func requireForceOff(c *ctx, g *gitCmd) bool {
 	if v, ok := g.config["clean.requireforce"]; ok {
-		return v == "false" || v == "no" || v == "off" || v == "0"
+		switch strings.ToLower(v) {
+		case "false", "no", "off", "0":
+			return true
+		}
+		return false
 	}
 	out, ok := c.git(g, "config", "--type=bool", "--get", "clean.requireForce")
 	return ok && strings.TrimSpace(out) == "false"
 }
 
 // overwritesUntracked reports whether resetting to target would replace an
-// untracked file with one target tracks.
+// untracked or ignored file, or a directory holding one, with something target
+// tracks.
 func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
-	entries, ok := c.status(g, "--untracked-files=all")
+	entries, ok := c.status(g, "--untracked-files=all", "--ignored=matching")
 	if !ok {
 		return false
 	}
-	var paths []string
+	var local []string
 	for _, e := range entries {
-		if e.xy == "??" && len(paths) < 500 {
-			paths = append(paths, e.path)
+		if e.xy == "??" || e.xy == "!!" {
+			local = append(local, e.path)
 		}
 	}
-	if len(paths) == 0 {
+	if len(local) == 0 {
 		return false
 	}
-	out, ok := c.git(g, append([]string{"ls-tree", "-r", "--name-only", target, "--"}, paths...)...)
-	return ok && strings.TrimSpace(out) != ""
+	out, ok := c.git(g, "ls-tree", "-r", "-z", "--full-tree", "--name-only", target)
+	if !ok {
+		return false
+	}
+	tracked := map[string]bool{}
+	for _, p := range strings.Split(out, "\x00") {
+		tracked[p] = true
+	}
+	// Porcelain paths are relative to the repository root, like --full-tree.
+	for _, p := range local {
+		for p = strings.TrimSuffix(p, "/"); p != "." && p != "/" && p != ""; p = path.Dir(p) {
+			if tracked[p] {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 var homeVar = regexp.MustCompile(`^\$(HOME|\{HOME\})/?(\*)?$`)
@@ -198,5 +218,6 @@ func dangerousTarget(c *ctx, cwd string, target shell.Word) bool {
 		return false
 	}
 	full = path.Clean(full)
-	return full == "/" || (c.opts.Home != "" && full == path.Clean(c.opts.Home)) || exists(path.Join(full, ".git"))
+	bare := exists(path.Join(full, "HEAD")) && exists(path.Join(full, "objects")) && exists(path.Join(full, "refs"))
+	return full == "/" || (c.opts.Home != "" && full == path.Clean(c.opts.Home)) || exists(path.Join(full, ".git")) || bare
 }

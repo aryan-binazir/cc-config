@@ -99,10 +99,9 @@ func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 	if len(specs) > 0 {
 		args = append(append(args, "--"), values(specs)...)
 	}
-	out, ok := c.git(g, args...)
-	if !ok {
-		return nil
-	}
+	// A failing dry run (say, one ignored operand) still stages the rest for
+	// real, so read what it listed either way.
+	out, _ := c.git(g, args...)
 	var found []string
 	for _, line := range strings.Split(out, "\n") {
 		if p, ok := strings.CutPrefix(line, "add '"); ok && isSecret(strings.TrimSuffix(p, "'")) {
