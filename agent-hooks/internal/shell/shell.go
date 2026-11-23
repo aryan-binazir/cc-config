@@ -26,9 +26,11 @@ type Word struct {
 
 // Invocation is one simple command.
 type Invocation struct {
-	Assigns map[string]string // leading NAME=value pairs, inherited by wrapped and nested commands
-	Args    []Word            // Args[0] is the command name
-	Stdin   *string           // here-document or here-string body on fd 0
+	// Assigns holds leading NAME=value pairs and variables exported earlier in
+	// the same shell; wrapped and nested commands inherit them.
+	Assigns map[string]string
+	Args    []Word  // Args[0] is the command name
+	Stdin   *string // here-document or here-string body on fd 0
 	// StdinDynamic marks a Stdin that contains expansions, kept as source text.
 	StdinDynamic bool
 	Cwd          string // directory it runs in; "" when unknown
@@ -82,16 +84,38 @@ func (w *walker) script(src, cwd string, env map[string]string, depth int) (pars
 	if err != nil {
 		return false
 	}
-	f := frame{src: src, env: env, depth: depth, home: w.home}
+	f := frame{src: src, env: &exported{env}, depth: depth, home: w.home}
 	f.stmts(w, file.Stmts, dirs{cwd})
 	return true
 }
 
 type frame struct {
 	src   string
-	env   map[string]string
+	env   *exported
 	depth int
 	home  string
+}
+
+// exported is the environment a shell passes to its commands. Updates replace
+// the map, so invocations already emitted keep the environment they ran with.
+type exported struct{ vars map[string]string }
+
+func (e *exported) set(name, value string) {
+	e.vars = copyEnv(e.vars)
+	e.vars[name] = value
+}
+
+func (e *exported) unset(name string) {
+	if _, ok := e.vars[name]; ok {
+		e.vars = copyEnv(e.vars)
+		delete(e.vars, name)
+	}
+}
+
+// subshell is a copy of f whose exports do not reach f.
+func (f frame) subshell() frame {
+	f.env = &exported{f.env.vars}
+	return f
 }
 
 func (f frame) text(n syntax.Node) string {
@@ -129,6 +153,9 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	if s == nil {
 		return cwd
 	}
+	if s.Background || s.Coprocess {
+		f = f.subshell()
+	}
 	for _, r := range s.Redirs {
 		f.substs(w, r.Word, cwd)
 		f.substs(w, r.Hdoc, cwd)
@@ -153,12 +180,12 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 			}
 			return afterX.union(afterY)
 		}
-		f.stmt(w, c.X, cwd)
-		f.stmt(w, c.Y, cwd)
+		f.subshell().stmt(w, c.X, cwd)
+		f.subshell().stmt(w, c.Y, cwd)
 	case *syntax.Block:
 		return f.stmts(w, c.Stmts, cwd)
 	case *syntax.Subshell:
-		f.stmts(w, c.Stmts, cwd)
+		f.subshell().stmts(w, c.Stmts, cwd)
 	case *syntax.IfClause:
 		for clause := c; clause != nil; clause = clause.Else {
 			f.stmts(w, clause.Then, f.stmts(w, clause.Cond, cwd))
@@ -177,12 +204,15 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 			f.stmts(w, item.Stmts, cwd)
 		}
 	case *syntax.FuncDecl:
-		f.stmt(w, c.Body, cwd)
+		f.subshell().stmt(w, c.Body, cwd)
 	case *syntax.TimeClause:
 		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s)})
 		return f.stmt(w, c.Stmt, cwd)
 	case *syntax.CoprocClause:
-		f.stmt(w, c.Stmt, cwd)
+		f.subshell().stmt(w, c.Stmt, cwd)
+	case *syntax.DeclClause:
+		f.substs(w, c, cwd)
+		f.declare(c)
 	case nil:
 	default:
 		f.substs(w, c, cwd)
@@ -197,10 +227,10 @@ func (f frame) substs(w *walker, n syntax.Node, cwd dirs) {
 	syntax.Walk(n, func(node syntax.Node) bool {
 		switch sub := node.(type) {
 		case *syntax.CmdSubst:
-			f.stmts(w, sub.Stmts, cwd)
+			f.subshell().stmts(w, sub.Stmts, cwd)
 			return false
 		case *syntax.ProcSubst:
-			f.stmts(w, sub.Stmts, cwd)
+			f.subshell().stmts(w, sub.Stmts, cwd)
 			return false
 		}
 		return true
@@ -214,19 +244,29 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 	for _, arg := range c.Args {
 		f.substs(w, arg, cwd)
 	}
-	env := f.env
+	if len(c.Args) == 0 {
+		for _, a := range c.Assigns {
+			if _, ok := f.env.vars[a.Name.Value]; ok {
+				f.env.set(a.Name.Value, f.assigned(a))
+			}
+		}
+		return cwd
+	}
+	env := f.env.vars
 	if len(c.Assigns) > 0 {
 		env = copyEnv(env)
 		for _, a := range c.Assigns {
-			if a.Name != nil && a.Value != nil {
-				env[a.Name.Value] = f.word(a.Value).Val
-			} else if a.Name != nil {
-				env[a.Name.Value] = ""
-			}
+			env[a.Name.Value] = f.assigned(a)
 		}
 	}
-	if len(c.Args) == 0 {
-		return cwd
+	if c.Args[0].Lit() == "unset" {
+		for _, arg := range c.Args[1:] {
+			if name := arg.Lit(); name == "-f" {
+				break
+			} else if name != "-v" {
+				f.env.unset(name)
+			}
+		}
 	}
 	inv := Invocation{Assigns: env, Source: f.text(s)}
 	for _, arg := range c.Args {
@@ -264,6 +304,47 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 	}
 	w.reached = append(w.reached, after...)
 	return after
+}
+
+// assigned is the value a NAME=value or NAME+=value assignment leaves.
+func (f frame) assigned(a *syntax.Assign) string {
+	value := ""
+	if a.Value != nil {
+		value = f.word(a.Value).Val
+	}
+	if a.Append {
+		value = f.env.vars[a.Name.Value] + value
+	}
+	return value
+}
+
+// declare applies export, export -n, and declare/typeset -x.
+func (f frame) declare(c *syntax.DeclClause) {
+	exporting := c.Variant.Value == "export"
+	unexporting := false
+	for _, a := range c.Args {
+		if a.Name != nil {
+			continue
+		}
+		if flag := f.word(a.Value).Val; strings.HasPrefix(flag, "-") {
+			exporting = exporting || strings.Contains(flag, "x")
+			unexporting = unexporting || (c.Variant.Value == "export" && strings.Contains(flag, "n"))
+		}
+	}
+	for _, a := range c.Args {
+		switch {
+		case a.Name == nil:
+		case unexporting:
+			f.env.unset(a.Name.Value)
+		case !exporting:
+		case a.Naked:
+			if _, ok := f.env.vars[a.Name.Value]; !ok {
+				f.env.set(a.Name.Value, "")
+			}
+		default:
+			f.env.set(a.Name.Value, f.assigned(a))
+		}
+	}
 }
 
 func (f frame) emit(w *walker, inv Invocation) {
