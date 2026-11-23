@@ -24,6 +24,7 @@ launchers='^(bash|sh|zsh|dash|fish|eval|source|\.|env|exec|command|nohup|setsid|
 
 is_agy() {
   local word=${1//[\"\'\`]/}
+  word=${word##*=}
   word=${word##*/}
   [[ $word =~ ^(agy|antigravity|acg)$ ]]
 }
