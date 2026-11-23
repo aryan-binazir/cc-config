@@ -138,9 +138,13 @@ func respond(o Options, messages []string) Result {
 	return Result{}
 }
 
+// mustJSON encodes v without HTML escaping, so shell text stays readable.
 func mustJSON(v any) string {
-	data, _ := json.Marshal(v)
-	return string(data)
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(v)
+	return strings.TrimSuffix(b.String(), "\n")
 }
 
 func (c *ctx) logOverride(hookName string, inv shell.Invocation) {
@@ -148,10 +152,14 @@ func (c *ctx) logOverride(hookName string, inv shell.Invocation) {
 	if dir == "" {
 		return
 	}
+	cwd := inv.Cwd
+	if cwd == "" {
+		cwd = c.call.cwd
+	}
 	line := mustJSON(map[string]string{
 		"time":    time.Now().UTC().Format(time.RFC3339),
 		"hook":    hookName,
-		"cwd":     inv.Cwd,
+		"cwd":     cwd,
 		"command": strings.Join(c.call.commands, "\n"),
 	}) + "\n"
 	if err := os.MkdirAll(dir, 0o700); err != nil {

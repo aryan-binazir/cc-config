@@ -323,3 +323,15 @@ func TestLookupsAreSkippedOnceAHookBlocks(t *testing.T) {
 		t.Fatalf("expected only merge-head-match: %+v", res)
 	}
 }
+
+func TestOverrideLogFallsBackToThePayloadCwdAndKeepsShellText(t *testing.T) {
+	state := t.TempDir()
+	payload := bashIn("/work/dir", `cd "$X" && AGENT_HOOKS_ALLOW=destructive git push -f`)
+	if res := runOpts(t, Options{Phase: "pre", Enabled: switches("destructive-git"), StateDir: state}, payload); res.Exit != 0 {
+		t.Fatalf("%+v", res)
+	}
+	raw, _ := os.ReadFile(filepath.Join(state, "overrides.log"))
+	if !strings.Contains(string(raw), `"cwd":"/work/dir"`) || !strings.Contains(string(raw), `$X\" && AGENT`) {
+		t.Errorf("log line: %s", raw)
+	}
+}
