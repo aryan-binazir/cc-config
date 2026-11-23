@@ -1,0 +1,13 @@
+# Switch hooks on (true) or off (false). Hooks that are not listed are off.
+# This file is compiled into the binary: run `make install` after editing it.
+hooks:
+  block-agy: true
+  draft-prs: true
+  pr-assignee: true
+  no-admin-merge: true
+  merge-head-match: true
+  no-production: true
+  commit-format: true
+  no-secrets-commit: true
+  destructive-git: true
+  rg-replace-flag: true

@@ -1,0 +1,344 @@
+package install
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+// Real-shaped copies of the configs on Ar's machine, plus the legacy block-agy wiring.
+const claudeOriginal = `{
+  "cleanupPeriodDays": 3650,
+  "attribution": {
+    "pr": ""
+  },
+  "model": "opus[1m]",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/home/ar/.claude/hooks/herdr-agent-state.sh' session",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "echo <ok> && true"
+  },
+  "alwaysThinkingEnabled": true
+}
+`
+
+const claudeLegacy = `{
+  "model": "opus[1m]",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/block-agy.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "other-hook"
+          }
+        ]
+      }
+    ]
+  }
+}
+`
+
+const codexOriginal = `{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bash '/home/ar/.codex/herdr-agent-state.sh' session",
+            "timeout": 10,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}`
+
+const codexLegacy = `{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "bash ~/.claude/hooks/block-agy.sh",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionStart": []
+  }
+}`
+
+const agyOriginal = `{
+  "lint": {
+    "PostToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "command": "./lint.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+`
+
+const bin = "/home/ar/.local/bin/agent-hooks"
+
+var now = time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
+
+func setup(t *testing.T, claude, codex, agy string) Paths {
+	t.Helper()
+	dir := t.TempDir()
+	p := Paths{
+		Claude: filepath.Join(dir, "claude", "settings.json"),
+		Codex:  filepath.Join(dir, "codex", "hooks.json"),
+		Agy:    filepath.Join(dir, "gemini", "config", "hooks.json"),
+	}
+	for path, content := range map[string]string{p.Claude: claude, p.Codex: codex, p.Agy: agy} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if content != "" {
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return p
+}
+
+func read(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func decode(t *testing.T, text string) map[string]any {
+	t.Helper()
+	var v map[string]any
+	if err := json.Unmarshal([]byte(text), &v); err != nil {
+		t.Fatalf("%v\n%s", err, text)
+	}
+	return v
+}
+
+func handlers(t *testing.T, cfg map[string]any, event string) []map[string]any {
+	t.Helper()
+	hooks, _ := cfg["hooks"].(map[string]any)
+	groups, _ := hooks[event].([]any)
+	var out []map[string]any
+	for _, g := range groups {
+		group := g.(map[string]any)
+		for _, h := range group["hooks"].([]any) {
+			handler := h.(map[string]any)
+			handler["matcher"] = group["matcher"]
+			out = append(out, handler)
+		}
+	}
+	return out
+}
+
+func TestInstallWiresEachHarness(t *testing.T) {
+	p := setup(t, claudeOriginal, codexOriginal, "")
+	changed, err := Install(p, bin, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(changed) != 3 {
+		t.Fatalf("changed: %v", changed)
+	}
+	claude := decode(t, read(t, p.Claude))
+	for event, arg := range map[string]string{"PreToolUse": "pre", "PostToolUse": "post"} {
+		hs := handlers(t, claude, event)
+		if len(hs) != 1 || hs[0]["command"] != "'"+bin+"' "+arg || hs[0]["matcher"] != "Bash" || hs[0]["type"] != "command" {
+			t.Errorf("claude %s: %v", event, hs)
+		}
+	}
+	codex := decode(t, read(t, p.Codex))
+	if hs := handlers(t, codex, "PreToolUse"); len(hs) != 1 || hs[0]["command"] != "'"+bin+"' pre" || hs[0]["matcher"] != "Bash" {
+		t.Errorf("codex pre: %v", hs)
+	}
+	if hs := handlers(t, codex, "PostToolUse"); len(hs) != 1 || hs[0]["command"] != "'"+bin+"' post" {
+		t.Errorf("codex post: %v", hs)
+	}
+	agy := decode(t, read(t, p.Agy))
+	want := map[string]any{"agent-hooks": map[string]any{"PreToolUse": []any{map[string]any{
+		"matcher": "run_command|manage_task",
+		"hooks":   []any{map[string]any{"type": "command", "command": "'" + bin + "' pre --agy", "timeout": float64(10)}},
+	}}}}
+	if !reflect.DeepEqual(agy, want) {
+		t.Errorf("agy: %v", agy)
+	}
+	// Unrelated settings survive, in their original order and spelling.
+	got := read(t, p.Claude)
+	for _, s := range []string{`"statusLine"`, `"echo <ok> && true"`, `herdr-agent-state.sh`, `"alwaysThinkingEnabled": true`} {
+		if !strings.Contains(got, s) {
+			t.Errorf("lost %s", s)
+		}
+	}
+	if strings.Index(got, `"cleanupPeriodDays"`) > strings.Index(got, `"model"`) || !strings.HasSuffix(got, "}\n") {
+		t.Errorf("key order or trailing newline changed:\n%s", got)
+	}
+	if strings.HasSuffix(read(t, p.Codex), "\n") {
+		t.Error("codex file gained a trailing newline")
+	}
+	if b := read(t, p.Claude+".bak-20261123T120000Z"); b != claudeOriginal {
+		t.Errorf("backup: %q", b)
+	}
+	if info, _ := os.Stat(p.Claude); info.Mode().Perm() != 0o600 {
+		t.Errorf("mode changed: %v", info.Mode())
+	}
+}
+
+func TestInstallIsIdempotent(t *testing.T) {
+	p := setup(t, claudeOriginal, codexOriginal, agyOriginal)
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	first := []string{read(t, p.Claude), read(t, p.Codex), read(t, p.Agy)}
+	changed, err := Install(p, bin, now.Add(time.Hour))
+	if err != nil || len(changed) != 0 {
+		t.Fatalf("second install changed %v (%v)", changed, err)
+	}
+	if again := []string{read(t, p.Claude), read(t, p.Codex), read(t, p.Agy)}; !reflect.DeepEqual(first, again) {
+		t.Error("second install rewrote files")
+	}
+	if _, err := os.Stat(p.Claude + ".bak-20261123T130000Z"); err == nil {
+		t.Error("backup written without a change")
+	}
+	// A moved binary replaces the old entry instead of adding a second one.
+	if _, err := Install(p, "/opt/bin/agent-hooks", now); err != nil {
+		t.Fatal(err)
+	}
+	if hs := handlers(t, decode(t, read(t, p.Claude)), "PreToolUse"); len(hs) != 1 || hs[0]["command"] != "'/opt/bin/agent-hooks' pre" {
+		t.Errorf("moved binary: %v", hs)
+	}
+}
+
+func TestInstallRemovesLegacyBlockAgyAndKeepsOtherHooks(t *testing.T) {
+	p := setup(t, claudeLegacy, codexLegacy, agyOriginal)
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{p.Claude, p.Codex} {
+		if text := read(t, path); strings.Contains(text, "block-agy.sh") {
+			t.Errorf("legacy entry left in %s:\n%s", path, text)
+		}
+	}
+	claude := decode(t, read(t, p.Claude))
+	pre := handlers(t, claude, "PreToolUse")
+	if len(pre) != 2 || pre[0]["command"] != "other-hook" || pre[1]["command"] != "'"+bin+"' pre" {
+		t.Errorf("claude pre: %v", pre)
+	}
+	codex := decode(t, read(t, p.Codex))
+	if hs := handlers(t, codex, "PreToolUse"); len(hs) != 1 {
+		t.Errorf("codex pre: %v", hs)
+	}
+	if _, ok := codex["hooks"].(map[string]any)["SessionStart"]; !ok {
+		t.Error("an unrelated empty event was dropped")
+	}
+	agy := decode(t, read(t, p.Agy))
+	if _, ok := agy["lint"]; !ok {
+		t.Error("lost the other agy hook")
+	}
+}
+
+func TestUninstallRestoresTheOriginal(t *testing.T) {
+	p := setup(t, claudeOriginal, codexOriginal, agyOriginal)
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Uninstall(p, now.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{p.Claude: claudeOriginal, p.Codex: codexOriginal, p.Agy: agyOriginal} {
+		if got := read(t, path); got != want {
+			t.Errorf("%s not restored:\n%s", path, got)
+		}
+	}
+	changed, err := Uninstall(p, now.Add(2*time.Minute))
+	if err != nil || len(changed) != 0 {
+		t.Errorf("second uninstall changed %v (%v)", changed, err)
+	}
+}
+
+func TestUninstallRemovesAnAgyFileItCreated(t *testing.T) {
+	p := setup(t, "", "", "")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Uninstall(p, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(p.Agy); !os.IsNotExist(err) {
+		t.Errorf("agy hooks file left behind: %v", err)
+	}
+	if got := read(t, p.Claude); got != "{}\n" {
+		t.Errorf("claude: %q", got)
+	}
+}
+
+func TestInstallWritesThroughSymlinks(t *testing.T) {
+	p := setup(t, "", codexOriginal, "")
+	target := filepath.Join(t.TempDir(), "real-settings.json")
+	if err := os.WriteFile(target, []byte(claudeOriginal), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, p.Claude); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Lstat(p.Claude); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("symlink replaced by a file")
+	}
+	if !strings.Contains(read(t, target), "agent-hooks") {
+		t.Error("target not updated")
+	}
+}
+
+func TestMalformedConfigIsLeftAlone(t *testing.T) {
+	p := setup(t, "{not json", codexOriginal, "")
+	if _, err := Install(p, bin, now); err == nil {
+		t.Fatal("want an error")
+	}
+	if got := read(t, p.Claude); got != "{not json" {
+		t.Errorf("malformed file was modified: %q", got)
+	}
+}
