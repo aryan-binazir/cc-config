@@ -184,17 +184,33 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 	// A collision is a shared path, or one side's path under the other's:
 	// an untracked file inside a tracked file's spot, or the reverse.
 	localSet := map[string]bool{}
+	var collapsed []string // wholly untracked or ignored directories, listed as dir/
 	for _, p := range local {
-		localSet[strings.TrimSuffix(p, "/")] = true // an ignored directory is listed as dir/
-		for q := strings.TrimSuffix(p, "/"); q != "." && q != ""; q = path.Dir(q) {
+		if strings.HasSuffix(p, "/") {
+			collapsed = append(collapsed, p)
+			continue
+		}
+		localSet[p] = true
+		for q := p; q != "." && q != ""; q = path.Dir(q) {
 			if tracked[q] {
 				return true
 			}
 		}
 	}
+	root := ""
+	if len(collapsed) > 0 {
+		out, _ := c.git(g, "rev-parse", "--show-toplevel")
+		root = strings.TrimSpace(out)
+	}
 	for t := range tracked {
 		for q := t; q != "." && q != ""; q = path.Dir(q) {
 			if localSet[q] {
+				return true
+			}
+		}
+		for _, dir := range collapsed {
+			// Inside a collapsed directory only a file at the same path is lost.
+			if strings.HasPrefix(t, dir) && (root == "" || exists(path.Join(root, t))) {
 				return true
 			}
 		}

@@ -559,3 +559,14 @@ func TestInstallLeavesOtherEventsAndSharedBashGroups(t *testing.T) {
 		t.Errorf("appended a second Bash group: %v", pre)
 	}
 }
+
+func TestSharedRegexMatcherCountsAsBash(t *testing.T) {
+	codex := `{"hooks": {"PreToolUse": [{"matcher": "Bash|Edit", "hooks": [{"command": "'/x/agent-hooks' pre"}, {"command": "mine"}]}]}}`
+	p := setup(t, "", codex, "")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	if pre := decode(t, read(t, p.Codex))["hooks"].(map[string]any)["PreToolUse"].([]any); len(pre) != 1 {
+		t.Errorf("appended a duplicate group: %v", pre)
+	}
+}

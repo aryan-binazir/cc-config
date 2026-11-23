@@ -23,8 +23,8 @@ func (f frame) word(w *syntax.Word) Word {
 	}
 	quoted := false
 	if len(w.Parts) > 0 {
-		_, lit := w.Parts[0].(*syntax.Lit)
-		quoted = !lit
+		lit, ok := w.Parts[0].(*syntax.Lit)
+		quoted = !ok || strings.HasPrefix(lit.Value, `\`)
 	}
 	return Word{Val: b.String(), Dynamic: dynamic, Quoted: quoted}
 }

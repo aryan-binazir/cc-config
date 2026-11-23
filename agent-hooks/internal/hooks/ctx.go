@@ -43,27 +43,11 @@ func newCtx(c call, o Options) *ctx {
 
 // git runs a read-only git command for g's repository, cached for the call.
 // ok is false when it fails, times out, overflows, or lookups are off;
-// callers then allow. Repository-configured programs stay off: fsmonitor and
-// every configured clean/smudge/process filter.
+// callers then allow. No lookup adds, locks, or hashes the worktree in bulk,
+// and fsmonitor stays off.
 func (c *ctx) git(g *gitCmd, args ...string) (string, bool) {
-	safe := append([]string{"-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"}, c.filterOverrides(g)...)
+	safe := []string{"-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"}
 	return c.run(gitTimeout, g.dir, g.env, "git", append(safe, args...)...)
-}
-
-// filterOverrides neutralizes the repository's configured filters, whichever
-// attributes file selects them: clean and smudge become cat, process is unset.
-// Reading config runs no filter.
-func (c *ctx) filterOverrides(g *gitCmd) []string {
-	out, _ := c.run(gitTimeout, g.dir, g.env, "git", "config", "--name-only", "--get-regexp", `^filter\..*\.(clean|smudge|process)$`)
-	var overrides []string
-	for _, key := range strings.Fields(out) {
-		value := "cat"
-		if strings.HasSuffix(key, ".process") {
-			value = ""
-		}
-		overrides = append(overrides, "-c", key+"="+value)
-	}
-	return overrides
 }
 
 func (c *ctx) gh(dir string, env []string, args ...string) (string, bool) {

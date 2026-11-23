@@ -11,6 +11,7 @@ package shell
 import (
 	"path"
 	"reflect"
+	"slices"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -70,9 +71,10 @@ func Parse(src, cwd, home string) (invs []Invocation, ok bool) {
 }
 
 type walker struct {
-	home string
-	out  []Invocation
-	ok   bool
+	home    string
+	out     []Invocation
+	reached dirs // every directory a cd led to, in order
+	ok      bool
 	// set while walking the top-level script so nested parses do not reset it
 	started bool
 }
@@ -87,7 +89,7 @@ func (w *walker) script(src, cwd string, env map[string]string, depth int) []Inv
 		return w.out
 	}
 	f := frame{src: src, env: env, depth: depth, home: w.home}
-	f.stmts(w, file.Stmts, cwd)
+	f.stmts(w, file.Stmts, dirs{cwd})
 	return w.out
 }
 
@@ -107,15 +109,33 @@ func (f frame) text(n syntax.Node) string {
 	return f.src[start:end]
 }
 
-// stmts walks a statement list in order and returns the directory it ends in.
-func (f frame) stmts(w *walker, list []*syntax.Stmt, cwd string) string {
+// dirs is the set of directories a command may run in, since `a || b` can
+// leave the shell in either. It is capped to keep walking linear.
+type dirs []string
+
+const maxDirs = 4
+
+func (d dirs) union(more ...dirs) dirs {
+	out := append(dirs{}, d...)
+	for _, m := range more {
+		for _, dir := range m {
+			if len(out) < maxDirs && !slices.Contains(out, dir) {
+				out = append(out, dir)
+			}
+		}
+	}
+	return out
+}
+
+// stmts walks a statement list in order and returns the directories it may end in.
+func (f frame) stmts(w *walker, list []*syntax.Stmt, cwd dirs) dirs {
 	for _, s := range list {
 		cwd = f.stmt(w, s, cwd)
 	}
 	return cwd
 }
 
-func (f frame) stmt(w *walker, s *syntax.Stmt, cwd string) string {
+func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	if s == nil {
 		return cwd
 	}
@@ -131,27 +151,19 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd string) string {
 		case syntax.AndStmt:
 			return f.stmt(w, c.Y, f.stmt(w, c.X, cwd))
 		case syntax.OrStmt:
+			mark := len(w.reached)
 			afterX := f.stmt(w, c.X, cwd)
-			// Y runs only when X failed, so it may start where X began (a cd
-			// failed) or where X ended (a later command failed). Walk Y from
-			// every directory it can start in.
-			starts := []string{afterX}
-			switch {
-			case isCd(c.X):
-				starts = []string{cwd}
-			case afterX != cwd:
-				starts = append(starts, cwd)
+			// Y runs only when X failed: where X began if a plain cd failed,
+			// else anywhere X's commands ran.
+			starts := cwd
+			if !isCd(c.X) {
+				starts = cwd.union(w.reached[mark:], afterX)
 			}
-			same := true
-			for _, start := range starts {
-				if f.stmt(w, c.Y, start) != afterX {
-					same = false
-				}
-			}
-			if same || exits(c.Y) {
+			afterY := f.stmt(w, c.Y, starts)
+			if exits(c.Y) {
 				return afterX // when Y exits, only the X path continues
 			}
-			return ""
+			return afterX.union(afterY)
 		}
 		f.stmt(w, c.X, cwd)
 		f.stmt(w, c.Y, cwd)
@@ -180,7 +192,7 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd string) string {
 		f.stmt(w, c.Body, cwd)
 	case *syntax.TimeClause:
 		// `time` is a keyword, but agents (and block-agy) treat it as a launcher.
-		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd, Source: f.text(s)})
+		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s)})
 		return f.stmt(w, c.Stmt, cwd)
 	case *syntax.CoprocClause:
 		f.stmt(w, c.Stmt, cwd)
@@ -192,7 +204,7 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd string) string {
 }
 
 // substs walks the command and process substitutions anywhere inside n.
-func (f frame) substs(w *walker, n syntax.Node, cwd string) {
+func (f frame) substs(w *walker, n syntax.Node, cwd dirs) {
 	if n == nil || reflect.ValueOf(n).IsNil() {
 		return
 	}
@@ -209,7 +221,7 @@ func (f frame) substs(w *walker, n syntax.Node, cwd string) {
 	})
 }
 
-func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd string) string {
+func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dirs {
 	for _, a := range c.Assigns {
 		f.substs(w, a, cwd)
 	}
@@ -230,7 +242,7 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd string) s
 	if len(c.Args) == 0 {
 		return cwd
 	}
-	inv := Invocation{Assigns: env, Cwd: cwd, Source: f.text(s)}
+	inv := Invocation{Assigns: env, Source: f.text(s)}
 	for _, arg := range c.Args {
 		inv.Args = append(inv.Args, f.word(arg))
 	}
@@ -253,11 +265,19 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd string) s
 		}
 		inv.Stdin, inv.StdinDynamic = &body.Val, body.Dynamic
 	}
-	f.emit(w, inv)
-	if inv.Args[0].Val == "cd" {
-		return f.cd(inv, cwd)
+	var after dirs
+	for _, dir := range cwd {
+		inv.Cwd = dir
+		f.emit(w, inv)
+		if inv.Args[0].Val == "cd" {
+			after = after.union(dirs{f.cd(inv, dir)})
+		}
 	}
-	return cwd
+	if after == nil {
+		return cwd
+	}
+	w.reached = append(w.reached, after...)
+	return after
 }
 
 // emit records inv and then any command it wraps or evaluates.

@@ -360,10 +360,16 @@ func filter(hooks *object, drop func(any) bool) bool {
 	return removedAny
 }
 
+// coversBash reports whether a group's matcher (a tool name, "*", or a regex)
+// selects the Bash tool.
 func coversBash(group *object) bool {
 	v, _ := group.get("matcher")
 	m, _ := v.(string)
-	return m == "" || m == "*" || m == "Bash"
+	if m == "" || m == "*" {
+		return true
+	}
+	re, err := regexp.Compile("^(?:" + m + ")$")
+	return err == nil && re.MatchString("Bash")
 }
 
 func commandOf(h any) string {

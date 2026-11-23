@@ -3,11 +3,13 @@ package hooks
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // repo is a work tree cloned from a local bare remote that has main and production.
@@ -473,7 +475,7 @@ func TestConfiguredAndMappedRefspecs(t *testing.T) {
 	r.expect("destructive-git", true, "git push", "git push origin")
 	r.git("config", "--unset", "remote.origin.push")
 	r.git("branch", "staging/production")
-	r.expect("no-production", true, "git push origin 'refs/heads/staging/*:refs/heads/*'", "git push --prune origin main", "git update-ref -d -- refs/heads/production")
+	r.expect("no-production", true, "git push origin 'refs/heads/staging/*:refs/heads/*'", "git update-ref -d -- refs/heads/production")
 	r.git("branch", "production", "origin/production")
 	r.expect("no-production", true, "git push --repo=origin --all")
 	r.expect("no-production", false, "git push origin 'refs/tags/*:refs/tags/*'", "git push origin 'refs/heads/feature/*:refs/heads/feature/*'")
@@ -626,4 +628,70 @@ func TestLookupsWorkInSHA256Repositories(t *testing.T) {
 			t.Errorf("%s in a SHA-256 repo: %+v", tc.command, res)
 		}
 	}
+}
+
+func TestSecretLookupsNeitherLockNorHash(t *testing.T) {
+	r := newRepo(t)
+	marker := filepath.Join(t.TempDir(), "filtered")
+	r.git("config", "filter.mark.clean", "touch "+marker+"; cat")
+	r.write(".gitattributes", "* filter=mark\n")
+	for i := 0; i < 300; i++ {
+		r.write(fmt.Sprintf("bulk/f%03d.txt", i), "x")
+	}
+	r.write(".env", "x")
+	start := time.Now()
+	r.expect("no-secrets-commit", true, "git add -A", "git add .", "git add bulk .env")
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("a secrets lookup ran a clean filter")
+	}
+	if _, err := os.Stat(filepath.Join(r.dir, ".git", "index.lock")); err == nil {
+		t.Error("a lookup left index.lock")
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Errorf("bulk add lookups took %v", time.Since(start))
+	}
+	r.write("sub/x.txt", "x")
+	if res := run(t, "no-secrets-commit", bashIn(filepath.Join(r.dir, "sub"), "git add -A")); res.Exit != 2 {
+		t.Errorf("add -A from a subdirectory stages the whole tree: %+v", res)
+	}
+}
+
+func TestDirectoryCandidates(t *testing.T) {
+	r := newRepo(t)
+	other := t.TempDir()
+	r.write("README.md", "edited\n")
+	r.expect("destructive-git", true, "cd "+r.dir+" || cd "+other+"; git reset --hard", "cd "+other+" || cd "+r.dir+"; git reset --hard")
+	r.write(".env", "x")
+	if res := run(t, "no-secrets-commit", bashIn(r.root, "cd work && cd missing && git status || git add -A")); res.Exit != 2 {
+		t.Errorf("intermediate directory: %+v", res)
+	}
+	deep := strings.Repeat("cd a || cd b || ", 14) + "true"
+	start := time.Now()
+	run(t, "no-secrets-commit", bashIn(r.dir, deep))
+	if time.Since(start) > 100*time.Millisecond {
+		t.Errorf("nested fallbacks took %v", time.Since(start))
+	}
+}
+
+func TestReviewRoundFiveLowCases(t *testing.T) {
+	r := newRepo(t)
+	r.expect("no-production", false, "git push --prune origin main", "git push --prune origin 'refs/tags/*:refs/tags/*'")
+	r.expect("no-production", true, "git push --prune origin : 'refs/tags/*:refs/tags/*'")
+	expectAllowed(t, "destructive-git", `rm -rf \~`)
+	solo := newRepo(t)
+	solo.git("remote", "rename", "origin", "backup")
+	solo.git("config", "remote.backup.mirror", "true")
+	solo.git("branch", "-q", "--unset-upstream")
+	solo.expect("no-production", true, "git push")
+}
+
+func TestResetKeepsIgnoredSiblings(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "other")
+	r.write("build/out.txt", "tracked")
+	r.git("add", "-f", "build/out.txt")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Other")
+	r.git("switch", "-q", "main")
+	r.write("build/cache.log", "ignored sibling")
+	r.expect("destructive-git", false, "git reset --hard other")
 }

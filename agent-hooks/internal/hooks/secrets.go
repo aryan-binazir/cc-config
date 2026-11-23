@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -83,32 +84,72 @@ func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 	return found
 }
 
-// wouldAdd asks `git add --dry-run` which files the add would stage, so ignore
-// rules, -f, -u, and pathspec magic match git exactly. It passes only flags it
-// understands, never the agent's own arguments, so the lookup cannot write.
+// wouldAdd lists credential-like files the add would stage. It never runs git
+// add: untracked (and, with -f, ignored) files come from ls-files, which reads
+// no content, and only tracked files with credential-like names are diffed.
 func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
-	args := []string{"add", "--dry-run"}
-	for _, f := range [][2]string{{"-f", "--force"}, {"-A", "--all"}, {"-u", "--update"}, {"--pathspec-file-nul", "--pathspec-file-nul"}} {
-		if o.has(f[0]) {
-			args = append(args, f[1])
+	paths := values(specs)
+	for _, file := range o.vals["--pathspec-from-file"] {
+		paths = append(paths, c.pathspecFile(g, file, o.has("--pathspec-file-nul"))...)
+	}
+	if len(paths) == 0 {
+		paths = []string{":/"} // -A and -u cover the whole tree
+	}
+	var found []string
+	keep := func(out string) {
+		for _, p := range strings.Split(out, "\x00") {
+			if p != "" && isSecret(p) {
+				found = append(found, p)
+			}
 		}
 	}
-	for _, file := range o.vals["--pathspec-from-file"] {
-		args = append(args, "--pathspec-from-file="+file.Val)
+	if !o.has("-u") {
+		out, _ := c.git(g, append([]string{"ls-files", "-z", "--others", "--exclude-standard", "--"}, paths...)...)
+		keep(out)
+		if o.has("-f") {
+			out, _ := c.git(g, append([]string{"ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--"}, paths...)...)
+			keep(out)
+		}
 	}
-	if len(specs) > 0 {
-		args = append(append(args, "--"), values(specs)...)
+	out, _ := c.git(g, append([]string{"ls-files", "-z", "--"}, paths...)...)
+	var tracked []string
+	for _, p := range strings.Split(out, "\x00") {
+		if p != "" && isSecret(p) {
+			tracked = append(tracked, p)
+		}
 	}
-	// A failing dry run (say, one ignored operand) still stages the rest for
-	// real, so read what it listed either way.
-	out, _ := c.git(g, args...)
-	var found []string
-	for _, line := range strings.Split(out, "\n") {
-		if p, ok := strings.CutPrefix(line, "add '"); ok && isSecret(strings.TrimSuffix(p, "'")) {
-			found = append(found, strings.TrimSuffix(p, "'"))
+	if len(tracked) > 0 {
+		out, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--relative", "--"}, tracked...)...)
+		for _, p := range strings.Split(out, "\x00") {
+			if p != "" && exists(shellPath(g.dir, p, c.opts.Home)) {
+				found = append(found, p) // a modification, not a deletion
+			}
 		}
 	}
 	return found
+}
+
+// pathspecFile reads the pathspecs an add takes from a file.
+func (c *ctx) pathspecFile(g *gitCmd, file shell.Word, nul bool) []string {
+	full := shell.Resolve(g.dir, file.Val, c.opts.Home)
+	if file.Dynamic || file.Val == "-" || full == "" {
+		return nil
+	}
+	data, err := os.ReadFile(full)
+	if err != nil || len(data) > 1<<20 {
+		return nil
+	}
+	sep := "\n"
+	if nul {
+		sep = "\x00"
+	}
+	var out []string
+	for _, line := range strings.Split(string(data), sep) {
+		if line = strings.TrimRight(line, "\r"); line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
 }
 
 // broad reports whether any pathspec can match files it does not name.

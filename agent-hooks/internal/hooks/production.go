@@ -207,6 +207,9 @@ func (c *ctx) remoteFor(g *gitCmd, o opts) string {
 			return strings.TrimSpace(out)
 		}
 	}
+	if out, _ := c.git(g, "remote"); len(strings.Fields(out)) == 1 {
+		return strings.TrimSpace(out) // git pushes to a sole remote
+	}
 	return "origin"
 }
 
@@ -236,25 +239,26 @@ func mapWildcard(src, dst string) (string, bool) {
 }
 
 // pruneDeletesProduction reports whether --prune could delete a remote
-// production branch: a wildcard covers it with no local source, or (without
-// wildcards) no local production branch exists. The remote's own branches are
-// unknowable offline, so the second case assumes it has one.
+// production branch: a wildcard covers it with no local source, or a matching
+// push (--all, `:`) runs with no local production branch. The remote's own
+// branches are unknowable offline, so that case assumes it has one.
 func (c *ctx) pruneDeletesProduction(g *gitCmd, o opts, refspecs []string) bool {
-	wildcard := false
+	matching := o.has("--all", "--branches")
 	for _, spec := range refspecs {
 		src, dst, ok := strings.Cut(strings.TrimPrefix(spec, "+"), ":")
 		if !ok {
 			dst = src
 		}
-		if !strings.Contains(dst, "*") {
-			continue
-		}
-		wildcard = true
-		if from, covers := mapWildcard(src, dst); covers && !c.refExists(g, from) {
-			return true
+		switch {
+		case src == "" && dst == "":
+			matching = true
+		case strings.Contains(dst, "*"):
+			if from, covers := mapWildcard(src, dst); covers && !c.refExists(g, from) {
+				return true
+			}
 		}
 	}
-	return !wildcard && !c.hasLocalProduction(g)
+	return matching && !c.hasLocalProduction(g)
 }
 
 func (c *ctx) refExists(g *gitCmd, ref string) bool {
