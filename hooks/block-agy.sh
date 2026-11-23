@@ -20,7 +20,7 @@ commands=$(jq -r '
   | join("\n")
 ' <<<"$payload" 2>/dev/null) || exit 0
 
-launchers='^(bash|sh|zsh|dash|fish|env|exec|command|nohup|setsid|timeout|stdbuf|nice|time|sudo|doas|xargs|parallel|watch|unbuffer|script|systemd-run|tmux|screen|ssh|mise)$'
+launchers='^(bash|sh|zsh|dash|fish|eval|source|\.|env|exec|command|nohup|setsid|timeout|stdbuf|nice|time|sudo|doas|xargs|parallel|watch|unbuffer|script|systemd-run|tmux|screen|ssh|mise)$'
 
 is_agy() {
   local word=${1//[\"\'\`]/}
@@ -38,6 +38,14 @@ EOF
   exit 2
 }
 
+# Any mention of agy anywhere in the call, so `echo 'agy -p x' | bash` is caught
+# by the launcher check below even though the bash segment never names agy.
+mentioned=false
+read -ra all_words <<<"$(tr ';&|()`\n' '       ' <<<"$commands")"
+for word in "${all_words[@]}"; do
+  is_agy "$word" && mentioned=true && break
+done
+
 while IFS= read -r segment; do
   read -ra words <<<"$segment"
   i=0
@@ -50,9 +58,7 @@ while IFS= read -r segment; do
   first=${first##*/}
   [[ $first =~ $launchers ]] || continue
   [[ $first == command && ${words[i + 1]:-} == -[vV] ]] && continue
-  for word in "${words[@]:i+1}"; do
-    is_agy "$word" && block
-  done
+  $mentioned && block
 done < <(tr ';&|()`\n' '\n\n\n\n\n\n\n' <<<"$commands")
 
 exit 0
