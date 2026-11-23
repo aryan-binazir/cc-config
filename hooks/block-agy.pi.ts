@@ -1,10 +1,10 @@
-// Blocks agent-run commands that drive the Antigravity CLI (agy / antigravity / acg)
-// non-interactively. The check lives in the shared Claude Code / Codex hook script.
+// Blocks agent-run commands that launch the Antigravity CLI (agy / antigravity / acg)
+// in any mode. The check lives in the shared Claude Code / Codex hook script.
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 
-const script = path.join(os.homedir(), ".claude/hooks/block-agy-headless.sh");
+const script = path.join(os.homedir(), ".claude/hooks/block-agy.sh");
 
 export default function (pi) {
   pi.on("tool_call", async (event) => {
