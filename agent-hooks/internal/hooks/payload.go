@@ -7,11 +7,10 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// call is the part of a hook payload the hooks read.
 type call struct {
 	agy      bool
-	commands []string // shell source the tool will run or type into a terminal
-	cwd      string   // "" when unknown
+	commands []string
+	cwd      string
 }
 
 // shellTools are the tool names whose input runs in, or types into, a shell:
@@ -30,8 +29,6 @@ type payload struct {
 	} `json:"toolCall"`
 }
 
-// decode reads a Claude Code, Codex, or Antigravity payload. Anything it cannot
-// read yields a call with no commands, which every hook allows.
 func decode(data []byte) call {
 	var p payload
 	if json.Unmarshal(data, &p) != nil {
@@ -78,8 +75,6 @@ func appendString(list []string, raw json.RawMessage) []string {
 	return list
 }
 
-// commandText accepts a command string or an argv array, which it re-quotes so
-// the shell parser sees the same words.
 func commandText(raw json.RawMessage) (string, bool) {
 	if len(raw) == 0 {
 		return "", false

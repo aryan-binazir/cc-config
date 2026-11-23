@@ -8,18 +8,16 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
-// gitCmd is a `git <subcommand>` invocation with its global options applied.
 type gitCmd struct {
 	sub    string
 	args   []shell.Word
-	dir    string            // effective working directory; "" when unknown
-	env    []string          // GIT_DIR and friends that select the repository
-	config map[string]string // -c key=value, keys lower-cased
+	dir    string
+	env    []string
+	config map[string]string
 }
 
 var gitGlobalValues = []string{"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix", "--exec-path"}
 
-// gitRepoEnv are the variables that point git at a different repository or index.
 var gitRepoEnv = []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"}
 
 func parseGit(inv shell.Invocation, home string) *gitCmd {
@@ -86,7 +84,7 @@ func parseGit(inv shell.Invocation, home string) *gitCmd {
 			full = shell.Resolve(g.dir, w.Val, home)
 		}
 		if full == "" {
-			g.dir = "" // the repository is unknowable, so skip lookups
+			g.dir = ""
 			return g
 		}
 		g.env = append(g.env, name+"="+full)
@@ -94,17 +92,14 @@ func parseGit(inv shell.Invocation, home string) *gitCmd {
 	return g
 }
 
-// opts is a parsed argument list. Flags are keyed by their canonical spelling.
 type opts struct {
 	set    map[string]int
 	vals   map[string][]shell.Word
-	pos    []shell.Word // operands before --
-	paths  []shell.Word // operands after --
-	dashed bool         // a -- was present
+	pos    []shell.Word
+	paths  []shell.Word
+	dashed bool
 }
 
-// parseOpts reads args given the short options that take a value, the long
-// options that take a separate value, and aliases from long to canonical names.
 func parseOpts(args []shell.Word, shortValues string, longValues []string, alias map[string]string) opts {
 	o := opts{set: map[string]int{}, vals: map[string][]shell.Word{}}
 	canon := func(name string) string {
@@ -136,7 +131,6 @@ func parseOpts(args []shell.Word, shortValues string, longValues []string, alias
 		case strings.HasPrefix(a, "--"):
 			name, value, hasValue := strings.Cut(a, "=")
 			if negated, ok := strings.CutPrefix(name, "--no-"); ok {
-				// --no-X cancels an earlier --X, as git's option parser does.
 				delete(o.set, canon("--"+negated))
 				delete(o.vals, canon("--"+negated))
 			}
@@ -187,7 +181,6 @@ func values(words []shell.Word) []string {
 	return out
 }
 
-// porcelain lists `git status --porcelain=v1 -z` entries as (XY, path) pairs.
 type entry struct {
 	xy   string
 	path string

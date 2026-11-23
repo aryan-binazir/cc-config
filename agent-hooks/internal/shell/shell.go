@@ -1,11 +1,11 @@
 // Package shell turns a shell command string into the simple commands it would run.
 //
-// It parses with mvdan.cc/sh and walks every statement, including pipelines,
-// subshells, command and process substitutions, and the bodies of `bash -c`,
-// `eval`, and shells fed a here-document. Common wrappers (sudo, env, timeout,
-// nohup, ...) are peeled so the wrapped command is reported as its own
-// invocation. Expansions are not performed: a word that depends on runtime
-// state keeps its source text and is marked Dynamic.
+// It walks every statement, including pipelines, subshells, command and
+// process substitutions, and the bodies of `bash -c`, `eval`, and shells fed a
+// here-document. Common wrappers (sudo, env, timeout, nohup, ...) are peeled so
+// the wrapped command is reported as its own invocation. Expansions are not
+// performed: a word that depends on runtime state keeps its source text and is
+// marked Dynamic.
 package shell
 
 import (
@@ -64,36 +64,29 @@ func (inv Invocation) Strings() []string {
 const maxDepth = 8
 
 // Parse returns every simple command in src, run from cwd ("" when unknown).
-// ok is false when src is not valid shell; the caller decides how to fall back.
+// ok is false when src is not valid shell.
 func Parse(src, cwd, home string) (invs []Invocation, ok bool) {
 	w := &walker{home: home}
-	return w.script(src, cwd, nil, 0), w.ok
+	ok = w.script(src, cwd, nil, 0)
+	return w.out, ok
 }
 
 type walker struct {
 	home    string
 	out     []Invocation
-	reached dirs // every directory a cd led to, in order
-	ok      bool
-	// set while walking the top-level script so nested parses do not reset it
-	started bool
+	reached dirs
 }
 
-func (w *walker) script(src, cwd string, env map[string]string, depth int) []Invocation {
+func (w *walker) script(src, cwd string, env map[string]string, depth int) (parsed bool) {
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(src), "")
-	if !w.started {
-		w.started = true
-		w.ok = err == nil
-	}
 	if err != nil {
-		return w.out
+		return false
 	}
 	f := frame{src: src, env: env, depth: depth, home: w.home}
 	f.stmts(w, file.Stmts, dirs{cwd})
-	return w.out
+	return true
 }
 
-// frame is the parse context of one source string.
 type frame struct {
 	src   string
 	env   map[string]string
@@ -109,8 +102,6 @@ func (f frame) text(n syntax.Node) string {
 	return f.src[start:end]
 }
 
-// dirs is the set of directories a command may run in, since `a || b` can
-// leave the shell in either. It is capped to keep walking linear.
 type dirs []string
 
 const maxDirs = 4
@@ -127,7 +118,6 @@ func (d dirs) union(more ...dirs) dirs {
 	return out
 }
 
-// stmts walks a statement list in order and returns the directories it may end in.
 func (f frame) stmts(w *walker, list []*syntax.Stmt, cwd dirs) dirs {
 	for _, s := range list {
 		cwd = f.stmt(w, s, cwd)
@@ -153,15 +143,13 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 		case syntax.OrStmt:
 			mark := len(w.reached)
 			afterX := f.stmt(w, c.X, cwd)
-			// Y runs only when X failed: where X began if a plain cd failed,
-			// else anywhere X's commands ran.
-			starts := cwd
+			whereXFailed := cwd
 			if !isCd(c.X) {
-				starts = cwd.union(w.reached[mark:], afterX)
+				whereXFailed = cwd.union(w.reached[mark:], afterX)
 			}
-			afterY := f.stmt(w, c.Y, starts)
+			afterY := f.stmt(w, c.Y, whereXFailed)
 			if exits(c.Y) {
-				return afterX // when Y exits, only the X path continues
+				return afterX
 			}
 			return afterX.union(afterY)
 		}
@@ -191,7 +179,6 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	case *syntax.FuncDecl:
 		f.stmt(w, c.Body, cwd)
 	case *syntax.TimeClause:
-		// `time` is a keyword, but agents (and block-agy) treat it as a launcher.
 		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s)})
 		return f.stmt(w, c.Stmt, cwd)
 	case *syntax.CoprocClause:
@@ -203,7 +190,6 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	return cwd
 }
 
-// substs walks the command and process substitutions anywhere inside n.
 func (f frame) substs(w *walker, n syntax.Node, cwd dirs) {
 	if n == nil || reflect.ValueOf(n).IsNil() {
 		return
@@ -258,7 +244,7 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 			body = f.word(r.Word)
 			body.Val += "\n"
 		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn:
-			inv.Stdin, inv.StdinDynamic = nil, false // the last stdin redirect wins
+			inv.Stdin, inv.StdinDynamic = nil, false
 			continue
 		default:
 			continue
@@ -280,7 +266,6 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 	return after
 }
 
-// emit records inv and then any command it wraps or evaluates.
 func (f frame) emit(w *walker, inv Invocation) {
 	w.out = append(w.out, inv)
 	if f.depth >= maxDepth {
@@ -303,7 +288,7 @@ func (f frame) emit(w *walker, inv Invocation) {
 			case !strings.HasPrefix(a, "--") && strings.Contains(a, "c"):
 				command = true
 			case !strings.HasPrefix(a, "--") && strings.Contains(a, "s"):
-				fromStdin = true // -s: the script is stdin, operands are arguments
+				fromStdin = true
 			}
 		}
 		if command {
@@ -319,7 +304,7 @@ func (f frame) emit(w *walker, inv Invocation) {
 			i++
 		}
 		if inv.Stdin != nil && (i == len(args) || fromStdin) {
-			f.nested(w, *inv.Stdin, inv) // no script operand, so the shell reads stdin
+			f.nested(w, *inv.Stdin, inv)
 		}
 	case "eval":
 		if len(args) > 0 && args[0].Val == "--" {
@@ -354,8 +339,7 @@ func (f frame) emit(w *walker, inv Invocation) {
 }
 
 func (f frame) nested(w *walker, src string, parent Invocation) {
-	inner := &walker{home: w.home, started: true}
-	inner.out = w.out
+	inner := &walker{home: w.home, out: w.out}
 	inner.script(src, parent.Cwd, parent.Assigns, f.depth+1)
 	w.out = inner.out
 }
@@ -379,7 +363,6 @@ func isCd(s *syntax.Stmt) bool {
 	return ok && len(call.Args) > 0 && call.Args[0].Lit() == "cd"
 }
 
-// exits reports whether s ends the shell: exit, or a group or list ending in it.
 func exits(s *syntax.Stmt) bool {
 	switch c := s.Cmd.(type) {
 	case *syntax.CallExpr:

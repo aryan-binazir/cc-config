@@ -62,22 +62,17 @@ func check(phase string, flags []string, switches, home string, stdin io.Reader,
 			o.Only = strings.TrimPrefix(f, "--only=")
 		}
 	}
-	// Never hang the agent: past the deadline, allow the call and say why.
-	time.AfterFunc(deadline, func() {
+	allowWithFault := func(reason string) int {
 		if o.Agy && phase == "pre" {
 			fmt.Fprintln(stdout, `{"decision":"allow"}`)
 		}
-		fmt.Fprintln(stderr, "agent-hooks: timed out; allowing the call")
-		os.Exit(1)
-	})
+		fmt.Fprintln(stderr, "agent-hooks:", reason)
+		return 1
+	}
+	time.AfterFunc(deadline, func() { os.Exit(allowWithFault("timed out; allowing the call")) })
 	enabled, err := parseSwitches(switches)
 	if err != nil {
-		// A fault, not a silent allow: Claude Code and Codex show it, and pi fails closed.
-		if o.Agy && phase == "pre" {
-			fmt.Fprintln(stdout, `{"decision":"allow"}`)
-		}
-		fmt.Fprintln(stderr, "agent-hooks: hooks.yaml:", err)
-		return 1
+		return allowWithFault("hooks.yaml: " + err.Error())
 	}
 	o.Enabled = enabled
 	o.Stdin, _ = io.ReadAll(io.LimitReader(stdin, maxPayload))
@@ -134,8 +129,6 @@ func wire(action, switches, home string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// parseSwitches reads hooks.yaml: a top-level `hooks:` mapping of hook names
-// to true or false, with comments. It accepts nothing else.
 func parseSwitches(text string) (map[string]bool, error) {
 	on := map[string]bool{}
 	inHooks := false

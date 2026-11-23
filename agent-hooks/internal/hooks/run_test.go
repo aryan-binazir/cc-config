@@ -17,18 +17,16 @@ func agyPayload(tool string, args map[string]any) map[string]any {
 }
 
 func TestPayloadShapesFromEachHarness(t *testing.T) {
-	blockedShapes := []any{
-		// Claude Code
-		bash("agy -p hi"),
-		// Codex: the local shell is exposed as Bash; older shapes carry cmd, argv, or chars.
-		map[string]any{"tool_name": "Bash", "hook_event_name": "PreToolUse", "turn_id": "t", "tool_input": map[string]any{"command": "agy -p hi"}, "cwd": "/x"},
-		map[string]any{"tool_name": "exec_command", "tool_input": map[string]any{"cmd": "agy -p hi"}},
-		map[string]any{"tool_name": "shell", "tool_input": map[string]any{"command": []string{"agy", "-p", "hi"}}},
-		map[string]any{"tool_name": "write_stdin", "tool_input": map[string]any{"session_id": 3, "chars": "agy -p hi\n"}},
+	blockedShapes := map[string]any{
+		"claude-code Bash":   bash("agy -p hi"),
+		"codex Bash":         map[string]any{"tool_name": "Bash", "hook_event_name": "PreToolUse", "turn_id": "t", "tool_input": map[string]any{"command": "agy -p hi"}, "cwd": "/x"},
+		"codex exec_command": map[string]any{"tool_name": "exec_command", "tool_input": map[string]any{"cmd": "agy -p hi"}},
+		"codex shell argv":   map[string]any{"tool_name": "shell", "tool_input": map[string]any{"command": []string{"agy", "-p", "hi"}}},
+		"codex write_stdin":  map[string]any{"tool_name": "write_stdin", "tool_input": map[string]any{"session_id": 3, "chars": "agy -p hi\n"}},
 	}
-	for _, p := range blockedShapes {
+	for harness, p := range blockedShapes {
 		if r := run(t, "block-agy", p); r.Exit != 2 {
-			t.Errorf("want block for %v, got %+v", p, r)
+			t.Errorf("%s: want block for %v, got %+v", harness, p, r)
 		}
 	}
 }

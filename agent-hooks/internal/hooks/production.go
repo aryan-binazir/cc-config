@@ -9,8 +9,6 @@ import (
 
 const production = "production"
 
-// noProduction blocks pushing to, merging into, force-updating, resetting, or
-// deleting a branch named production unless the user asked for it.
 var noProduction = hook{name: "no-production", phase: "pre", override: "production", check: func(c *ctx, inv shell.Invocation) string {
 	if touchesProduction(c, inv) {
 		return "Only push to production if the user, or an agent acting on the user's instruction, told you to. If so, rerun with AGENT_HOOKS_ALLOW=production. When delegating, pass the user's instruction along."
@@ -56,8 +54,6 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 		case o.has("-d", "-D", "-f"):
 			return names(refs, production)
 		case o.has("-m", "-M"):
-			// Renaming deletes the old name: production as either operand, or the
-			// current branch when only the new name is given.
 			return names(refs, production) || (len(refs) == 1 && c.currentBranch(g) == production)
 		case o.has("-c", "-C"):
 			return len(refs) > 0 && refs[len(refs)-1].Val == production
@@ -91,8 +87,6 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 	return false
 }
 
-// prTouchesProduction looks up the PR's base and head: merging into production,
-// or deleting a production head with --delete-branch.
 func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghPr) bool {
 	args := []string{"pr", "view"}
 	args = append(args, pr.positionals...)
@@ -114,12 +108,12 @@ func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghPr) bool {
 }
 
 func pushesProduction(c *ctx, g *gitCmd) bool {
-	o := parseOpts(g.args, "o", pushLongValues, pushAliases)
+	o := parseOpts(g.args, "o", pushLongValues, pushLongNames)
 	if o.has("-n") {
 		return false
 	}
 	if o.has("--mirror") {
-		return true // mirroring can delete a remote production branch
+		return true
 	}
 	refspecs := pushRefspecs(o)
 	if len(refspecs) == 0 {
@@ -127,7 +121,7 @@ func pushesProduction(c *ctx, g *gitCmd) bool {
 			return true
 		}
 		if out, _ := c.git(g, "config", "--type=bool", "remote."+c.remoteFor(g, o)+".mirror"); strings.TrimSpace(out) == "true" {
-			return true // a mirror remote mirrors (and deletes) every ref
+			return true
 		}
 		refspecs = configuredRefspecs(c, g, o)
 		if len(refspecs) == 0 {
@@ -139,7 +133,7 @@ func pushesProduction(c *ctx, g *gitCmd) bool {
 	if o.has("--all", "--branches") && c.hasLocalProduction(g) {
 		return true
 	}
-	if o.has("--prune") && c.pruneDeletesProduction(g, o, refspecs) {
+	if o.has("--prune") && c.pruneMayDeleteProduction(g, o, refspecs) {
 		return true
 	}
 	if len(refspecs) == 0 {
@@ -174,15 +168,13 @@ func pushesProduction(c *ctx, g *gitCmd) bool {
 	return false
 }
 
-// pushRefspecs returns the refspecs after the remote operand.
 func pushRefspecs(o opts) []string {
 	if len(o.pos) == 0 && len(o.paths) > 0 {
-		return values(o.paths[1:]) // git push -- <remote> <refspec>...
+		return values(o.paths[1:])
 	}
 	return values(append(append([]shell.Word{}, o.pos[min(1, len(o.pos)):]...), o.paths...))
 }
 
-// pushRemote returns the remote a push names, or "" when it names none.
 func pushRemote(o opts) string {
 	switch {
 	case len(o.vals["--repo"]) > 0:
@@ -195,9 +187,6 @@ func pushRemote(o opts) string {
 	return ""
 }
 
-// remoteFor returns the remote a push goes to: the one named, else the current
-// branch's push remote (branch.<name>.pushRemote, remote.pushDefault, or its
-// upstream's remote), else origin.
 func (c *ctx) remoteFor(g *gitCmd, o opts) string {
 	if r := pushRemote(o); r != "" {
 		return r
@@ -213,16 +202,12 @@ func (c *ctx) remoteFor(g *gitCmd, o opts) string {
 	return "origin"
 }
 
-// configuredRefspecs returns the remote's configured push refspecs, which
-// git uses when the command names none.
 func configuredRefspecs(c *ctx, g *gitCmd, o opts) []string {
 	out, _ := c.git(g, "config", "--get-all", "remote."+c.remoteFor(g, o)+".push")
 	return strings.Fields(out)
 }
 
-// mapWildcard reports whether a src:dst wildcard refspec's destination covers
-// refs/heads/production, and the local ref it would push there.
-func mapWildcard(src, dst string) (string, bool) {
+func mapWildcard(src, dst string) (from string, covers bool) {
 	full := func(ref string) string {
 		if strings.HasPrefix(ref, "refs/") {
 			return ref
@@ -238,11 +223,7 @@ func mapWildcard(src, dst string) (string, bool) {
 	return strings.Replace(full(src), "*", match, 1), true
 }
 
-// pruneDeletesProduction reports whether --prune could delete a remote
-// production branch: a wildcard covers it with no local source, or a matching
-// push (--all, `:`) runs with no local production branch. The remote's own
-// branches are unknowable offline, so that case assumes it has one.
-func (c *ctx) pruneDeletesProduction(g *gitCmd, o opts, refspecs []string) bool {
+func (c *ctx) pruneMayDeleteProduction(g *gitCmd, o opts, refspecs []string) bool {
 	matching := o.has("--all", "--branches")
 	for _, spec := range refspecs {
 		src, dst, ok := strings.Cut(strings.TrimPrefix(spec, "+"), ":")

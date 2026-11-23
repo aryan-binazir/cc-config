@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// Real-shaped copies of the configs on Ar's machine, plus the legacy block-agy wiring.
 const claudeOriginal = `{
   "cleanupPeriodDays": 3650,
   "attribution": {
@@ -204,7 +203,6 @@ func TestInstallWiresEachHarness(t *testing.T) {
 	if !reflect.DeepEqual(agy, want) {
 		t.Errorf("agy: %v", agy)
 	}
-	// Unrelated settings survive, in their original order and spelling.
 	got := read(t, p.Claude)
 	for _, s := range []string{`"statusLine"`, `"echo <ok> && true"`, `herdr-agent-state.sh`, `"alwaysThinkingEnabled": true`} {
 		if !strings.Contains(got, s) {
@@ -241,7 +239,6 @@ func TestInstallIsIdempotent(t *testing.T) {
 	if _, err := os.Stat(p.Claude + ".bak-20261123T130000Z"); err == nil {
 		t.Error("backup written without a change")
 	}
-	// A moved binary replaces the old entry instead of adding a second one.
 	if _, err := Install(p, "/opt/bin/agent-hooks", now); err != nil {
 		t.Fatal(err)
 	}

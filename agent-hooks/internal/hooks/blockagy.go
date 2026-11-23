@@ -6,13 +6,10 @@ import (
 	"strings"
 )
 
-// blockAgy refuses any agent-run command that launches the Antigravity CLI
-// (agy / antigravity / acg) in any mode. Google's consumer terms forbid
-// wrapping agy in a third-party agent, and accounts get suspended for it.
 var blockAgy = hook{
-	name:  "block-agy",
-	phase: "pre",
-	whole: checkAgy,
+	name:      "block-agy",
+	phase:     "pre",
+	checkCall: checkAgy,
 }
 
 const agyMessage = `Blocked: agents must not run the Antigravity CLI (agy / antigravity / acg) at all, in any mode.
@@ -36,8 +33,6 @@ func isAgy(word string) bool {
 	return word == "agy" || word == "antigravity" || word == "acg"
 }
 
-// splitAny splits s on any of the separator bytes, then on whitespace, as
-// block-agy.sh did with tr and read -a.
 func splitAny(s, seps string) [][]string {
 	var out [][]string
 	for _, seg := range strings.FieldsFunc(s, func(r rune) bool { return strings.ContainsRune(seps, r) }) {
@@ -53,9 +48,7 @@ func checkAgy(c *ctx) string {
 	if text == "" {
 		return ""
 	}
-	// Any mention anywhere, so `echo 'agy -p x' | bash` is caught by the launcher
-	// check even though the bash segment never names agy.
-	mentioned := false
+	mentionedAnywhere := false
 	for _, word := range strings.Fields(strings.Map(func(r rune) rune {
 		if strings.ContainsRune(separators, r) {
 			return ' '
@@ -63,7 +56,7 @@ func checkAgy(c *ctx) string {
 		return r
 	}, text)) {
 		if isAgy(word) {
-			mentioned = true
+			mentionedAnywhere = true
 			break
 		}
 	}
@@ -78,9 +71,9 @@ func checkAgy(c *ctx) string {
 		if !launchers[first] || first == "command" && len(words) > 1 && (words[1] == "-v" || words[1] == "-V") {
 			return false
 		}
-		return mentioned
+		return mentionedAnywhere
 	}
-	if c.parsed {
+	if c.allParsed {
 		for _, inv := range c.invs {
 			if launches(inv.Values()) {
 				return agyMessage

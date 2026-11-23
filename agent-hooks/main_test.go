@@ -69,7 +69,6 @@ func BenchmarkParseSwitches(b *testing.B) {
 	}
 }
 
-// binary builds agent-hooks once per test binary.
 var builtBinary string
 
 func binary(t testing.TB) string {
@@ -187,8 +186,6 @@ func percentile(samples []time.Duration, p float64) time.Duration {
 	return s[min(len(s)-1, int(float64(len(s))*p))]
 }
 
-// TestBinaryLatency times the built binary end to end, process start included.
-// It prints p50/p99 and fails only on gross regressions, since timing is noisy.
 func TestBinaryLatency(t *testing.T) {
 	if testing.Short() {
 		t.Skip("timing")

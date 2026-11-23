@@ -2,12 +2,11 @@ package shell
 
 import "strings"
 
-// wrapper describes a command that runs its operands as another command.
 type wrapper struct {
-	shortValues string   // short options that take a value
-	longValues  []string // long options that take a value when not written --opt=value
-	assigns     bool     // NAME=value operands before the command set its environment
-	operand     bool     // one operand (a duration or priority) precedes the command
+	shortValues    string
+	longValues     []string
+	assigns        bool
+	leadingOperand bool
 }
 
 var wrappers = map[string]wrapper{
@@ -17,7 +16,7 @@ var wrappers = map[string]wrapper{
 	"nohup":    {},
 	"setsid":   {},
 	"nice":     {shortValues: "n", longValues: []string{"--adjustment"}},
-	"timeout":  {shortValues: "sk", longValues: []string{"--signal", "--kill-after"}, operand: true},
+	"timeout":  {shortValues: "sk", longValues: []string{"--signal", "--kill-after"}, leadingOperand: true},
 	"stdbuf":   {shortValues: "ioe", longValues: []string{"--input", "--output", "--error"}},
 	"command":  {},
 	"exec":     {shortValues: "a"},
@@ -26,8 +25,6 @@ var wrappers = map[string]wrapper{
 	"unbuffer": {},
 }
 
-// unwrap returns the command a wrapper runs, with any environment it sets and
-// the directory it changes to (env -C), if any.
 func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir *Word, ok bool) {
 	if name == "mise" {
 		for i, a := range args {
@@ -66,7 +63,6 @@ func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir
 			i++
 			continue
 		}
-		// A short cluster: the first value-taking letter consumes the rest or the next word.
 		for j := 1; j < len(a); j++ {
 			if strings.IndexByte(spec.shortValues, a[j]) >= 0 {
 				value := Word{Val: a[j+1:], Dynamic: args[i].Dynamic}
@@ -92,7 +88,7 @@ func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir
 			i++
 		}
 	}
-	if spec.operand && i < len(args) {
+	if spec.leadingOperand && i < len(args) {
 		i++
 	}
 	if i >= len(args) {

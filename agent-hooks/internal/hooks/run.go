@@ -12,15 +12,14 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
-// Options configure one hook run.
 type Options struct {
-	Phase    string          // "pre" or "post"
-	Stdin    []byte          // the hook payload
-	Enabled  map[string]bool // hook name -> on
-	Only     string          // run just this hook, if set
-	Agy      bool            // answer in Antigravity's JSON protocol
-	StateDir string          // where overrides.log goes
-	Home     string          // expands ~ in commands
+	Phase    string // "pre" or "post"
+	Stdin    []byte // the hook payload
+	Enabled  map[string]bool
+	Only     string // run just this hook, if set
+	Agy      bool   // answer in Antigravity's JSON protocol
+	StateDir string // where overrides.log goes
+	Home     string // expands ~ in commands
 }
 
 // Result is what the process prints and exits with.
@@ -30,18 +29,14 @@ type Result struct {
 	Stderr string
 }
 
-// hook checks one invocation and returns a message when it objects.
 type hook struct {
-	name     string
-	phase    string
-	override string // the AGENT_HOOKS_ALLOW name that lets it through; "" for none
-	check    func(*ctx, shell.Invocation) string
-	// whole checks the call once instead of per invocation (block-agy).
-	whole func(*ctx) string
+	name      string
+	phase     string
+	override  string
+	check     func(*ctx, shell.Invocation) string
+	checkCall func(*ctx) string
 }
 
-// Catalog lists every hook in the order they run. Cheap payload-only checks
-// come before ones that may need repository state.
 var catalog = []hook{
 	blockAgy,
 	draftPrs, prAssignee, noAdminMerge, mergeHeadMatch,
@@ -80,7 +75,7 @@ func Run(o Options) (res Result) {
 		}
 		if msg := c.evaluate(h); msg != "" {
 			messages = append(messages, fmt.Sprintf("[agent-hooks: %s] %s", h.name, msg))
-			c.lookupsOff = true
+			c.blocked = true
 		}
 	}
 	res = respond(o, messages)
@@ -91,8 +86,8 @@ func Run(o Options) (res Result) {
 }
 
 func (c *ctx) evaluate(h hook) string {
-	if h.whole != nil {
-		return h.whole(c)
+	if h.checkCall != nil {
+		return h.checkCall(c)
 	}
 	for _, inv := range c.invs {
 		msg := h.check(c, inv)
@@ -138,7 +133,6 @@ func respond(o Options, messages []string) Result {
 	return Result{}
 }
 
-// mustJSON encodes v without HTML escaping, so shell text stays readable.
 func mustJSON(v any) string {
 	var b strings.Builder
 	enc := json.NewEncoder(&b)

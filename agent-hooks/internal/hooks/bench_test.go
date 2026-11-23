@@ -18,7 +18,6 @@ func benchPayload(b *testing.B, dir, command string) []byte {
 	return data
 }
 
-// BenchmarkRunPayloadOnly covers calls decided from the payload alone.
 func BenchmarkRunPayloadOnly(b *testing.B) {
 	for name, command := range map[string]string{
 		"echo":      "echo hello",
@@ -37,7 +36,6 @@ func BenchmarkRunPayloadOnly(b *testing.B) {
 	}
 }
 
-// BenchmarkRunGitLookup covers calls that need repository state.
 func BenchmarkRunGitLookup(b *testing.B) {
 	r := newRepo(b)
 	r.git("switch", "-q", "-c", "amb/x")

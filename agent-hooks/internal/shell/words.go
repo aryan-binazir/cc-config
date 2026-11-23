@@ -7,9 +7,6 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// word decodes quoting and $'...' escapes. Expansions keep their source text
-// and mark the word Dynamic, except `$(cat <<EOF ... EOF)` with a literal body,
-// which is decoded to that body because its output is fixed.
 func (f frame) word(w *syntax.Word) Word {
 	if w == nil {
 		return Word{}
@@ -29,7 +26,6 @@ func (f frame) word(w *syntax.Word) Word {
 	return Word{Val: b.String(), Dynamic: dynamic, Quoted: quoted}
 }
 
-// part appends the value of one word part and reports whether it was literal.
 func (f frame) part(b *strings.Builder, part syntax.WordPart, quoted bool) bool {
 	switch p := part.(type) {
 	case *syntax.Lit:
@@ -84,8 +80,8 @@ func catHeredoc(f frame, c *syntax.CmdSubst) (string, bool) {
 	return strings.TrimRight(body.Val, "\n"), true
 }
 
-// heredoc decodes a here-document body. A quoted delimiter keeps the body
-// literal; otherwise backslashes and expansions work as inside double quotes.
+// A quoted here-document delimiter keeps the body literal; otherwise
+// backslashes and expansions work as inside double quotes.
 func (f frame) heredoc(r *syntax.Redirect) Word {
 	if r.Hdoc == nil {
 		return Word{}
@@ -110,7 +106,6 @@ func (f frame) heredoc(r *syntax.Redirect) Word {
 	return Word{Val: b.String(), Dynamic: dynamic}
 }
 
-// unescape removes shell backslash quoting from literal text.
 func unescape(s string, quoted bool) string {
 	if !strings.Contains(s, `\`) {
 		return s
@@ -136,7 +131,6 @@ func unescape(s string, quoted bool) string {
 	return b.String()
 }
 
-// ansiC decodes the body of a $'...' string the way Bash does.
 func ansiC(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {

@@ -16,8 +16,6 @@ var commitAliases = map[string]string{
 }
 var commitLongValues = []string{"-m", "-F", "-C", "-c", "-t", "--fixup", "--squash", "--author", "--date", "--trailer", "--cleanup", "--pathspec-from-file"}
 
-// commitFormat enforces `type(PROJECT): description` on git commit messages
-// and one commit type per branch.
 var commitFormat = hook{name: "commit-format", phase: "pre", check: func(c *ctx, inv shell.Invocation) string {
 	g := parseGit(inv, c.opts.Home)
 	if g == nil || g.sub != "commit" {
@@ -36,12 +34,12 @@ var commitFormat = hook{name: "commit-format", phase: "pre", check: func(c *ctx,
 	case len(o.vals["-F"]) > 0 && o.vals["-F"][0].Val == "-" && inv.Stdin != nil:
 		message, dynamic = *inv.Stdin, inv.StdinDynamic
 	default:
-		return "" // the editor, a file, or --no-edit supplies the message
+		return ""
 	}
 	subject, _, _ := strings.Cut(strings.TrimLeft(message, " \t\n"), "\n")
 	subject = strings.TrimRight(subject, " \t\r")
 	if dynamic && strings.ContainsAny(subject, "$`") {
-		return "" // the subject depends on an expansion
+		return ""
 	}
 	for _, p := range []string{"fixup! ", "squash! ", "amend! "} {
 		if strings.HasPrefix(subject, p) {
@@ -63,13 +61,11 @@ var commitFormat = hook{name: "commit-format", phase: "pre", check: func(c *ctx,
 	return ""
 }}
 
-// firstBranchCommit returns the subject of the oldest commit on HEAD's
-// first-parent chain since the default branch, and how many there are.
-func (c *ctx) firstBranchCommit(g *gitCmd) (string, int) {
+func (c *ctx) firstBranchCommit(g *gitCmd) (subject string, count int) {
 	for _, base := range []string{"origin/HEAD", "origin/main", "origin/master", "main", "master"} {
 		out, ok := c.git(g, "log", "--first-parent", "--reverse", "--format=%s", base+"..HEAD")
 		if !ok {
-			if c.lookupsOff || g.dir == "" {
+			if c.blocked || g.dir == "" {
 				return "", 0
 			}
 			continue

@@ -17,7 +17,6 @@ var rgLongValues = []string{
 	"--hyperlink-format", "--path-separator", "--sort", "--sortr", "--generate",
 }
 
-// rgReplaceFlag adds a note after rg runs with -r, which agents often mistake for recursive.
 var rgReplaceFlag = hook{name: "rg-replace-flag", phase: "post", check: func(_ *ctx, inv shell.Invocation) string {
 	if inv.Name() != "rg" || !rgReplaces(inv.Strings()) {
 		return ""

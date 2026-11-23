@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-// repo is a work tree cloned from a local bare remote that has main and production.
 type repo struct {
 	t    testing.TB
 	dir  string
@@ -80,7 +79,6 @@ func (r *repo) expect(hooks string, wantBlock bool, commands ...string) {
 	}
 }
 
-// fakeGh puts a gh on PATH whose `gh pr view` reports "<base> <head>".
 func fakeGh(t *testing.T, base string) {
 	t.Helper()
 	fakeGhScript(t, `case "$*" in *'pr view'*baseRefName*) echo `+base+` feature ;; *) exit 1 ;; esac`)
@@ -142,7 +140,6 @@ func TestCommitFormat(t *testing.T) {
 
 func TestCommitFormatKeepsTheBranchType(t *testing.T) {
 	r := newRepo(t)
-	// On the default branch there is no branch type to match.
 	r.expect("commit-format", false, `git commit -m "fix(no-ticket): ok"`)
 	r.git("switch", "-q", "-c", "amb/x")
 	r.expect("commit-format", false, `git commit -m "fix(no-ticket): first commit picks the type"`)
@@ -178,7 +175,6 @@ func TestNoSecretsCommit(t *testing.T) {
 	if res := r.run("no-secrets-commit", "git add -A"); !strings.Contains(res.Stderr, ".env") || !strings.Contains(res.Stderr, "src/server.key") {
 		t.Errorf("message should list the files: %q", res.Stderr)
 	}
-	// commit -a stages tracked changes only.
 	r.expect("no-secrets-commit", false, `git commit -am "feat(no-ticket): x"`)
 	r.git("add", "-f", ".env")
 	r.git("commit", "-q", "-m", "chore(no-ticket): Track env")
@@ -202,7 +198,6 @@ func TestNoSecretsOverrideIsLogged(t *testing.T) {
 	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("log should be private: %v %v", info, err)
 	}
-	// The override names one hook and covers only its own command.
 	for _, command := range []string{"AGENT_HOOKS_ALLOW=destructive git add .env", "AGENT_HOOKS_ALLOW=secrets true; git add .env", "AGENT_HOOKS_ALLOW=x,secretsy git add .env"} {
 		if res := runOpts(t, Options{Phase: "pre", Enabled: switches("no-secrets-commit"), StateDir: state}, bashIn(r.dir, command)); res.Exit != 2 {
 			t.Errorf("%q should still block: %+v", command, res)
@@ -213,7 +208,6 @@ func TestNoSecretsOverrideIsLogged(t *testing.T) {
 			t.Errorf("%q should be allowed: %+v", command, res)
 		}
 	}
-	// No log line when nothing was overridden.
 	before := len(overrideLog(t, state))
 	runOpts(t, Options{Phase: "pre", Enabled: switches("no-secrets-commit"), StateDir: state}, bashIn(r.dir, "AGENT_HOOKS_ALLOW=secrets git add README.md"))
 	if len(overrideLog(t, state)) != before {
@@ -411,7 +405,8 @@ func TestDestructiveCheckoutFromACommitAndClean(t *testing.T) {
 	r := newRepo(t)
 	r.write("README.md", "staged\n")
 	r.git("add", "README.md")
-	r.expect("destructive-git", true, "git checkout HEAD .", "git checkout HEAD -- .", "git restore --source=HEAD .")
+	r.expect("destructive-git", true, "git checkout HEAD .", "git checkout HEAD -- .")
+	r.expect("destructive-git", false, "git restore --source=HEAD .") // writes only the worktree; the index keeps the staged change
 	r.git("commit", "-q", "-m", "chore(no-ticket): X")
 	r.write("nested/deep/file.txt", "x")
 	r.write("scratch.txt", "x")

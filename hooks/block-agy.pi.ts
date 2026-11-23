@@ -1,6 +1,3 @@
-// Blocks agent-run commands that launch the Antigravity CLI (agy / antigravity / acg)
-// in any mode. The check lives in agent-hooks (cc-config/agent-hooks), shared with
-// Claude Code, Codex and agy.
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";

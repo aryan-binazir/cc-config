@@ -9,8 +9,7 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
-// Identity entries let git's unique-prefix abbreviations (--mir) resolve.
-var pushAliases = map[string]string{
+var pushLongNames = map[string]string{
 	"--force": "-f", "--dry-run": "-n", "--delete": "-d", "--set-upstream": "-u", "--push-option": "-o",
 	"--mirror": "--mirror", "--all": "--all", "--branches": "--branches", "--prune": "--prune",
 	"--force-with-lease": "--force-with-lease", "--repo": "--repo", "--tags": "--tags",
@@ -21,8 +20,6 @@ var pushLongValues = []string{"--repo", "--receive-pack", "--exec", "-o"}
 
 const discardAdvice = "Commit or stash them first; if the user asked to throw them away, rerun with AGENT_HOOKS_ALLOW=destructive."
 
-// destructiveGit blocks force pushes, rm -rf of /, home, or a repository
-// root, and commands that discard uncommitted work.
 var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "destructive", check: func(c *ctx, inv shell.Invocation) string {
 	if inv.Name() == "rm" {
 		return checkRm(c, inv)
@@ -33,7 +30,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 	}
 	switch g.sub {
 	case "push":
-		o := parseOpts(g.args, "o", pushLongValues, pushAliases)
+		o := parseOpts(g.args, "o", pushLongValues, pushLongNames)
 		if o.has("-n") {
 			return ""
 		}
@@ -45,7 +42,6 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 			refspecs = configuredRefspecs(c, g, o)
 		}
 		for _, refspec := range refspecs {
-			// A + forces that ref even when a lease is given for another.
 			if strings.HasPrefix(refspec, "+") {
 				return "A +refspec force-pushes. Push without the + and use --force-with-lease, or rerun with AGENT_HOOKS_ALLOW=destructive if the user asked for it."
 			}
@@ -56,9 +52,8 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 			return ""
 		}
 		if !o.has("-f") && !requireForceOff(c, g) {
-			return "" // git refuses to clean without -f
+			return ""
 		}
-		// git's own dry run knows its excludes, -d, and nested repositories.
 		out, ok := c.git(g, cleanDryRun(o)...)
 		if first, _, _ := strings.Cut(strings.TrimSpace(out), "\n"); ok && first != "" {
 			return "git clean would delete untracked files (" + strings.TrimPrefix(first, "Would remove ") + ", ...). " + discardAdvice
@@ -86,8 +81,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if !hasAll(specs) {
 			return ""
 		}
-		// Restoring from a commit also discards staged changes.
-		fromCommit := o.has("-s", "--source") || (g.sub == "checkout" && len(o.pos) > 0 && (o.dashed || !hasAll(o.pos[:1])))
+		fromCommit := g.sub == "checkout" && len(o.pos) > 0 && (o.dashed || !hasAll(o.pos[:1]))
 		if c.dirty(g, specs, !fromCommit) {
 			return fmt.Sprintf("git %s would discard uncommitted changes. %s", g.sub, discardAdvice)
 		}
@@ -95,7 +89,6 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 	return ""
 }}
 
-// hasAll reports whether the pathspecs cover the whole tree or the current directory.
 func hasAll(specs []shell.Word) bool {
 	for _, s := range specs {
 		if v := strings.TrimSuffix(s.Val, "/"); v == "." || v == ":/" || v == ":" || v == "*" {
@@ -105,7 +98,6 @@ func hasAll(specs []shell.Word) bool {
 	return false
 }
 
-// dirty reports tracked changes; worktreeOnly ignores changes already staged.
 func (c *ctx) dirty(g *gitCmd, specs []shell.Word, worktreeOnly bool) bool {
 	entries, ok := c.status(g, withPaths([]string{"--untracked-files=no"}, specs)...)
 	if !ok {
@@ -119,8 +111,6 @@ func (c *ctx) dirty(g *gitCmd, specs []shell.Word, worktreeOnly bool) bool {
 	return false
 }
 
-// cleanDryRun builds `git clean -n` from the parsed flags only, never the
-// agent's own arguments, so the lookup cannot delete anything.
 func cleanDryRun(o opts) []string {
 	args := []string{"clean", "-n"}
 	if o.has("-d") {
@@ -155,9 +145,6 @@ func requireForceOff(c *ctx, g *gitCmd) bool {
 	return ok && strings.TrimSpace(out) == "false"
 }
 
-// overwritesUntracked reports whether resetting to target would replace an
-// untracked or ignored file, or a directory holding one, with something target
-// tracks.
 func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 	entries, ok := c.status(g, "--untracked-files=all", "--ignored=matching")
 	if !ok {
@@ -181,10 +168,8 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 		tracked[p] = true
 	}
 	// Porcelain paths are relative to the repository root, like --full-tree.
-	// A collision is a shared path, or one side's path under the other's:
-	// an untracked file inside a tracked file's spot, or the reverse.
 	localSet := map[string]bool{}
-	var collapsed []string // wholly untracked or ignored directories, listed as dir/
+	var collapsed []string
 	for _, p := range local {
 		if strings.HasSuffix(p, "/") {
 			collapsed = append(collapsed, p)
@@ -209,7 +194,6 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 			}
 		}
 		for _, dir := range collapsed {
-			// Inside a collapsed directory only a file at the same path is lost.
 			if strings.HasPrefix(t, dir) && (root == "" || exists(path.Join(root, t))) {
 				return true
 			}
@@ -236,11 +220,11 @@ func checkRm(c *ctx, inv shell.Invocation) string {
 func dangerousTarget(c *ctx, cwd string, target shell.Word) bool {
 	v := target.Val
 	if target.Dynamic {
-		return homeVar.MatchString(v) // only a real expansion of $HOME
+		return homeVar.MatchString(v)
 	}
 	v = strings.TrimSuffix(v, "/*")
 	if strings.HasPrefix(v, "~") && target.Quoted {
-		v = "./" + v // a quoted ~ is a literal name, not home
+		v = "./" + v
 	}
 	if v == "" || v == "~" || v == "~/" {
 		return true

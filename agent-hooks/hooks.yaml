@@ -1,5 +1,3 @@
-# Switch hooks on (true) or off (false). Hooks that are not listed are off.
-# This file is compiled into the binary: run `make install` after editing it.
 hooks:
   block-agy: true
   draft-prs: true

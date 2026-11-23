@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// ghBoth mirrors pi's gh-pr tests, which enable draft-prs and no-admin-merge.
 func ghBoth(t *testing.T, command string) Result {
 	t.Helper()
 	return run(t, "draft-prs,no-admin-merge", bash(command))

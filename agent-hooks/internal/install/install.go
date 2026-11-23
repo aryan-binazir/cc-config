@@ -15,9 +15,9 @@ import (
 
 // Paths are the hook config files of each harness.
 type Paths struct {
-	Claude string // ~/.claude/settings.json
-	Codex  string // ~/.codex/hooks.json
-	Agy    string // ~/.gemini/config/hooks.json
+	Claude string
+	Codex  string
+	Agy    string
 }
 
 // DefaultPaths returns the user-level configs under home.
@@ -36,14 +36,10 @@ const (
 )
 
 var (
-	// owned matches exactly the commands Install writes: a single-quoted path
-	// ending in /agent-hooks, then pre, post, or pre --agy.
-	owned = regexp.MustCompile(`^'(?:[^']|'\\'')*/agent-hooks' (pre|post|pre --agy)$`)
-	// legacy matches the hook commands that ran block-agy.sh.
-	legacy = regexp.MustCompile(`^((ba)?sh\s+)?['"]?[^'"\s]*/block-agy\.sh['"]?$`)
+	ownedCommand  = regexp.MustCompile(`^'(?:[^']|'\\'')*/agent-hooks' (pre|post|pre --agy)$`)
+	legacyCommand = regexp.MustCompile(`^((ba)?sh\s+)?['"]?[^'"\s]*/block-agy\.sh['"]?$`)
 )
 
-// shellQuote single-quotes s for the sh -c every harness runs hooks through.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
@@ -107,15 +103,14 @@ func Uninstall(p Paths, now time.Time) ([]string, error) {
 	})
 }
 
-// edit changes a parsed config and reports whether it changed anything.
 type edit struct {
-	path   string
-	create bool // write the file when it does not exist yet
-	change func(*object) (changed bool, err error)
+	path            string
+	createIfMissing bool
+	change          func(*object) (changed bool, err error)
 }
 
 type pending struct {
-	path     string // the real file, after following symlinks
+	path     string
 	existed  bool
 	mode     fs.FileMode
 	original []byte
@@ -149,7 +144,6 @@ func apply(now time.Time, edits []edit) ([]string, error) {
 	return changed, nil
 }
 
-// backup writes the original next to the file under a name no earlier backup has.
 func backup(plan pending, stamp string) error {
 	name := plan.path + ".bak-" + stamp
 	for n := 2; ; n++ {
@@ -179,7 +173,7 @@ func prepare(e edit) (pending, bool, error) {
 	trailing := "\n"
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
-		if !e.create {
+		if !e.createIfMissing {
 			return plan, false, nil
 		}
 	case err != nil:
@@ -258,7 +252,6 @@ func writeAtomic(path, content string, mode fs.FileMode) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// hooksOf returns root.hooks, creating it if needed.
 func hooksOf(root *object) *object {
 	v, _ := root.get("hooks")
 	hooks, ok := v.(*object)
@@ -269,11 +262,8 @@ func hooksOf(root *object) *object {
 	return hooks
 }
 
-// upsert points event at command without moving any group or handler, since
-// Codex keys hook trust by group and handler index. Owned and (with legacy)
-// block-agy.sh handlers get the new command in place, and a group holding only
-// ours gets our matcher; shared groups keep theirs. Only when no group holds
-// ours alone is a new group appended.
+// upsert never moves a group or handler: Codex keys hook trust by group and
+// handler index.
 func upsert(hooks *object, event, matcher, command string, legacy bool) {
 	v, _ := hooks.get(event)
 	groups, _ := v.([]any)
@@ -297,7 +287,7 @@ func upsert(hooks *object, event, matcher, command string, legacy bool) {
 			group.set("matcher", matcher)
 			placed = true
 		case mine > 0 && coversBash(group):
-			placed = true // already runs for Bash alongside other handlers
+			placed = true
 		}
 	}
 	if !placed {
@@ -306,16 +296,7 @@ func upsert(hooks *object, event, matcher, command string, legacy bool) {
 	hooks.set(event, groups)
 }
 
-// strip removes owned and legacy handlers, dropping groups and events only
-// when that removal emptied them. It reports whether it removed anything.
-func strip(hooks *object) bool {
-	return filter(hooks, func(h any) bool { return isOwned(h) || isLegacy(h) })
-}
-
-// filter removes handlers matching drop, dropping groups and events only when
-// that removal emptied them. It reports whether it removed anything.
-func filter(hooks *object, drop func(any) bool) bool {
-	removedAny := false
+func strip(hooks *object) (removedAny bool) {
 	for _, event := range append([]string(nil), hooks.keys...) {
 		v, _ := hooks.get(event)
 		groups, ok := v.([]any)
@@ -333,7 +314,7 @@ func filter(hooks *object, drop func(any) bool) bool {
 			}
 			var keep []any
 			for _, h := range handlers {
-				if drop(h) {
+				if isOwned(h) || isLegacy(h) {
 					removed = true
 				} else {
 					keep = append(keep, h)
@@ -360,8 +341,6 @@ func filter(hooks *object, drop func(any) bool) bool {
 	return removedAny
 }
 
-// coversBash reports whether a group's matcher (a tool name, "*", or a regex)
-// selects the Bash tool.
 func coversBash(group *object) bool {
 	v, _ := group.get("matcher")
 	m, _ := v.(string)
@@ -382,8 +361,8 @@ func commandOf(h any) string {
 	return cmd
 }
 
-func isOwned(h any) bool  { return owned.MatchString(commandOf(h)) }
-func isLegacy(h any) bool { return legacy.MatchString(commandOf(h)) }
+func isOwned(h any) bool  { return ownedCommand.MatchString(commandOf(h)) }
+func isLegacy(h any) bool { return legacyCommand.MatchString(commandOf(h)) }
 
 func handler(command string) *object {
 	h := newObject()

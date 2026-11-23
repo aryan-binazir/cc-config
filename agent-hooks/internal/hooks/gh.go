@@ -9,13 +9,10 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
-// ghPr is an effective `gh pr create|merge` invocation, following gh's option
-// parsing: flags may come before the command words, boolean flags take =false,
-// and short flags cluster.
 type ghPr struct {
-	action      string              // "create" or "merge"
-	flags       map[string]bool     // boolean flags in effect
-	values      map[string][]string // value flags, by long name
+	action      string
+	flags       map[string]bool
+	values      map[string][]string
 	positionals []string
 }
 
@@ -29,8 +26,6 @@ var ghShortValues = map[string]map[byte]string{
 	"merge":  {'A': "--author-email", 'b': "--body", 'F': "--body-file", 't': "--subject", 'R': "--repo"},
 }
 
-// ghWords selects up to two command words after gh, skipping flags and the
-// values they probably take, and returns them with the remaining arguments.
 func ghWords(inv shell.Invocation) (words, rest []string) {
 	if inv.Name() != "gh" {
 		return nil, nil
@@ -142,8 +137,8 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 	return pr
 }
 
-// has reports whether the last value given for a flag is non-empty, as gh
-// keeps only the last value of a scalar flag.
+// gh keeps only the last value of a scalar flag, but every value of a list
+// flag like --assignee.
 func (pr *ghPr) has(name string) bool {
 	vals := pr.values[name]
 	if name == "--assignee" {
@@ -191,10 +186,9 @@ var noAdminMerge = hook{name: "no-admin-merge", phase: "pre", check: func(_ *ctx
 
 var pullMerge = regexp.MustCompile(`(^|/)pulls/[^/]+/merge/?$`)
 
-// ghAPI is a `gh api` call.
 type ghAPI struct {
 	endpoint string
-	method   string // upper case; GET unless fields or --input imply POST
+	method   string
 }
 
 var ghAPIValueShort = "XfFHqtp"
@@ -220,9 +214,9 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 		name, value, hasValue := strings.Cut(arg, "=")
 		switch {
 		case name == "--help":
-			help = !hasValue || truthy(value) // the last value wins
+			help = !hasValue || truthy(value)
 		case arg == "-h":
-			shortHelp = true // -h shows help whatever --help says
+			shortHelp = true
 		case strings.HasPrefix(arg, "--") && slices.Contains(ghAPIValueLong, name):
 			if !hasValue && i+1 < len(rest) {
 				i++

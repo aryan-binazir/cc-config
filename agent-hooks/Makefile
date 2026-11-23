@@ -15,7 +15,6 @@ check:
 	go test -count=1 -run TestBinaryLatency -v .
 	go test ./... -run '^$$' -bench . -benchtime 200x
 
-# Check the name and the embedded hooks.yaml before replacing the installed binary.
 install: build
 	test "$$(basename "$(BIN)")" = agent-hooks
 	echo '{}' | ./bin/agent-hooks pre

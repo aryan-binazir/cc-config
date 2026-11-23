@@ -37,7 +37,6 @@ func TestBlockAgyBlocksEveryAgentLaunch(t *testing.T) {
 		map[string]any{"tool_name": "shell", "tool_input": map[string]any{"command": []string{"bash", "-lc", "agy -p hi"}}},
 		map[string]any{"tool_name": "write_stdin", "tool_input": map[string]any{"chars": "agy\n"}},
 		map[string]any{"tool_name": "bash", "tool_input": map[string]any{"command": "agy acp"}},
-		// Adversarial: quoting, nesting, substitutions, heredocs, wrappers, absolute paths.
 		bash(`"agy" -p hi`),
 		bash(`'/usr/bin/agy' -p hi`),
 		bash(`a\gy -p hi`),

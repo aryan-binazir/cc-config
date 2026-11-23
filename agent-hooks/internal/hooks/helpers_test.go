@@ -26,7 +26,6 @@ func encode(t *testing.T, payload any) []byte {
 	return data
 }
 
-// run executes the pre phase with only the named hooks enabled.
 func run(t *testing.T, enabled string, payload any) Result {
 	t.Helper()
 	return runOpts(t, Options{Phase: "pre", Enabled: switches(enabled)}, payload)

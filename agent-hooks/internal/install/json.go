@@ -8,11 +8,9 @@ import (
 	"strings"
 )
 
-// object is a JSON object that remembers its key order, so rewriting a
-// hand-edited config only changes the entries this tool owns.
 type object struct {
 	keys []string
-	vals map[string]any // *object, []any, string, json.Number, bool, or nil
+	vals map[string]any
 }
 
 func newObject() *object { return &object{vals: map[string]any{}} }
@@ -100,8 +98,6 @@ func parseValue(dec *json.Decoder) (any, error) {
 	}
 }
 
-// encode writes v with two-space indentation, like json.MarshalIndent but
-// without escaping <, >, and &.
 func encode(v any) string {
 	var b strings.Builder
 	write(&b, v, "")

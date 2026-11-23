@@ -8,7 +8,6 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
-// isSecret reports whether a file name looks like credentials.
 func isSecret(p string) bool {
 	b := baseName(p)
 	switch {
@@ -32,7 +31,6 @@ var addAliases = map[string]string{
 	"--patch": "-p", "--interactive": "-i", "--edit": "-e",
 }
 
-// noSecretsCommit blocks staging files that look like credentials.
 var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "secrets", check: func(c *ctx, inv shell.Invocation) string {
 	g := parseGit(inv, c.opts.Home)
 	if g == nil {
@@ -55,7 +53,7 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 		specs := append(o.pos, o.paths...)
 		found = c.explicitSecrets(g, specs)
 		if o.has("-a") || broad(g.dir, specs, c.opts.Home) {
-			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs), true)...)
+			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs))...)
 		}
 	default:
 		return ""
@@ -66,8 +64,6 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 	return fmt.Sprintf("Don't stage credentials: %s. Unstage or .gitignore them. If the user explicitly asked to commit them, rerun with AGENT_HOOKS_ALLOW=secrets.", strings.Join(dedupe(found), ", "))
 }}
 
-// explicitSecrets lists named paths that look like credentials, except
-// tracked files gone from disk: staging those records a deletion.
 func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 	var found []string
 	for _, s := range specs {
@@ -75,7 +71,7 @@ func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 			continue
 		}
 		if full := shell.Resolve(g.dir, s.Val, c.opts.Home); full != "" && !exists(full) {
-			if _, tracked := c.git(g, "ls-files", "--error-unmatch", "--", s.Val); tracked {
+			if _, stagesDeletion := c.git(g, "ls-files", "--error-unmatch", "--", s.Val); stagesDeletion {
 				continue
 			}
 		}
@@ -84,9 +80,6 @@ func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 	return found
 }
 
-// wouldAdd lists credential-like files the add would stage. It never runs git
-// add: untracked (and, with -f, ignored) files come from ls-files, which reads
-// no content, and only tracked files with credential-like names are diffed.
 func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 	paths := values(specs)
 	for _, file := range o.vals["--pathspec-from-file"] {
@@ -122,14 +115,13 @@ func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 		out, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--relative", "--"}, tracked...)...)
 		for _, p := range strings.Split(out, "\x00") {
 			if p != "" && exists(shellPath(g.dir, p, c.opts.Home)) {
-				found = append(found, p) // a modification, not a deletion
+				found = append(found, p)
 			}
 		}
 	}
 	return found
 }
 
-// pathspecFile reads the pathspecs an add takes from a file.
 func (c *ctx) pathspecFile(g *gitCmd, file shell.Word, nul bool) []string {
 	full := shell.Resolve(g.dir, file.Val, c.opts.Home)
 	if file.Dynamic || file.Val == "-" || full == "" {
@@ -152,7 +144,6 @@ func (c *ctx) pathspecFile(g *gitCmd, file shell.Word, nul bool) []string {
 	return out
 }
 
-// broad reports whether any pathspec can match files it does not name.
 func broad(dir string, specs []shell.Word, home string) bool {
 	for _, s := range specs {
 		if s.Dynamic || strings.ContainsAny(s.Val, "*?[") || strings.HasPrefix(s.Val, ":") || isDir(dir, s.Val, home) {
@@ -162,10 +153,7 @@ func broad(dir string, specs []shell.Word, home string) bool {
 	return false
 }
 
-// secretChanges lists changed, non-deleted files that look like credentials.
-// tracked limits it to what `git commit -a` commits: staged and modified
-// tracked files.
-func (c *ctx) secretChanges(g *gitCmd, statusArgs []string, tracked bool) []string {
+func (c *ctx) secretChanges(g *gitCmd, statusArgs []string) []string {
 	entries, ok := c.status(g, statusArgs...)
 	if !ok {
 		return nil
@@ -173,7 +161,7 @@ func (c *ctx) secretChanges(g *gitCmd, statusArgs []string, tracked bool) []stri
 	var found []string
 	for _, e := range entries {
 		x, y := e.xy[0], e.xy[1]
-		if y == 'D' || (x == 'D' && y == ' ') || (tracked && x == '?') {
+		if y == 'D' || (x == 'D' && y == ' ') || x == '?' {
 			continue
 		}
 		if isSecret(e.path) {
