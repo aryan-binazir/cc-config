@@ -70,7 +70,7 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 		refs := append(append([]shell.Word{}, o.pos...), o.paths...)
 		return len(refs) > 0 && isProduction(refs[0].Val)
 	case "reset":
-		o := parseOpts(g.args, "", nil, nil)
+		o := parseOpts(g.args, "", nil, resetModes)
 		moves := o.has("--hard", "--soft", "--keep", "--merge", "--mixed")
 		for _, p := range o.pos {
 			if !exists(shellPath(g.dir, p.Val, c.opts.Home)) {
@@ -125,6 +125,9 @@ func pushesProduction(c *ctx, g *gitCmd) bool {
 	if len(refspecs) == 0 {
 		if c.currentBranch(g) == production {
 			return true
+		}
+		if out, _ := c.git(g, "config", "--type=bool", "remote."+c.remoteFor(g, o)+".mirror"); strings.TrimSpace(out) == "true" {
+			return true // a mirror remote mirrors (and deletes) every ref
 		}
 		refspecs = configuredRefspecs(c, g, o)
 		if len(refspecs) == 0 {
@@ -234,7 +237,8 @@ func mapWildcard(src, dst string) (string, bool) {
 
 // pruneDeletesProduction reports whether --prune could delete a remote
 // production branch: a wildcard covers it with no local source, or (without
-// wildcards) the remote has one and no local branch does.
+// wildcards) no local production branch exists. The remote's own branches are
+// unknowable offline, so the second case assumes it has one.
 func (c *ctx) pruneDeletesProduction(g *gitCmd, o opts, refspecs []string) bool {
 	wildcard := false
 	for _, spec := range refspecs {
@@ -250,7 +254,7 @@ func (c *ctx) pruneDeletesProduction(g *gitCmd, o opts, refspecs []string) bool 
 			return true
 		}
 	}
-	return !wildcard && c.hasRemoteProduction(g, c.remoteFor(g, o)) && !c.hasLocalProduction(g)
+	return !wildcard && !c.hasLocalProduction(g)
 }
 
 func (c *ctx) refExists(g *gitCmd, ref string) bool {
@@ -259,10 +263,6 @@ func (c *ctx) refExists(g *gitCmd, ref string) bool {
 }
 
 func (c *ctx) hasLocalProduction(g *gitCmd) bool { return c.refExists(g, "refs/heads/"+production) }
-
-func (c *ctx) hasRemoteProduction(g *gitCmd, remote string) bool {
-	return c.refExists(g, "refs/remotes/"+remote+"/"+production)
-}
 
 func names(words []shell.Word, name string) bool {
 	for _, w := range words {

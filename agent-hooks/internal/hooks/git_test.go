@@ -567,3 +567,63 @@ func TestReviewRoundThreeShellCases(t *testing.T) {
 	gitIn(t, r.root, "init", "-q", "--bare", bare)
 	r.expect("destructive-git", true, "rm -rf "+bare)
 }
+
+func TestReviewRoundFourCases(t *testing.T) {
+	r := newRepo(t)
+	marker := filepath.Join(t.TempDir(), "filtered")
+	r.git("config", "filter.mark.clean", "touch "+marker+"; cat")
+	os.MkdirAll(filepath.Join(r.dir, ".git", "info"), 0o755)
+	os.WriteFile(filepath.Join(r.dir, ".git", "info", "attributes"), []byte("* filter=mark\n"), 0o644)
+	r.write(".env", "x")
+	r.write("notes.txt", "n")
+	r.expect("no-secrets-commit", true, "git add -A")
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("a lookup ran a filter selected by .git/info/attributes")
+	}
+	r.git("update-ref", "-d", "refs/remotes/origin/production")
+	r.expect("no-production", true, "git push --all --prune origin", "git push --prune origin :", "git push --mir origin")
+	r.git("config", "remote.origin.mirror", "true")
+	r.expect("no-production", true, "git push", "git push origin")
+	r.git("config", "--unset", "remote.origin.mirror")
+	r.write("sub/b.txt", "b")
+	r.expect("no-secrets-commit", true, "cd missing && git status || git add -A")
+	r.write("README.md", "edited\n")
+	r.expect("destructive-git", true, "git reset --har")
+}
+
+func TestResetHardDirectoryCollisions(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "other")
+	r.write("dir/file", "tracked")
+	r.write("build/out.txt", "tracked under an ignored dir")
+	r.git("add", "-f", "dir/file", "build/out.txt")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Other")
+	r.git("switch", "-q", "main")
+	r.write("dir", "an untracked file where other has a directory")
+	r.expect("destructive-git", true, "git reset --hard other")
+	os.Remove(filepath.Join(r.dir, "dir"))
+	r.write("build/out.txt", "local build output")
+	r.expect("destructive-git", true, "git reset --hard other")
+}
+
+func TestQuotedHomeIsLiteral(t *testing.T) {
+	expectAllowed(t, "destructive-git", "rm -rf '~'", `rm -rf '$HOME'`, `rm -rf "~"`)
+	expectBlocked(t, "destructive-git", "rm -rf ~", "rm -rf $HOME", `rm -rf "$HOME"`)
+	expectBlocked(t, "no-admin-merge", "gh api -X PUT repos/o/r/pulls/1/merge")
+	expectAllowed(t, "no-admin-merge", "gh api -h --help=false -X PUT repos/o/r/pulls/1/merge")
+}
+
+func TestLookupsWorkInSHA256Repositories(t *testing.T) {
+	dir := t.TempDir()
+	gitIn(t, dir, "init", "-q", "--object-format=sha256", "-b", "main")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a"), 0o644)
+	gitIn(t, dir, "add", "a.txt")
+	gitIn(t, dir, "commit", "-q", "-m", "chore(no-ticket): Init")
+	os.WriteFile(filepath.Join(dir, ".env"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("changed"), 0o644)
+	for _, tc := range []struct{ hooks, command string }{{"no-secrets-commit", "git add -A"}, {"destructive-git", "git reset --hard"}} {
+		if res := run(t, tc.hooks, bashIn(dir, tc.command)); res.Exit != 2 {
+			t.Errorf("%s in a SHA-256 repo: %+v", tc.command, res)
+		}
+	}
+}

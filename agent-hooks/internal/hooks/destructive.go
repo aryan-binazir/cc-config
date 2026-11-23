@@ -9,9 +9,14 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
+// Identity entries let git's unique-prefix abbreviations (--mir) resolve.
 var pushAliases = map[string]string{
 	"--force": "-f", "--dry-run": "-n", "--delete": "-d", "--set-upstream": "-u", "--push-option": "-o",
+	"--mirror": "--mirror", "--all": "--all", "--branches": "--branches", "--prune": "--prune",
+	"--force-with-lease": "--force-with-lease", "--repo": "--repo", "--tags": "--tags",
 }
+
+var resetModes = map[string]string{"--hard": "--hard", "--soft": "--soft", "--mixed": "--mixed", "--keep": "--keep", "--merge": "--merge"}
 var pushLongValues = []string{"--repo", "--receive-pack", "--exec", "-o"}
 
 const discardAdvice = "Commit or stash them first; if the user asked to throw them away, rerun with AGENT_HOOKS_ALLOW=destructive."
@@ -59,7 +64,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 			return "git clean would delete untracked files (" + strings.TrimPrefix(first, "Would remove ") + ", ...). " + discardAdvice
 		}
 	case "reset":
-		o := parseOpts(g.args, "", nil, nil)
+		o := parseOpts(g.args, "", nil, resetModes)
 		if !o.has("--hard") {
 			return ""
 		}
@@ -176,9 +181,20 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 		tracked[p] = true
 	}
 	// Porcelain paths are relative to the repository root, like --full-tree.
+	// A collision is a shared path, or one side's path under the other's:
+	// an untracked file inside a tracked file's spot, or the reverse.
+	localSet := map[string]bool{}
 	for _, p := range local {
-		for p = strings.TrimSuffix(p, "/"); p != "." && p != "/" && p != ""; p = path.Dir(p) {
-			if tracked[p] {
+		localSet[strings.TrimSuffix(p, "/")] = true // an ignored directory is listed as dir/
+		for q := strings.TrimSuffix(p, "/"); q != "." && q != ""; q = path.Dir(q) {
+			if tracked[q] {
+				return true
+			}
+		}
+	}
+	for t := range tracked {
+		for q := t; q != "." && q != ""; q = path.Dir(q) {
+			if localSet[q] {
 				return true
 			}
 		}
@@ -203,13 +219,13 @@ func checkRm(c *ctx, inv shell.Invocation) string {
 
 func dangerousTarget(c *ctx, cwd string, target shell.Word) bool {
 	v := target.Val
-	if homeVar.MatchString(v) {
-		return true
-	}
 	if target.Dynamic {
-		return false
+		return homeVar.MatchString(v) // only a real expansion of $HOME
 	}
 	v = strings.TrimSuffix(v, "/*")
+	if strings.HasPrefix(v, "~") && target.Quoted {
+		v = "./" + v // a quoted ~ is a literal name, not home
+	}
 	if v == "" || v == "~" || v == "~/" {
 		return true
 	}

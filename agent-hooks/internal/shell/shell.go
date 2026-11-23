@@ -20,6 +20,7 @@ import (
 type Word struct {
 	Val     string // the decoded value, or the source text when Dynamic
 	Dynamic bool   // depends on parameter, arithmetic or command expansion
+	Quoted  bool   // starts with a quote, so a leading ~ is literal
 }
 
 // Invocation is one simple command.
@@ -131,15 +132,23 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd string) string {
 			return f.stmt(w, c.Y, f.stmt(w, c.X, cwd))
 		case syntax.OrStmt:
 			afterX := f.stmt(w, c.X, cwd)
-			// Y runs only when X failed. A failed plain cd changed nothing; any
-			// other X ran to its end first.
-			beforeY := afterX
-			if isCd(c.X) {
-				beforeY = cwd
-			}
-			afterY := f.stmt(w, c.Y, beforeY)
+			// Y runs only when X failed, so it may start where X began (a cd
+			// failed) or where X ended (a later command failed). Walk Y from
+			// every directory it can start in.
+			starts := []string{afterX}
 			switch {
-			case exits(c.Y), afterY == afterX:
+			case isCd(c.X):
+				starts = []string{cwd}
+			case afterX != cwd:
+				starts = append(starts, cwd)
+			}
+			same := true
+			for _, start := range starts {
+				if f.stmt(w, c.Y, start) != afterX {
+					same = false
+				}
+			}
+			if same || exits(c.Y) {
 				return afterX // when Y exits, only the X path continues
 			}
 			return ""

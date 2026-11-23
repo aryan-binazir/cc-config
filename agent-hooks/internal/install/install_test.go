@@ -542,3 +542,20 @@ func TestInstallNeverShiftsCodexIndices(t *testing.T) {
 		t.Errorf("legacy or stale paths left:\n%s", read(t, p.Codex))
 	}
 }
+
+func TestInstallLeavesOtherEventsAndSharedBashGroups(t *testing.T) {
+	codex := `{"hooks": {"SessionStart": [{"hooks": [{"command": "bash ~/.claude/hooks/block-agy.sh"}, {"command": "custom"}]}],
+"PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "'/x/agent-hooks' pre"}, {"command": "mine"}]}]}}`
+	p := setup(t, "", codex, "")
+	if _, err := Install(p, bin, now); err != nil {
+		t.Fatal(err)
+	}
+	cfg := decode(t, read(t, p.Codex))
+	start := cfg["hooks"].(map[string]any)["SessionStart"].([]any)[0].(map[string]any)["hooks"].([]any)
+	if len(start) != 2 {
+		t.Errorf("SessionStart handlers moved: %v", start)
+	}
+	if pre := cfg["hooks"].(map[string]any)["PreToolUse"].([]any); len(pre) != 1 {
+		t.Errorf("appended a second Bash group: %v", pre)
+	}
+}

@@ -61,7 +61,6 @@ func Install(p Paths, bin string, now time.Time) ([]string, error) {
 		hooks := hooksOf(root)
 		upsert(hooks, "PreToolUse", "Bash", command("pre"), true)
 		upsert(hooks, "PostToolUse", "Bash", command("post"), true)
-		dropLegacy(hooks) // block-agy.sh only ever ran as PreToolUse; drop strays elsewhere
 		return encode(root) != before, nil
 	}
 	return apply(now, []edit{
@@ -293,9 +292,12 @@ func upsert(hooks *object, event, matcher, command string, legacy bool) {
 				mine++
 			}
 		}
-		if mine > 0 && mine == len(handlers) {
+		switch {
+		case mine > 0 && mine == len(handlers):
 			group.set("matcher", matcher)
 			placed = true
+		case mine > 0 && coversBash(group):
+			placed = true // already runs for Bash alongside other handlers
 		}
 	}
 	if !placed {
@@ -309,8 +311,6 @@ func upsert(hooks *object, event, matcher, command string, legacy bool) {
 func strip(hooks *object) bool {
 	return filter(hooks, func(h any) bool { return isOwned(h) || isLegacy(h) })
 }
-
-func dropLegacy(hooks *object) { filter(hooks, isLegacy) }
 
 // filter removes handlers matching drop, dropping groups and events only when
 // that removal emptied them. It reports whether it removed anything.
@@ -358,6 +358,12 @@ func filter(hooks *object, drop func(any) bool) bool {
 		}
 	}
 	return removedAny
+}
+
+func coversBash(group *object) bool {
+	v, _ := group.get("matcher")
+	m, _ := v.(string)
+	return m == "" || m == "*" || m == "Bash"
 }
 
 func commandOf(h any) string {

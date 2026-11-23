@@ -214,7 +214,7 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 	}
 	rest := args[i+1:]
 	api := &ghAPI{}
-	body, help := false, false
+	body, help, shortHelp := false, false, false
 	for i := 0; i < len(rest); i++ {
 		arg := rest[i]
 		name, value, hasValue := strings.Cut(arg, "=")
@@ -222,7 +222,7 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 		case name == "--help":
 			help = !hasValue || truthy(value) // the last value wins
 		case arg == "-h":
-			help = true
+			shortHelp = true // -h shows help whatever --help says
 		case strings.HasPrefix(arg, "--") && slices.Contains(ghAPIValueLong, name):
 			if !hasValue && i+1 < len(rest) {
 				i++
@@ -239,7 +239,8 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 			for j := 1; j < len(arg); j++ {
 				flag := arg[j]
 				if flag == 'h' {
-					return nil
+					shortHelp = true
+					break
 				}
 				if strings.IndexByte(ghAPIValueShort, flag) < 0 {
 					continue
@@ -263,7 +264,7 @@ func parseGhAPI(inv shell.Invocation) *ghAPI {
 			}
 		}
 	}
-	if help {
+	if help || shortHelp {
 		return nil
 	}
 	if api.method == "" {

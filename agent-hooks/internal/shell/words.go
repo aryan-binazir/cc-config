@@ -21,7 +21,12 @@ func (f frame) word(w *syntax.Word) Word {
 			dynamic = true
 		}
 	}
-	return Word{Val: b.String(), Dynamic: dynamic}
+	quoted := false
+	if len(w.Parts) > 0 {
+		_, lit := w.Parts[0].(*syntax.Lit)
+		quoted = !lit
+	}
+	return Word{Val: b.String(), Dynamic: dynamic, Quoted: quoted}
 }
 
 // part appends the value of one word part and reports whether it was literal.
