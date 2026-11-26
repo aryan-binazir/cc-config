@@ -11,7 +11,13 @@ func TestForcedCheckoutAndSwitchKeepUncommittedWork(t *testing.T) {
 	r := newRepo(t)
 	r.git("switch", "-q", "-c", "other")
 	r.git("switch", "-q", "main") // so that - names a previous branch
+	r.write("paths.txt", "notes.txt\n")
+	r.write("all.txt", ".\n")
+	r.write("empty.txt", "")
 	forced := []string{
+		"git checkout -f --pathspec-from-file=empty.txt", "git checkout -f --pathspec-from-file=- <<<''", // no paths: git moves HEAD
+		"git checkout -f --pathspec-from-file=all.txt", "git checkout --pathspec-from-file=all.txt", "git restore --pathspec-from-file=all.txt",
+		"git checkout --pathspec-from-file=- <<<.", `git checkout --pathspec-from-file="$LIST"`,
 		"git checkout -f", "git checkout --force", "git checkout -f other", "git checkout -f -B fresh", `git checkout -f "$BRANCH"`,
 		"git switch -f other", "git switch --force other", "git switch --discard-changes other", "git switch -f -",
 		"git checkout -f other --", "git checkout -f -bfresh", "git checkout -f --orphan fresh", "git checkout -f -",
@@ -26,7 +32,7 @@ func TestForcedCheckoutAndSwitchKeepUncommittedWork(t *testing.T) {
 	r.expect("destructive-git", false,
 		"git checkout other", "git switch other", // without force git refuses on its own
 		"git checkout -f -- notes.txt", "git checkout -f notes.txt", "git checkout -f HEAD notes.txt", "git checkout -f other -- notes.txt", // path mode touches only that path
-		"git checkout -f --pathspec-from-file=paths.txt", "git checkout -f --pathspec-from-file paths.txt",
+		"git checkout -f --pathspec-from-file=paths.txt", "git checkout -f --pathspec-from-file paths.txt", "git checkout --pathspec-from-file=- <<<notes.txt",
 		"git switch --force-create fresh", // resets the branch, keeps the changes
 		"AGENT_HOOKS_ALLOW=destructive git checkout -f",
 	)
@@ -54,6 +60,7 @@ func TestForcedCheckoutKeepsUntrackedFilesTheTargetTracks(t *testing.T) {
 	r.git("remote", "add", "fork", filepath.Join(r.root, "remote.git"))
 	r.git("fetch", "-q", "fork")
 	r.expect("destructive-git", false, "git checkout -f remote-only", "git switch -f remote-only") // two remotes have it: git refuses to guess
+	r.expect("destructive-git", true, "git -c checkout.defaultRemote=origin checkout -f remote-only")
 	r.git("config", "checkout.defaultRemote", "origin")
 	r.expect("destructive-git", true, "git checkout -f remote-only", "git switch -f remote-only")
 }

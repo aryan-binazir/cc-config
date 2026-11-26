@@ -76,3 +76,22 @@ func TestHereDocumentsThatShareALineWithAnotherCommandAreRead(t *testing.T) {
 		}
 	}
 }
+
+func TestEnvSplitStringIsReadTheWayEnvSplitsIt(t *testing.T) {
+	// Single quotes keep a $ literal, so the script is one bash can be shown.
+	if res := run(t, "block-agy", bash(`env -S "bash -c 'echo \$HOME; rg agy notes.txt'"`)); res.Exit != 0 {
+		t.Errorf("a quoted script that only mentions agy: %+v", res)
+	}
+	if res := run(t, "destructive-git", bash(`env -S "bash -c 'git push --force origin \$BRANCH'"`)); !blocked(t, res, "destructive-git") {
+		t.Errorf("a quoted script is still read: %+v", res)
+	}
+	for _, command := range []string{
+		`env -S '# a comment ends the string' agy -p hi`,
+		`env -S '\c printf' agy -p hi`, // \c ends the string before printf
+		`env -S '\_agy\_-p'`,
+	} {
+		if res := run(t, "block-agy", bash(command)); res.Exit != 2 {
+			t.Errorf("%q runs agy: %+v", command, res)
+		}
+	}
+}

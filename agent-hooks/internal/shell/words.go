@@ -212,39 +212,23 @@ func isHex(c byte) bool {
 // Split divides s into words the way git splits an alias: on whitespace, with
 // single quotes, double quotes, and backslash escapes, and nothing else
 // special. It reports false for an unclosed quote or a trailing backslash.
-func Split(s string) ([]Word, bool) { return split(s, false) }
-
-// split also reads the string of env -S, where \_ separates words (inside
-// double quotes it is a space) and \c ends the string.
-func split(s string, env bool) ([]Word, bool) {
+func Split(s string) ([]Word, bool) {
 	var words []Word
 	var word strings.Builder
 	open, quote, escaped := false, rune(0), false
-	end := func() {
-		if open {
-			words = append(words, Word{Val: word.String()})
-		}
-		word.Reset()
-		open = false
-	}
 	for _, r := range s {
 		switch {
-		case escaped && env && quote == 0 && r == 'c':
-			end()
-			return words, true
-		case escaped && env && quote == 0 && r == '_':
-			end()
-			escaped = false
 		case escaped:
-			if env && r == '_' {
-				r = ' '
-			}
 			word.WriteRune(r)
 			open, escaped = true, false
 		case r == '\\' && quote != '\'':
 			escaped = true
 		case quote == 0 && unicode.IsSpace(r):
-			end()
+			if open {
+				words = append(words, Word{Val: word.String()})
+				word.Reset()
+				open = false
+			}
 		case quote == 0 && (r == '\'' || r == '"'):
 			open, quote = true, r
 		case r == quote:
@@ -257,6 +241,8 @@ func split(s string, env bool) ([]Word, bool) {
 	if escaped || quote != 0 {
 		return nil, false
 	}
-	end()
+	if open {
+		words = append(words, Word{Val: word.String()})
+	}
 	return words, true
 }

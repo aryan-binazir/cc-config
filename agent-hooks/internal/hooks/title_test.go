@@ -48,6 +48,9 @@ func TestPRTitleKeepsTheBranchType(t *testing.T) {
 		`gh pr create --base release --title "fix(no-ticket): Nothing ahead of release yet"`,
 		`gh pr create --base "$BASE" --title "fix(no-ticket): Unknown base"`,
 	)
+	r.git("config", "branch.amb/x.gh-merge-base", "release") // where gh opens this branch's pull request
+	r.expect("commit-format", false, `gh pr create --title "fix(no-ticket): Nothing ahead of release"`, `gh pr edit --title "fix(no-ticket): Nothing ahead of release"`)
+	r.git("config", "--unset", "branch.amb/x.gh-merge-base")
 	t.Setenv("GH_REPO", "upstream/repo")
 	r.expect("commit-format", false, `gh pr create --title "Fix it"`, `gh pr edit --title "fix(no-ticket): Other type"`)
 }

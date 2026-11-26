@@ -45,7 +45,7 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 		if o.has("-n", "-p", "-i", "-e") {
 			return ""
 		}
-		specs := append(o.pos, o.paths...)
+		specs := append(append(o.pos, o.paths...), c.fileSpecs(g, o)...)
 		found = c.explicitSecrets(g, specs)
 		if o.has("-A", "-u", "--pathspec-from-file") || broad(g.dir, specs, c.opts.Home) {
 			found = append(found, c.wouldAdd(g, o, specs)...)
@@ -55,12 +55,7 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 		if o.has("--dry-run", "--short", "--porcelain", "--long", "-z", "-h", "--help") {
 			return ""
 		}
-		specs := append(o.pos, o.paths...)
-		for _, file := range o.vals["--pathspec-from-file"] {
-			for _, p := range c.pathspecFile(g, file, o.has("--pathspec-file-nul")) {
-				specs = append(specs, shell.Word{Val: p})
-			}
-		}
+		specs := append(append(o.pos, o.paths...), c.fileSpecs(g, o)...)
 		found = c.explicitSecrets(g, specs)
 		if o.has("-a") || broad(g.dir, specs, c.opts.Home) {
 			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs))...)
@@ -128,9 +123,6 @@ func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 
 func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 	paths := values(specs)
-	for _, file := range o.vals["--pathspec-from-file"] {
-		paths = append(paths, c.pathspecFile(g, file, o.has("--pathspec-file-nul"))...)
-	}
 	if len(paths) == 0 {
 		paths = []string{":/"} // -A and -u cover the whole tree
 	}
@@ -168,35 +160,51 @@ func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 	return found
 }
 
-func (c *ctx) pathspecFile(g *gitCmd, file shell.Word, nul bool) []string {
-	full := shell.Resolve(g.dir, file.Val, c.opts.Home)
-	if file.Dynamic || file.Val == "-" || full == "" {
-		return nil
-	}
-	data, err := os.ReadFile(full)
-	if err != nil || len(data) > 1<<20 {
-		return nil
-	}
-	sep := "\n"
-	if nul {
-		sep = "\x00"
-	}
-	var out []string
-	for _, line := range strings.Split(string(data), sep) {
-		if !nul {
-			line = strings.TrimSuffix(line, "\r")
-			// git reads a line that opens with a quote as a C-style string, up to its closing quote.
-			if quoted, err := strconv.QuotedPrefix(line); err == nil && quoted[0] == '"' {
-				if plain, err := strconv.Unquote(quoted); err == nil {
-					line = plain
-				}
+// fileSpecs is the pathspecs --pathspec-from-file adds: one per line, or per
+// NUL with --pathspec-file-nul, from a file or from standard input. A list the
+// hook cannot read (an expansion, a pipe, a missing file) could name anything,
+// so it stands for the whole tree.
+func (c *ctx) fileSpecs(g *gitCmd, o opts) []shell.Word {
+	nul := o.has("--pathspec-file-nul")
+	var specs []shell.Word
+	for _, file := range o.vals["--pathspec-from-file"] {
+		list, ok := "", false
+		switch {
+		case file.Dynamic:
+		case file.Val == "-":
+			if g.stdin != nil {
+				list, ok = *g.stdin, true
+			}
+		default:
+			if full := shell.Resolve(g.dir, file.Val, c.opts.Home); full != "" {
+				data, err := os.ReadFile(full)
+				list, ok = string(data), err == nil && len(data) <= 1<<20
 			}
 		}
-		if line != "" {
-			out = append(out, line)
+		if !ok {
+			specs = append(specs, shell.Word{Val: ":/"})
+			continue
+		}
+		sep := "\n"
+		if nul {
+			sep = "\x00"
+		}
+		for _, line := range strings.Split(list, sep) {
+			if !nul {
+				line = strings.TrimSuffix(line, "\r")
+				// git reads a line that opens with a quote as a C-style string, up to its closing quote.
+				if quoted, err := strconv.QuotedPrefix(line); err == nil && quoted[0] == '"' {
+					if plain, err := strconv.Unquote(quoted); err == nil {
+						line = plain
+					}
+				}
+			}
+			if line != "" {
+				specs = append(specs, shell.Word{Val: line})
+			}
 		}
 	}
-	return out
+	return specs
 }
 
 func broad(dir string, specs []shell.Word, home string) bool {

@@ -107,14 +107,91 @@ options:
 }
 
 // resplit is env's argument list after -S: env splits the string into words,
-// options included, and carries on with what follows. A word with ${NAME} in
-// it is filled in from the environment.
+// options included, and carries on with what follows.
 func resplit(value string, rest []Word) []Word {
-	words, _ := split(value, true)
-	for i := range words {
-		words[i].Dynamic = strings.Contains(words[i].Val, "$")
-	}
+	words, _ := splitEnv(value)
 	return append(words, rest...)
+}
+
+// splitEnv divides the string of env -S by the rules of GNU env: whitespace
+// and \_ separate words, quotes group them, a # that starts a word or a \c
+// ends the string, and ${NAME} outside single quotes is filled in from the
+// environment, which makes that word Dynamic. It reports false where env
+// rejects the string.
+func splitEnv(s string) ([]Word, bool) {
+	var words []Word
+	var word strings.Builder
+	open, expands, single, double := false, false, false, false
+	end := func() {
+		if open {
+			words = append(words, Word{Val: word.String(), Dynamic: expands})
+		}
+		word.Reset()
+		open, expands = false, false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == '\'' && !double:
+			single, open = !single, true
+			continue
+		case c == '"' && !single:
+			double, open = !double, true
+			continue
+		case !single && !double && strings.IndexByte(" \t\n\v\f\r", c) >= 0:
+			end()
+			continue
+		case c == '#' && !open:
+			return words, true
+		case c == '\\' && (!single || strings.HasPrefix(s[i+1:], `\`) || strings.HasPrefix(s[i+1:], "'")):
+			if i++; i == len(s) {
+				return nil, false
+			}
+			switch c = s[i]; c {
+			case '"', '#', '$', '\'', '\\':
+			case '_':
+				if !double {
+					end()
+					continue
+				}
+				c = ' '
+			case 'c':
+				if double {
+					return nil, false
+				}
+				end()
+				return words, true
+			case 'f':
+				c = '\f'
+			case 'n':
+				c = '\n'
+			case 'r':
+				c = '\r'
+			case 't':
+				c = '\t'
+			case 'v':
+				c = '\v'
+			default:
+				return nil, false
+			}
+		case c == '$' && !single:
+			closing := strings.IndexByte(s[i:], '}')
+			if !strings.HasPrefix(s[i:], "${") || closing < 0 {
+				return nil, false
+			}
+			word.WriteString(s[i : i+closing+1])
+			open, expands = true, true
+			i += closing
+			continue
+		}
+		word.WriteByte(c)
+		open = true
+	}
+	if single || double {
+		return nil, false
+	}
+	end()
+	return words, true
 }
 
 func isAssign(s string) bool {

@@ -17,6 +17,7 @@ type gitCmd struct {
 	dir    string
 	env    []string
 	config map[string]string
+	stdin  *string // what the command reads, when the command line spells it out
 }
 
 // parseGit reads a git invocation, following plain aliases to the command
@@ -46,8 +47,8 @@ func (c *ctx) alias(g *gitCmd) []shell.Word {
 			scope = append(scope, "--global")
 		}
 		value, _ = c.git(&where, append(scope, "--get", "alias."+g.sub)...)
+		value = strings.TrimSuffix(value, "\n") // git config prints one after the value
 	}
-	value = strings.TrimSuffix(value, "\n") // git config prints one after the value
 	if strings.HasPrefix(value, "!") {
 		return nil
 	}
@@ -64,6 +65,9 @@ func parseGit(inv shell.Invocation, home string) *gitCmd {
 		return nil
 	}
 	g := &gitCmd{dir: inv.Cwd}
+	if !inv.StdinDynamic {
+		g.stdin = inv.Stdin
+	}
 	repo := map[string]shell.Word{}
 	for _, name := range gitRepoEnv {
 		if v, ok := inv.Assigns[name]; ok {

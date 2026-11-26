@@ -71,9 +71,9 @@ func TestAliasWordsAreSplitTheWayGitSplitsThem(t *testing.T) {
 	r := newRepo(t)
 	r.git("config", "alias.cost", `commit -m "wip $5"`) // git passes $5 through; it is not a shell expansion
 	r.git("config", "alias.good", `commit -m "feat(no-ticket): Cost $5 #1; it's done"`)
-	r.git("config", "alias.open", `commit -m "unclosed`) // git rejects this alias
-	r.git("config", "alias.padded", `commit -m wip\ `)   // an escaped space ends the message
-	r.expect("commit-format", true, "git cost", "git padded")
+	r.git("config", "alias.open", `commit -m "unclosed`)                                                // git rejects this alias
+	r.git("config", "alias.padded", `commit -m wip\ `)                                                  // an escaped space ends the message
+	r.expect("commit-format", true, "git cost", "git padded", "git -c 'alias.nl=commit -m wip\\\n' nl") // an escaped newline ends that message too
 	r.expect("commit-format", false, "git good", "git open")
 }
 

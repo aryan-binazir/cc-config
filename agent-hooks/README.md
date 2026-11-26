@@ -112,7 +112,7 @@ The hooks run on every tool call, so:
 | Calls | p50 | p99 |
 | --- | --- | --- |
 | Decided from the payload alone | 1.5 ms | 2.0 ms |
-| Needing a git lookup | 5.7 ms | 8.7 ms |
+| Needing a git lookup | 6.5 ms | 8.6 ms |
 | Old `block-agy.sh` (bash + jq, one hook) | 10.3 ms | 12.3 ms |
 
 ## Development

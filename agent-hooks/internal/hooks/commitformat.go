@@ -82,6 +82,11 @@ func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 			branch = nil // the commits ahead of an unknown base cannot be counted
 		}
 		bases = []string{"origin/" + base.Val, base.Val}
+	} else if branch != nil {
+		// Without --base, gh opens the pull request against this setting when the branch has it.
+		if base, ok := c.git(branch, "config", "--get", "branch."+c.currentBranch(branch)+".gh-merge-base"); ok {
+			bases = []string{"origin/" + strings.TrimSpace(base), strings.TrimSpace(base)}
+		}
 	}
 	return c.subjectProblem(branch, "PR titles", strings.TrimSpace(title.Val), false, bases...)
 }

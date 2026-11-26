@@ -80,7 +80,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		}
 		fallthrough
 	case "restore":
-		o := parseOpts(g.args, "s", []string{"--source"}, map[string]string{"--staged": "-S", "--worktree": "-W"})
+		o := parseOpts(g.args, "s", []string{"--source", "--pathspec-from-file"}, map[string]string{"--staged": "-S", "--worktree": "-W"})
 		if g.sub == "restore" && o.has("-S") && !o.has("-W") {
 			return ""
 		}
@@ -88,6 +88,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if g.sub == "restore" || !o.dashed {
 			specs = append(append([]shell.Word{}, o.pos...), o.paths...)
 		}
+		specs = append(specs, c.fileSpecs(g, o)...)
 		if !hasAll(specs) {
 			return ""
 		}
@@ -133,7 +134,7 @@ func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
 		return false, false
 	}
 	pathsAllowed := g.sub == "checkout" && !o.has("-b", "-B", "--orphan")
-	if pathsAllowed && (len(o.paths) > 0 || len(o.pos) > 1 || o.has("--pathspec-from-file")) {
+	if pathsAllowed && (len(o.paths) > 0 || len(o.pos) > 1 || len(c.fileSpecs(g, o)) > 0) {
 		return false, false
 	}
 	target := ""
@@ -150,7 +151,10 @@ func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
 		out, _ := c.git(g, "for-each-ref", "--format=%(refname)", "refs/remotes/*/"+target)
 		refs := strings.Fields(out)
 		if len(refs) > 1 {
-			preferred, _ := c.git(g, "config", "--get", "checkout.defaultRemote")
+			preferred, inline := g.config["checkout.defaultremote"]
+			if !inline {
+				preferred, _ = c.git(g, "config", "--get", "checkout.defaultRemote")
+			}
 			refs = slices.DeleteFunc(refs, func(ref string) bool { return ref != "refs/remotes/"+strings.TrimSpace(preferred)+"/"+target })
 		}
 		switch {

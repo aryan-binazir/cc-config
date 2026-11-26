@@ -24,12 +24,14 @@ func TestCommitFlagsSecretsAlreadyInTheIndex(t *testing.T) {
 		"git commit --include docs/ -m x", "git commit --patch docs/", "git commit --interactive", // each keeps what is already staged
 		"git commit --pathspec-from-file=empty.txt -m x", "git commit --pathspec-from-file=quoted-env.txt -m x",
 		"git commit --pathspec-from-file=quoted-env-then-text.txt -m x",
+		"git commit --pathspec-from-file=- -m x <<<'./.env'", "git commit --pathspec-from-file=- -m x <<'EOF'\nnotes.txt\n.env\nEOF",
 	)
 	if res := r.run("no-secrets-commit", "git commit -m x"); !strings.Contains(res.Stderr, ".env") || !strings.Contains(res.Stderr, "AGENT_HOOKS_ALLOW=secrets") {
 		t.Errorf("the message should name the file and the override: %q", res.Stderr)
 	}
 	r.expect("no-secrets-commit", false,
 		"git commit notes.txt -m x", "git commit -o notes.txt -m x", "git commit --pathspec-from-file=only-notes.txt -m x", // git commits only those paths
+		"git commit --pathspec-from-file=- -m x <<<notes.txt",
 		"git commit --only --amend --no-edit", "git commit --fixup=reword:HEAD", // neither reads the index
 		"git commit --dry-run", "git commit --short", "git commit --porcelain", "git commit --long", "git commit -z", "git commit --null", "git commit -h",
 		"git commit --porc", "git commit --dry",
@@ -56,6 +58,9 @@ func TestCommitFollowsWhatEachModeWouldRecord(t *testing.T) {
 	r.git("add", "-N", "key.pem")
 	r.expect("no-secrets-commit", false, "git commit -m x") // intent-to-add records nothing
 	r.expect("no-secrets-commit", true, "git commit -am x")
+	// A list the hook cannot read could name any tracked file.
+	r.expect("no-secrets-commit", true, `git commit --pathspec-from-file="$LIST" -m x`, "printf 'key.pem' | git commit --pathspec-from-file=- -m x")
+	r.expect("no-secrets-commit", true, "git commit --pathspec-from-file=- -m x <<<key.pem")
 
 	fresh := t.TempDir()
 	gitIn(t, fresh, "init", "-q", "-b", "main")
