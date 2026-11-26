@@ -186,7 +186,7 @@ func TestNoSecretsCommit(t *testing.T) {
 func TestNoSecretsOverrideIsLogged(t *testing.T) {
 	r := newRepo(t)
 	state := t.TempDir()
-	res := runOpts(t, Options{Phase: "pre", Enabled: switches("no-secrets-commit"), StateDir: state}, bashIn(r.dir, "AGENT_HOOKS_ALLOW=secrets git add .env"))
+	res := runOpts(t, Options{Phase: "pre", Only: only("no-secrets-commit"), StateDir: state}, bashIn(r.dir, "AGENT_HOOKS_ALLOW=secrets git add .env"))
 	if res.Exit != 0 {
 		t.Fatalf("override did not apply: %+v", res)
 	}
@@ -199,12 +199,12 @@ func TestNoSecretsOverrideIsLogged(t *testing.T) {
 		t.Fatalf("log should be private: %v %v", info, err)
 	}
 	for _, command := range []string{"AGENT_HOOKS_ALLOW=destructive git add .env", "AGENT_HOOKS_ALLOW=secrets true; git add .env", "AGENT_HOOKS_ALLOW=x,secretsy git add .env"} {
-		if res := runOpts(t, Options{Phase: "pre", Enabled: switches("no-secrets-commit"), StateDir: state}, bashIn(r.dir, command)); res.Exit != 2 {
+		if res := runOpts(t, Options{Phase: "pre", Only: only("no-secrets-commit"), StateDir: state}, bashIn(r.dir, command)); res.Exit != 2 {
 			t.Errorf("%q should still block: %+v", command, res)
 		}
 	}
 	for _, command := range []string{"AGENT_HOOKS_ALLOW=destructive,secrets git add .env", "env AGENT_HOOKS_ALLOW=secrets git add .env", "AGENT_HOOKS_ALLOW=secrets bash -c 'git add .env'"} {
-		if res := runOpts(t, Options{Phase: "pre", Enabled: switches("no-secrets-commit"), StateDir: state}, bashIn(r.dir, command)); res.Exit != 0 {
+		if res := runOpts(t, Options{Phase: "pre", Only: only("no-secrets-commit"), StateDir: state}, bashIn(r.dir, command)); res.Exit != 0 {
 			t.Errorf("%q should be allowed: %+v", command, res)
 		}
 	}
@@ -243,7 +243,7 @@ func TestOverrideLogSkipsNoOps(t *testing.T) {
 	r := newRepo(t)
 	state := t.TempDir()
 	before := len(overrideLog(t, state))
-	runOpts(t, Options{Phase: "pre", Enabled: switches("no-secrets-commit"), StateDir: state}, bashIn(r.dir, "AGENT_HOOKS_ALLOW=secrets git add README.md"))
+	runOpts(t, Options{Phase: "pre", Only: only("no-secrets-commit"), StateDir: state}, bashIn(r.dir, "AGENT_HOOKS_ALLOW=secrets git add README.md"))
 	if len(overrideLog(t, state)) != before {
 		t.Error("logged an override that did not change the outcome")
 	}
@@ -259,7 +259,7 @@ func TestDestructiveGitPushAndRm(t *testing.T) {
 	)
 	r.expect("destructive-git", false,
 		"git push --force-with-lease", "git push origin x", "git push -n -f",
-		"rm -rf node_modules", "rm -rf /tmp/agent-hooks-x/build", "rm -r ~", "rm -f ~/.cache/x", "echo rm -rf /",
+		"rm -rf node_modules", "rm -rf /tmp/agent-hooks-x/build", "rm -f ~/.cache/x", "echo rm -rf /",
 		`rm -rf "$HOME/.cache/foo"`, "rm -rf build", "rm -rf "+r.root+"/elsewhere", "rm -rf ./src",
 	)
 }
@@ -287,7 +287,7 @@ func TestDestructiveGitOnlyWhenTheTreeIsDirty(t *testing.T) {
 
 func TestDestructiveOverride(t *testing.T) {
 	state := t.TempDir()
-	res := runOpts(t, Options{Phase: "pre", Enabled: switches("destructive-git"), StateDir: state}, bash("AGENT_HOOKS_ALLOW=destructive git push --force"))
+	res := runOpts(t, Options{Phase: "pre", Only: only("destructive-git"), StateDir: state}, bash("AGENT_HOOKS_ALLOW=destructive git push --force"))
 	if res.Exit != 0 || len(overrideLog(t, state)) != 1 {
 		t.Fatalf("override: %+v %v", res, overrideLog(t, state))
 	}
@@ -345,7 +345,7 @@ func TestNoProductionPRBase(t *testing.T) {
 func TestNoProductionOverride(t *testing.T) {
 	r := newRepo(t)
 	state := t.TempDir()
-	res := runOpts(t, Options{Phase: "pre", Enabled: switches("no-production"), StateDir: state}, bashIn(r.dir, "AGENT_HOOKS_ALLOW=production git push origin production"))
+	res := runOpts(t, Options{Phase: "pre", Only: only("no-production"), StateDir: state}, bashIn(r.dir, "AGENT_HOOKS_ALLOW=production git push origin production"))
 	if res.Exit != 0 || len(overrideLog(t, state)) != 1 {
 		t.Fatalf("override: %+v", res)
 	}
@@ -363,7 +363,7 @@ func TestLookupsAreSkippedOnceAHookBlocks(t *testing.T) {
 func TestOverrideLogFallsBackToThePayloadCwdAndKeepsShellText(t *testing.T) {
 	state := t.TempDir()
 	payload := bashIn("/work/dir", `cd "$X" && AGENT_HOOKS_ALLOW=destructive git push -f`)
-	if res := runOpts(t, Options{Phase: "pre", Enabled: switches("destructive-git"), StateDir: state}, payload); res.Exit != 0 {
+	if res := runOpts(t, Options{Phase: "pre", Only: only("destructive-git"), StateDir: state}, payload); res.Exit != 0 {
 		t.Fatalf("%+v", res)
 	}
 	raw, _ := os.ReadFile(filepath.Join(state, "overrides.log"))

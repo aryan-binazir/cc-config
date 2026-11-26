@@ -7,11 +7,11 @@
 package main
 
 import (
-	_ "embed"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,12 +19,9 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/install"
 )
 
-//go:embed hooks.yaml
-var hooksYAML string
-
 const (
 	maxPayload = 16 << 20
-	deadline   = 8 * time.Second
+	deadline   = hooks.LookupBudget + 2*time.Second
 	usage      = "usage: agent-hooks pre|post [--agy] [--only=<hook>] | install | uninstall"
 )
 
@@ -38,43 +35,49 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 64
 	}
 	home, homeErr := os.UserHomeDir()
-	switch args[0] {
-	case "pre", "post":
-		return check(args[0], args[1:], hooksYAML, home, stdin, stdout, stderr)
-	case "install", "uninstall":
+	switch {
+	case args[0] == "pre" || args[0] == "post":
+		return check(args[0], args[1:], home, stdin, stdout, stderr)
+	case (args[0] == "install" || args[0] == "uninstall") && len(args) == 1:
 		if homeErr != nil {
 			fmt.Fprintln(stderr, "agent-hooks: cannot find the home directory:", homeErr)
 			return 1
 		}
-		return wire(args[0], hooksYAML, home, stdout, stderr)
+		return wire(args[0], home, stdout, stderr)
 	}
 	fmt.Fprintln(stderr, usage)
 	return 64
 }
 
-func check(phase string, flags []string, switches, home string, stdin io.Reader, stdout, stderr io.Writer) int {
+func check(phase string, flags []string, home string, stdin io.Reader, stdout, stderr io.Writer) int {
 	o := hooks.Options{Phase: phase, Home: home, StateDir: stateDir(home)}
+	misuse := ""
 	for _, f := range flags {
+		name, isOnly := strings.CutPrefix(f, "--only=")
 		switch {
 		case f == "--agy":
 			o.Agy = true
-		case strings.HasPrefix(f, "--only="):
-			o.Only = strings.TrimPrefix(f, "--only=")
+		case isOnly && len(o.Only) > 0:
+			misuse = "--only takes one hook"
+		case isOnly && slices.Contains(hooks.Names(), name):
+			o.Only = []string{name}
+		case isOnly:
+			misuse = fmt.Sprintf("no hook named %q", name)
+		default:
+			misuse = "unknown argument " + f
 		}
 	}
-	allowWithFault := func(reason string) int {
+	allowWith := func(exit int, reason string) int {
 		if o.Agy && phase == "pre" {
 			fmt.Fprintln(stdout, `{"decision":"allow"}`)
 		}
 		fmt.Fprintln(stderr, "agent-hooks:", reason)
-		return 1
+		return exit
 	}
-	time.AfterFunc(deadline, func() { os.Exit(allowWithFault("timed out; allowing the call")) })
-	enabled, err := parseSwitches(switches)
-	if err != nil {
-		return allowWithFault("hooks.yaml: " + err.Error())
+	if misuse != "" {
+		return allowWith(64, misuse+"\n"+usage)
 	}
-	o.Enabled = enabled
+	time.AfterFunc(deadline, func() { os.Exit(allowWith(1, "timed out; allowing the call")) })
 	o.Stdin, _ = io.ReadAll(io.LimitReader(stdin, maxPayload))
 	res := hooks.Run(o)
 	io.WriteString(stdout, res.Stdout)
@@ -92,11 +95,7 @@ func stateDir(home string) string {
 	return filepath.Join(home, ".local", "state", "agent-hooks")
 }
 
-func wire(action, switches, home string, stdout, stderr io.Writer) int {
-	if _, err := parseSwitches(switches); err != nil && action == "install" {
-		fmt.Fprintln(stderr, "agent-hooks: refusing to install: hooks.yaml:", err)
-		return 1
-	}
+func wire(action, home string, stdout, stderr io.Writer) int {
 	paths := install.DefaultPaths(home)
 	var changed []string
 	var err error
@@ -127,33 +126,4 @@ func wire(action, switches, home string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Codex runs a hook only after you trust it: open Codex, run /hooks, and approve the agent-hooks PreToolUse and PostToolUse entries.")
 	}
 	return 0
-}
-
-func parseSwitches(text string) (map[string]bool, error) {
-	on := map[string]bool{}
-	inHooks := false
-	for n, line := range strings.Split(text, "\n") {
-		if i := strings.Index(line, "#"); i >= 0 {
-			line = line[:i]
-		}
-		line = strings.TrimRight(line, " \r")
-		switch {
-		case strings.TrimSpace(line) == "":
-		case line == "hooks:" && !inHooks && len(on) == 0:
-			inHooks = true
-		case inHooks && strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   "):
-			name, value, ok := strings.Cut(strings.TrimSpace(line), ":")
-			value = strings.TrimSpace(value)
-			if !ok || name == "" || (value != "true" && value != "false") {
-				return nil, fmt.Errorf("line %d: want `  <hook>: true|false`", n+1)
-			}
-			on[name] = value == "true"
-		default:
-			return nil, fmt.Errorf("line %d: want a single top-level hooks: mapping", n+1)
-		}
-	}
-	if !inHooks {
-		return nil, fmt.Errorf("missing hooks: mapping")
-	}
-	return on, nil
 }

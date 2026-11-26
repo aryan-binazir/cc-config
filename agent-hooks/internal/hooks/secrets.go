@@ -2,7 +2,7 @@ package hooks
 
 import (
 	"fmt"
-	"os"
+	"slices"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -28,32 +28,43 @@ func isSecret(p string) bool {
 
 var addAliases = map[string]string{
 	"--all": "-A", "--no-ignore-removal": "-A", "--update": "-u", "--force": "-f", "--dry-run": "-n",
-	"--patch": "-p", "--interactive": "-i", "--edit": "-e",
+	"--patch": "-p", "--interactive": "-i", "--edit": "-e", pathspecList: pathspecList,
 }
 
 var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "secrets", check: func(c *ctx, inv shell.Invocation) string {
-	g := parseGit(inv, c.opts.Home)
+	g := c.parseGit(inv)
 	if g == nil {
 		return ""
 	}
 	var found []string
 	switch g.sub {
 	case "add":
-		o := parseOpts(g.args, "", []string{"--chmod", "--pathspec-from-file"}, addAliases)
+		o := parseOpts(g.args, "", []string{"--chmod", pathspecList}, addAliases)
 		if o.has("-n", "-p", "-i", "-e") {
 			return ""
 		}
-		specs := append(o.pos, o.paths...)
+		specs := o.listed(append(o.pos, o.paths...))
 		found = c.explicitSecrets(g, specs)
-		if o.has("-A", "-u", "--pathspec-from-file") || broad(g.dir, specs, c.opts.Home) {
+		if o.has("-A", "-u") || broad(g.dir, specs, c.opts.Home) {
 			found = append(found, c.wouldAdd(g, o, specs)...)
 		}
 	case "commit":
 		o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
-		specs := append(o.pos, o.paths...)
+		if o.has("--dry-run", "--short", "--porcelain", "--long", "-z", "-h", "--help") {
+			return ""
+		}
+		specs := o.listed(append(o.pos, o.paths...))
 		found = c.explicitSecrets(g, specs)
 		if o.has("-a") || broad(g.dir, specs, c.opts.Home) {
 			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs))...)
+		}
+		if commitsTheIndex(o, specs) {
+			staged := c.stagedSecrets(g)
+			if len(staged) > 0 && len(specs) > 0 && o.has("-i") && !o.has(pathspecList) { // --include first stages the deletion of a named file that is gone
+				gone, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--diff-filter=D", "--no-relative", "--"}, values(specs)...)...)
+				staged = slices.DeleteFunc(staged, func(p string) bool { return slices.Contains(strings.Split(gone, "\x00"), p) })
+			}
+			found = append(found, staged...)
 		}
 	default:
 		return ""
@@ -63,6 +74,35 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 	}
 	return fmt.Sprintf("Don't stage credentials: %s. Unstage or .gitignore them. If the user explicitly asked to commit them, rerun with AGENT_HOOKS_ALLOW=secrets.", strings.Join(dedupe(found), ", "))
 }}
+
+// commitsTheIndex reports whether a commit records what is already staged.
+// With pathspecs git commits only those paths, unless --include, --patch, or
+// --interactive adds them to the index instead, or they come from a list,
+// which may be empty. -a restages every tracked file, which the status check
+// covers, and --only --amend and --fixup=reword: rewrite a commit without
+// reading the index.
+func commitsTheIndex(o opts, specs []shell.Word) bool {
+	for _, fixup := range o.vals["--fixup"] {
+		if strings.HasPrefix(fixup.Val, "reword:") {
+			return false
+		}
+	}
+	if o.has("-a") || (o.has("-o") && o.has("--amend")) {
+		return false
+	}
+	return len(specs) == 0 || o.has("-i", "-p", "--interactive", pathspecList)
+}
+
+func (c *ctx) stagedSecrets(g *gitCmd) []string {
+	out, _ := c.git(g, "diff", "--cached", "--name-only", "-z", "--diff-filter=d", "--no-renames", "--no-relative", "--ita-invisible-in-index")
+	var found []string
+	for _, p := range strings.Split(out, "\x00") {
+		if p != "" && isSecret(p) {
+			found = append(found, p)
+		}
+	}
+	return found
+}
 
 func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 	var found []string
@@ -82,9 +122,6 @@ func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 
 func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 	paths := values(specs)
-	for _, file := range o.vals["--pathspec-from-file"] {
-		paths = append(paths, c.pathspecFile(g, file, o.has("--pathspec-file-nul"))...)
-	}
 	if len(paths) == 0 {
 		paths = []string{":/"} // -A and -u cover the whole tree
 	}
@@ -112,36 +149,10 @@ func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 		}
 	}
 	if len(tracked) > 0 {
-		out, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--relative", "--"}, tracked...)...)
-		for _, p := range strings.Split(out, "\x00") {
-			if p != "" && exists(shellPath(g.dir, p, c.opts.Home)) {
-				found = append(found, p)
-			}
-		}
+		changedNotDeleted, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--diff-filter=d", "--no-relative", "--"}, tracked...)...)
+		keep(changedNotDeleted)
 	}
 	return found
-}
-
-func (c *ctx) pathspecFile(g *gitCmd, file shell.Word, nul bool) []string {
-	full := shell.Resolve(g.dir, file.Val, c.opts.Home)
-	if file.Dynamic || file.Val == "-" || full == "" {
-		return nil
-	}
-	data, err := os.ReadFile(full)
-	if err != nil || len(data) > 1<<20 {
-		return nil
-	}
-	sep := "\n"
-	if nul {
-		sep = "\x00"
-	}
-	var out []string
-	for _, line := range strings.Split(string(data), sep) {
-		if line = strings.TrimRight(line, "\r"); line != "" {
-			out = append(out, line)
-		}
-	}
-	return out
 }
 
 func broad(dir string, specs []shell.Word, home string) bool {

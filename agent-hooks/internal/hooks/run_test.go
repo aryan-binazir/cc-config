@@ -43,7 +43,7 @@ func TestAgyProtocolAnswersWithJSONDecisions(t *testing.T) {
 		{agyPayload("view_file", map[string]any{"AbsolutePath": "/agy"}), "allow"},
 	}
 	for _, tc := range cases {
-		r := runOpts(t, Options{Phase: "pre", Enabled: switches("block-agy"), Agy: true}, tc.payload)
+		r := runOpts(t, Options{Phase: "pre", Only: only("block-agy"), Agy: true}, tc.payload)
 		var out struct{ Decision, Reason string }
 		if r.Exit != 0 || json.Unmarshal([]byte(r.Stdout), &out) != nil || out.Decision != tc.decision {
 			t.Errorf("%v: want decision %q, got %+v", tc.payload, tc.decision, r)
@@ -66,21 +66,21 @@ func TestMalformedPayloadsAreAllowed(t *testing.T) {
 		if r := run(t, "block-agy", raw); r.Exit != 0 || r.Stderr != "" || (r.Stdout != "" && r.Stdout != `{"decision":"allow"}`) {
 			t.Errorf("%.40q: got %+v", raw, r)
 		}
-		r := runOpts(t, Options{Phase: "pre", Enabled: switches("block-agy"), Agy: true}, raw)
+		r := runOpts(t, Options{Phase: "pre", Only: only("block-agy"), Agy: true}, raw)
 		if r.Exit != 0 || r.Stdout != `{"decision":"allow"}` {
 			t.Errorf("agy %.40q: got %+v", raw, r)
 		}
 	}
 }
 
-func TestDisabledAndOnlyHooksDoNotRun(t *testing.T) {
-	if r := runOpts(t, Options{Phase: "pre", Enabled: map[string]bool{}}, bash("agy")); r.Exit != 0 {
-		t.Errorf("disabled hook ran: %+v", r)
+func TestOnlySelectsHooksWithinTheirPhase(t *testing.T) {
+	if r := run(t, "draft-prs", bash("agy")); r.Exit != 0 {
+		t.Errorf("a hook outside --only ran: %+v", r)
 	}
-	if r := runOpts(t, Options{Phase: "pre", Enabled: switches("block-agy"), Only: "draft-prs"}, bash("agy")); r.Exit != 0 {
-		t.Errorf("--only did not restrict: %+v", r)
+	if r := runOpts(t, Options{Phase: "pre"}, bash("agy && gh pr create")); r.Exit != 2 || !strings.Contains(r.Stderr, "block-agy") || !strings.Contains(r.Stderr, "draft-prs") {
+		t.Errorf("without --only every hook runs: %+v", r)
 	}
-	if r := runOpts(t, Options{Phase: "post", Enabled: switches("block-agy")}, bash("agy")); r.Exit != 0 || r.Stdout != "" {
+	if r := runOpts(t, Options{Phase: "post", Only: only("block-agy")}, bash("agy")); r.Exit != 0 || r.Stdout != "" {
 		t.Errorf("pre hook ran in post: %+v", r)
 	}
 }

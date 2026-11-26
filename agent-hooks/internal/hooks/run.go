@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,13 +15,12 @@ import (
 )
 
 type Options struct {
-	Phase    string // "pre" or "post"
-	Stdin    []byte // the hook payload
-	Enabled  map[string]bool
-	Only     string // run just this hook, if set
-	Agy      bool   // answer in Antigravity's JSON protocol
-	StateDir string // where overrides.log goes
-	Home     string // expands ~ in commands
+	Phase    string   // "pre" or "post"
+	Stdin    []byte   // the hook payload
+	Only     []string // run just these hooks; empty runs the whole catalog
+	Agy      bool     // answer in Antigravity's JSON protocol
+	StateDir string   // where overrides.log goes
+	Home     string   // expands ~ in commands
 }
 
 // Result is what the process prints and exits with.
@@ -69,10 +70,17 @@ func Run(o Options) (res Result) {
 		o.Agy = true
 	}
 	var messages []string
+	var selected []hook
 	for _, h := range catalog {
-		if h.phase != o.Phase || !o.Enabled[h.name] || (o.Only != "" && o.Only != h.name) {
-			continue
+		if h.phase == o.Phase && (len(o.Only) == 0 || slices.Contains(o.Only, h.name)) {
+			selected = append(selected, h)
 		}
+	}
+	if o.Phase == "pre" && slices.ContainsFunc(selected, func(h hook) bool { return h.check != nil }) && c.unreadCouldBeGuarded() {
+		messages = append(messages, "[agent-hooks: unparsed] "+unparsedMessage)
+		c.blocked = true
+	}
+	for _, h := range selected {
 		if msg := c.evaluate(h); msg != "" {
 			messages = append(messages, fmt.Sprintf("[agent-hooks: %s] %s", h.name, msg))
 			c.blocked = true
@@ -85,12 +93,29 @@ func Run(o Options) (res Result) {
 	return res
 }
 
+const unparsedMessage = "This command stops being valid bash partway through, and the part that cannot be read mentions git, gh, or rm, so the guardrails cannot check it. Fix the syntax, or run that part as its own command."
+
+var guardedCommand = regexp.MustCompile("(^|[\\s;&|()<>'\"`/])(git|gh|rm)($|[\\s;&|()<>'\"`])")
+
+func (c *ctx) unreadCouldBeGuarded() bool {
+	for _, p := range c.parsed {
+		if !p.keystrokes && slices.ContainsFunc(p.unread, guardedCommand.MatchString) {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *ctx) evaluate(h hook) string {
 	if h.checkCall != nil {
 		return h.checkCall(c)
 	}
 	for _, inv := range c.invs {
+		c.unanswered = ""
 		msg := h.check(c, inv)
+		if msg == "" && c.unanswered != "" && h.override != "" {
+			msg = fmt.Sprintf("Could not check this command: %s. Retry it; if it keeps failing and the user approved the command, rerun with AGENT_HOOKS_ALLOW=%s.", c.unanswered, h.override)
+		}
 		if msg == "" {
 			continue
 		}
@@ -154,7 +179,7 @@ func (c *ctx) logOverride(hookName string, inv shell.Invocation) {
 		"time":    time.Now().UTC().Format(time.RFC3339),
 		"hook":    hookName,
 		"cwd":     cwd,
-		"command": strings.Join(c.call.commands, "\n"),
+		"command": c.call.text(),
 	}) + "\n"
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		c.logErr = err

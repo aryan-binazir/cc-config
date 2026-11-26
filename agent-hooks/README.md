@@ -8,20 +8,20 @@ sees every command inside pipelines, subshells, `$(...)`, here-documents,
 
 ## Hooks
 
-`hooks.yaml` switches each hook on or off (unlisted means off). It is compiled
-into the binary, so run `make install` after editing it.
+Every hook in the `catalog` in `internal/hooks/run.go` runs. To drop one,
+delete its line there and run `make install`.
 
 | Hook | Blocks | Override |
 | --- | --- | --- |
-| `block-agy` | Running agy / antigravity / acg in any mode, directly, through a launcher, or by piping agy text into a shell | none |
+| `block-agy` | Running agy / antigravity / acg in any mode: directly, through a wrapper or nested shell, as an argument to `tmux`, `ssh`, and the like, or when agy is named in text that feeds a command the hook cannot read | none |
 | `draft-prs` | `gh pr create` without `--draft`, or with `--web` | none |
 | `pr-assignee` | `gh pr create` without `--assignee` / `-a` | none |
 | `no-admin-merge` | `gh pr merge --admin`, and `PUT …/pulls/N/merge` through `gh api` | none |
 | `merge-head-match` | `gh pr merge` without `--match-head-commit <sha>` | none |
 | `no-production` | Pushing to, merging into, force-updating, resetting, or deleting a `production` branch, including `gh pr merge` into production | `production` |
-| `commit-format` | `git commit` messages that don't match `type(PROJECT): description`, or whose type differs from the branch's first commit | none |
-| `no-secrets-commit` | `git add` / `git commit -a` staging `.env*`, keys, certificates, `credentials*.json`, or `settings.local.json` | `secrets` |
-| `destructive-git` | `git push --force`, `rm -rf` of `/`, `~`, or a repository root, and `git clean`, `reset --hard`, or `checkout -- .` that would discard uncommitted work | `destructive` |
+| `commit-format` | `git commit` messages, and `--title` on `gh pr create` / `gh pr edit`, that don't match `type(PROJECT): description`, or whose type differs from the branch's first commit | `commit-format` |
+| `no-secrets-commit` | `git add` / `git commit -a` staging, or `git commit` recording from the index, `.env*`, keys, certificates, `credentials*.json`, or `settings.local.json` | `secrets` |
+| `destructive-git` | `git push --force`; `rm -r` of `/`, `~`, or a repository root, including a bare `*` there; `git clean`, `reset --hard`, `checkout -- .`, `checkout -f`, `switch --discard-changes`, or `worktree remove --force` that would discard uncommitted work or a submodule's repository; a twice-forced `worktree remove` of a locked worktree; `git stash clear` while stashes exist | `destructive` |
 | `rg-replace-flag` | Nothing. After `rg -r`, it adds a note that `-r` means `--replace` (Claude Code and Codex only) | n/a |
 
 To let one command through, put the override at its front:
@@ -31,6 +31,44 @@ earlier in the same tool call also works, as it would in the shell:
 subshell, pipeline, or `$(...)` does not carry over. Separate several names
 with commas. Each use is logged as a JSON line to
 `~/.local/state/agent-hooks/overrides.log` (or under `$XDG_STATE_HOME`).
+
+## What the hooks read
+
+A hook sees the command before it runs and decides from that text plus, for
+git and gh commands, the repository as it is at that moment.
+
+- **Git aliases** are followed to the command they stand for, from `-c alias.x=…`
+  or `git config`, up to four levels. Shell aliases (`alias.x = !cmd`) are not.
+  When the working directory is unknown, only the user's global aliases apply.
+- **A command that stops parsing partway** still has every complete statement
+  before the error checked, as bash would still run them. If the part that
+  could not be read mentions `git`, `gh`, or `rm`, the call is blocked as
+  `[agent-hooks: unparsed]`. There is no override: fix the syntax. Input typed
+  into a running program (`chars`, agy's `send_input`) is exempt, since it need
+  not be shell.
+- **A lookup with no answer** blocks instead of allowing. If `git` or `gh` times
+  out, or `gh pr view` runs and cannot name the pull request's base branch, a
+  hook that has an override blocks with the reason and the override to use. A
+  lookup that cannot be attempted allows the call: the working directory is
+  unknown (a `cd` into an expansion), or `gh` is not installed.
+- **`--pathspec-from-file`** lists are not read. The list stands for the whole
+  tree, and for no pathspec at all where git then does something else (a forced
+  checkout moves HEAD, a commit records the index). Name the paths on the
+  command line to have only those checked.
+- **block-agy** counts a mention of agy only where it can reach a command the
+  hook cannot read: at or before the end of that command's pipeline, or
+  anywhere when the command sits in a function body. So `time grep agy notes.txt`
+  and `bash build.sh && rg agy` pass, while `a=agy; $a -p hi` and
+  `echo 'agy -p hi' | bash` are blocked. Inside a `bash -c` string or a
+  here-document fed to a shell the same rule applies to that text, together
+  with the text that can reach the shell itself and the shell's other
+  arguments.
+
+Not covered: commands started by an interpreter (`python -c`, `node -e`), by a
+wrapper the parser does not unwrap (`uv run`, `npx`, `find -exec`, `xargs -I{}`),
+or by a `bash -c` or `env -S` string built from an expansion (only block-agy
+reads those).
+The hooks guard against mistakes, not against an agent set on evading them.
 
 ## Install
 
@@ -60,9 +98,11 @@ and writes a `.bak-<timestamp>` copy before any change. It also removes the old
   - Codex 0.171 sends the shell as `Bash`, including commands nested in code mode. It never sends `write_stdin` to hooks, so input typed into a running terminal isn't checked there.
 - **agy** (`pre --agy`): the payload is camelCase, `{toolCall: {name: "run_command", args: {CommandLine, Cwd}}, …}`.
   - The answer is always JSON on stdout: `{"decision": "allow"}` or `{"decision": "deny", "reason": …}`.
+- `pre --only=<hook>` runs that one hook, as the pi wrapper does for block-agy.
 - A malformed or unknown payload is allowed.
-- An internal fault, including an invalid embedded `hooks.yaml`, exits 1. Claude Code and Codex report that without blocking, and the pi wrapper treats it as a failure.
-- Each `git` / `gh` lookup times out after 1–2 s, and a failed lookup allows the call.
+- An unknown hook name, flag, or extra argument is a usage error and exits 64. An internal fault exits 1. Claude Code and Codex report either without blocking, and the pi wrapper treats it as a failure.
+- Each `git` lookup times out after 1 s and each `gh` lookup after 2 s; all lookups in one call share 6 s. See [What the hooks read](#what-the-hooks-read) for what a lookup with no answer does.
+- The whole process stops after 8 s and allows the call.
 
 ## Performance
 
@@ -70,13 +110,14 @@ The hooks run on every tool call, so:
 
 - Calls decided from the payload alone never start a subprocess.
 - `git` and `gh` run only for git/gh commands that need repository state. Their results are cached within the call and skipped once a hook has blocked.
+- A git subcommand that git itself ships (`status`, `log`, `diff`, …) never needs an alias lookup. Any other costs one `git config` call.
 
 `make check` prints these numbers. Measured end to end on the built binary, process start included, with all ten hooks on:
 
 | Calls | p50 | p99 |
 | --- | --- | --- |
-| Decided from the payload alone | 1.1 ms | 1.7 ms |
-| Needing a git lookup | 5.0 ms | 10.7 ms |
+| Decided from the payload alone | 1.5 ms | 2.0 ms |
+| Needing a git lookup | 6.5 ms | 8.6 ms |
 | Old `block-agy.sh` (bash + jq, one hook) | 10.3 ms | 12.3 ms |
 
 ## Development

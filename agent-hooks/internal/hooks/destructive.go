@@ -2,8 +2,11 @@ package hooks
 
 import (
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -24,7 +27,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 	if inv.Name() == "rm" {
 		return checkRm(c, inv)
 	}
-	g := parseGit(inv, c.opts.Home)
+	g := c.parseGit(inv)
 	if g == nil {
 		return ""
 	}
@@ -69,8 +72,15 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if len(o.pos) > 0 && c.overwritesUntracked(g, o.pos[0].Val) {
 			return "git reset --hard " + o.pos[0].Val + " would overwrite untracked files that the target tracks. " + discardAdvice
 		}
-	case "checkout", "restore":
-		o := parseOpts(g.args, "s", []string{"--source"}, map[string]string{"--staged": "-S", "--worktree": "-W"})
+	case "checkout", "switch":
+		if moves, lost := c.forcedSwitch(g); lost {
+			return fmt.Sprintf("git %s --force would discard uncommitted changes. %s", g.sub, discardAdvice)
+		} else if moves || g.sub == "switch" {
+			return ""
+		}
+		fallthrough
+	case "restore":
+		o := parseOpts(g.args, "s", []string{"--source", pathspecList}, map[string]string{"--staged": "-S", "--worktree": "-W", pathspecList: pathspecList})
 		if g.sub == "restore" && o.has("-S") && !o.has("-W") {
 			return ""
 		}
@@ -78,16 +88,150 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if g.sub == "restore" || !o.dashed {
 			specs = append(append([]shell.Word{}, o.pos...), o.paths...)
 		}
+		specs = o.listed(specs)
 		if !hasAll(specs) {
 			return ""
 		}
-		fromCommit := g.sub == "checkout" && len(o.pos) > 0 && (o.dashed || !hasAll(o.pos[:1]))
-		if c.dirty(g, specs, !fromCommit) {
+		// From a commit, checkout rewrites the index too, and so does restore --staged --worktree.
+		rewritesIndex := o.has("-S") || (g.sub == "checkout" && len(o.pos) > 0 && (o.dashed || !hasAll(o.pos[:1])))
+		if c.dirty(g, specs, !rewritesIndex) {
 			return fmt.Sprintf("git %s would discard uncommitted changes. %s", g.sub, discardAdvice)
+		}
+	case "worktree":
+		o := parseOpts(g.args, "", nil, map[string]string{"--force": "-f"})
+		words := append(o.pos, o.paths...)
+		if len(words) < 2 || words[0].Val != "remove" || !o.has("-f") || words[1].Dynamic {
+			return ""
+		}
+		dir, locked := c.worktree(g, words[1].Val)
+		if locked && o.set["-f"] > 1 {
+			return fmt.Sprintf("git worktree remove --force --force would remove %s, which someone locked. Unlock it with git worktree unlock if it is yours; if the user asked for this, rerun with AGENT_HOOKS_ALLOW=destructive.", dir)
+		}
+		// Without --force git refuses exactly when this status is not empty,
+		// or the worktree has a submodule checked out.
+		if entries, ok := c.status(&gitCmd{dir: dir}); ok && len(entries) > 0 {
+			return fmt.Sprintf("git worktree remove --force would delete uncommitted work in %s (%s, ...). %s", dir, entries[0].path, discardAdvice)
+		}
+		if c.holdsSubmodules(dir) {
+			return fmt.Sprintf("git worktree remove --force would delete the submodule repositories in %s, with any commits and stashes only they hold. Git refuses this without --force; if the user asked for it, rerun with AGENT_HOOKS_ALLOW=destructive.", dir)
+		}
+	case "stash":
+		if len(g.args) > 0 && g.args[0].Val == "clear" && c.refExists(g, "refs/stash") {
+			return "git stash clear would delete every stash in this repository, including ones from other worktrees. Drop the ones you made instead; if the user asked to clear them, rerun with AGENT_HOOKS_ALLOW=destructive."
 		}
 	}
 	return ""
 }}
+
+var switchAliases = map[string]string{
+	"--force": "-f", "--discard-changes": "-f", "--create": "-c", "--force-create": "-C",
+	pathspecList: pathspecList, "--guess": "--guess", "--no-guess": "--no-guess",
+}
+
+// forcedSwitch looks at checkout -f and switch -f. moves says the command
+// moves HEAD, where git throws local changes away instead of refusing; a
+// checkout that names paths only rewrites those. A pathspec list may be
+// empty, which moves HEAD. lost says the move would discard tracked changes,
+// or untracked files the target tracks.
+func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
+	o := parseOpts(g.args, "bBcC", []string{"-b", "-B", "-c", "-C", "--orphan", "--conflict", pathspecList}, switchAliases)
+	if !o.has("-f") {
+		return false, false
+	}
+	pathsAllowed := g.sub == "checkout" && !o.has("-b", "-B", "--orphan")
+	if pathsAllowed && (len(o.paths) > 0 || len(o.pos) > 1) {
+		return false, false
+	}
+	target := ""
+	if len(o.pos) > 0 && !o.pos[0].Dynamic {
+		target = o.pos[0].Val
+	}
+	if target == "-" {
+		target = "@{-1}"
+	}
+	if target != "" && !c.refExists(g, target) {
+		// Not a commit: unless --no-guess says otherwise, git creates the
+		// branch from the one remote that has it, or from the remote
+		// checkout.defaultRemote names, and failing that checkout reads the
+		// word as a path.
+		var refs []string
+		if !o.has("--no-guess") || o.has("--guess") {
+			out, _ := c.git(g, "for-each-ref", "--format=%(refname)", "refs/remotes/*/"+target)
+			refs = strings.Fields(out)
+		}
+		if len(refs) > 1 {
+			preferred, inline := g.config["checkout.defaultremote"]
+			if !inline {
+				preferred, _ = c.git(g, "config", "--get", "checkout.defaultRemote")
+			}
+			refs = slices.DeleteFunc(refs, func(ref string) bool { return ref != "refs/remotes/"+strings.TrimSpace(preferred)+"/"+target })
+		}
+		switch {
+		case len(refs) == 1:
+			target = refs[0]
+		case pathsAllowed && !o.dashed:
+			return false, false
+		default:
+			target = ""
+		}
+	}
+	return true, c.dirty(g, nil, false) || (target != "" && c.overwritesUntracked(g, target))
+}
+
+// holdsSubmodules mirrors the other reason git refuses to remove a worktree
+// without --force: a submodule's repository sits in the worktree, or in the
+// worktree's git directory, and is deleted with it.
+func (c *ctx) holdsSubmodules(dir string) bool {
+	wt := &gitCmd{dir: dir}
+	gitDir, _ := c.git(wt, "rev-parse", "--absolute-git-dir")
+	if gitDir = strings.TrimSpace(gitDir); gitDir != "" && isDir(gitDir, "modules", "") {
+		return true
+	}
+	index, _ := c.git(wt, "ls-files", "--stage", "-z")
+	for _, entry := range strings.Split(index, "\x00") {
+		mode, name, _ := strings.Cut(entry, "\t")
+		if strings.HasPrefix(mode, "160000 ") && exists(filepath.Join(dir, name, ".git")) {
+			return true
+		}
+	}
+	return false
+}
+
+// worktree finds the worktree git would remove for arg, its path or a unique
+// trailing part of one, and whether that worktree is locked.
+func (c *ctx) worktree(g *gitCmd, arg string) (dir string, locked bool) {
+	full := shell.Resolve(g.dir, arg, c.opts.Home)
+	if real, err := filepath.EvalSymlinks(full); err == nil {
+		full = real
+	}
+	out, _ := c.git(g, "worktree", "list", "--porcelain", "-z")
+	found, trailing := -1, []int{}
+	lines := strings.Split(out, "\x00")
+	for i, line := range lines {
+		path, ok := strings.CutPrefix(line, "worktree ")
+		switch {
+		case !ok:
+		case path == full:
+			found = i
+		case strings.HasSuffix(path, "/"+strings.Trim(arg, "/")):
+			trailing = append(trailing, i)
+		}
+	}
+	if found < 0 && len(trailing) == 1 {
+		found = trailing[0]
+	}
+	if found < 0 {
+		return "", false
+	}
+	for _, line := range lines[found+1:] {
+		endOfRecord := line == ""
+		if endOfRecord {
+			break
+		}
+		locked = locked || line == "locked" || strings.HasPrefix(line, "locked ")
+	}
+	return strings.TrimPrefix(lines[found], "worktree "), locked
+}
 
 func hasAll(specs []shell.Word) bool {
 	for _, s := range specs {
@@ -171,15 +315,15 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 	localSet := map[string]bool{}
 	var collapsed []string
 	for _, p := range local {
-		if strings.HasSuffix(p, "/") {
-			collapsed = append(collapsed, p)
-			continue
-		}
-		localSet[p] = true
-		for q := p; q != "." && q != ""; q = path.Dir(q) {
+		for q := strings.TrimSuffix(p, "/"); q != "." && q != ""; q = path.Dir(q) {
 			if tracked[q] {
 				return true
 			}
+		}
+		if strings.HasSuffix(p, "/") {
+			collapsed = append(collapsed, p)
+		} else {
+			localSet[p] = true
 		}
 	}
 	root := ""
@@ -205,16 +349,45 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 var homeVar = regexp.MustCompile(`^\$(HOME|\{HOME\})/?(\*)?$`)
 
 func checkRm(c *ctx, inv shell.Invocation) string {
-	o := parseOpts(inv.Args[1:], "", nil, map[string]string{"--recursive": "-r", "-R": "-r", "--force": "-f"})
-	if !o.has("-r") || !o.has("-f") {
+	o := parseOpts(inv.Args[1:], "", nil, map[string]string{"--recursive": "-r", "-R": "-r"})
+	if !o.has("-r") || rmAsksFirst(inv.Args[1:]) {
 		return ""
 	}
 	for _, target := range append(o.pos, o.paths...) {
 		if dangerousTarget(c, inv.Cwd, target) {
-			return fmt.Sprintf("Refusing rm -rf %s: it is /, your home directory, or a git repository root. Delete specific paths instead; if the user asked for this, rerun with AGENT_HOOKS_ALLOW=destructive.", target.Val)
+			return fmt.Sprintf("Refusing rm -r %s: it is /, your home directory, or a git repository root. Delete specific paths instead; if the user asked for this, rerun with AGENT_HOOKS_ALLOW=destructive.", target.Val)
 		}
 	}
 	return ""
+}
+
+// rmAsksFirst reports whether rm would prompt before deleting: the last of
+// -i, -I, -f, and --interactive decides. An agent cannot answer the prompt.
+func rmAsksFirst(args []shell.Word) bool {
+	asks := false
+	for _, arg := range args {
+		name, when, _ := strings.Cut(arg.Val, "=")
+		// GNU rm accepts any unambiguous start of a long option, and of its value.
+		long := func(option string) bool { return len(name) > 2 && strings.HasPrefix(option, name) }
+		switch {
+		case name == "--":
+			return asks
+		case long("--force"):
+			asks = false
+		case long("--interactive"):
+			asks = !strings.HasPrefix(when, "n") // never, no, none
+		case strings.HasPrefix(name, "-") && !strings.HasPrefix(name, "--"):
+			for _, flag := range name[1:] {
+				switch flag {
+				case 'i', 'I':
+					asks = true
+				case 'f':
+					asks = false
+				}
+			}
+		}
+	}
+	return asks
 }
 
 func dangerousTarget(c *ctx, cwd string, target shell.Word) bool {
@@ -223,6 +396,9 @@ func dangerousTarget(c *ctx, cwd string, target shell.Word) bool {
 		return homeVar.MatchString(v)
 	}
 	v = strings.TrimSuffix(v, "/*")
+	if v == "*" && !target.Quoted {
+		v = "."
+	}
 	if strings.HasPrefix(v, "~") && target.Quoted {
 		v = "./" + v
 	}
@@ -234,6 +410,9 @@ func dangerousTarget(c *ctx, cwd string, target shell.Word) bool {
 		return false
 	}
 	full = path.Clean(full)
+	if info, err := os.Lstat(full); err == nil && info.Mode()&os.ModeSymlink != 0 && !strings.HasSuffix(target.Val, "/") && !strings.HasSuffix(target.Val, "*") {
+		return false // rm removes a link itself, not what it points to
+	}
 	bare := exists(path.Join(full, "HEAD")) && exists(path.Join(full, "objects")) && exists(path.Join(full, "refs"))
 	return full == "/" || (c.opts.Home != "" && full == path.Clean(c.opts.Home)) || exists(path.Join(full, ".git")) || bare
 }
