@@ -80,7 +80,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		}
 		fallthrough
 	case "restore":
-		o := parseOpts(g.args, "s", []string{"--source", "--pathspec-from-file"}, map[string]string{"--staged": "-S", "--worktree": "-W"})
+		o := parseOpts(g.args, "s", []string{"--source", pathspecList}, map[string]string{"--staged": "-S", "--worktree": "-W", pathspecList: pathspecList})
 		if g.sub == "restore" && o.has("-S") && !o.has("-W") {
 			return ""
 		}
@@ -88,7 +88,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if g.sub == "restore" || !o.dashed {
 			specs = append(append([]shell.Word{}, o.pos...), o.paths...)
 		}
-		specs = append(specs, c.fileSpecs(g, o)...)
+		specs = o.listed(specs)
 		if !hasAll(specs) {
 			return ""
 		}
@@ -122,19 +122,20 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 	return ""
 }}
 
-var switchAliases = map[string]string{"--force": "-f", "--discard-changes": "-f", "--create": "-c", "--force-create": "-C"}
+var switchAliases = map[string]string{"--force": "-f", "--discard-changes": "-f", "--create": "-c", "--force-create": "-C", pathspecList: pathspecList}
 
 // forcedSwitch looks at checkout -f and switch -f. moves says the command
 // moves HEAD, where git throws local changes away instead of refusing; a
-// checkout that names paths only rewrites those. lost says the move would
-// discard tracked changes, or untracked files the target tracks.
+// checkout that names paths only rewrites those. A pathspec list may be
+// empty, which moves HEAD. lost says the move would discard tracked changes,
+// or untracked files the target tracks.
 func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
-	o := parseOpts(g.args, "bBcC", []string{"-b", "-B", "-c", "-C", "--orphan", "--conflict", "--pathspec-from-file"}, switchAliases)
+	o := parseOpts(g.args, "bBcC", []string{"-b", "-B", "-c", "-C", "--orphan", "--conflict", pathspecList}, switchAliases)
 	if !o.has("-f") {
 		return false, false
 	}
 	pathsAllowed := g.sub == "checkout" && !o.has("-b", "-B", "--orphan")
-	if pathsAllowed && (len(o.paths) > 0 || len(o.pos) > 1 || len(c.fileSpecs(g, o)) > 0) {
+	if pathsAllowed && (len(o.paths) > 0 || len(o.pos) > 1) {
 		return false, false
 	}
 	target := ""
@@ -145,11 +146,15 @@ func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
 		target = "@{-1}"
 	}
 	if target != "" && !c.refExists(g, target) {
-		// Not a commit: git creates the branch from the one remote that has
-		// it, or from the remote checkout.defaultRemote names, and failing
-		// that checkout reads the word as a path.
-		out, _ := c.git(g, "for-each-ref", "--format=%(refname)", "refs/remotes/*/"+target)
-		refs := strings.Fields(out)
+		// Not a commit: unless --no-guess says otherwise, git creates the
+		// branch from the one remote that has it, or from the remote
+		// checkout.defaultRemote names, and failing that checkout reads the
+		// word as a path.
+		var refs []string
+		if !o.has("--no-guess") || o.has("--guess") {
+			out, _ := c.git(g, "for-each-ref", "--format=%(refname)", "refs/remotes/*/"+target)
+			refs = strings.Fields(out)
+		}
 		if len(refs) > 1 {
 			preferred, inline := g.config["checkout.defaultremote"]
 			if !inline {

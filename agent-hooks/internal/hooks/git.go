@@ -17,7 +17,6 @@ type gitCmd struct {
 	dir    string
 	env    []string
 	config map[string]string
-	stdin  *string // what the command reads, when the command line spells it out
 }
 
 // parseGit reads a git invocation, following plain aliases to the command
@@ -65,9 +64,6 @@ func parseGit(inv shell.Invocation, home string) *gitCmd {
 		return nil
 	}
 	g := &gitCmd{dir: inv.Cwd}
-	if !inv.StdinDynamic {
-		g.stdin = inv.Stdin
-	}
 	repo := map[string]shell.Word{}
 	for _, name := range gitRepoEnv {
 		if v, ok := inv.Assigns[name]; ok {
@@ -206,6 +202,18 @@ func parseOpts(args []shell.Word, shortValues string, longValues []string, alias
 	}
 	return o
 }
+
+// listed is specs plus what --pathspec-from-file adds. The hook does not read
+// the list, so it stands for the whole tree; callers that act differently on
+// no pathspec at all also allow for an empty one.
+func (o opts) listed(specs []shell.Word) []shell.Word {
+	if o.has(pathspecList) {
+		return append(specs, shell.Word{Val: ":/"})
+	}
+	return specs
+}
+
+const pathspecList = "--pathspec-from-file"
 
 func (o opts) has(names ...string) bool {
 	for _, n := range names {

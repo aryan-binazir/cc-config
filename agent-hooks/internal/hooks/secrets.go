@@ -2,9 +2,7 @@ package hooks
 
 import (
 	"fmt"
-	"os"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -30,7 +28,7 @@ func isSecret(p string) bool {
 
 var addAliases = map[string]string{
 	"--all": "-A", "--no-ignore-removal": "-A", "--update": "-u", "--force": "-f", "--dry-run": "-n",
-	"--patch": "-p", "--interactive": "-i", "--edit": "-e",
+	"--patch": "-p", "--interactive": "-i", "--edit": "-e", pathspecList: pathspecList,
 }
 
 var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "secrets", check: func(c *ctx, inv shell.Invocation) string {
@@ -41,13 +39,13 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 	var found []string
 	switch g.sub {
 	case "add":
-		o := parseOpts(g.args, "", []string{"--chmod", "--pathspec-from-file"}, addAliases)
+		o := parseOpts(g.args, "", []string{"--chmod", pathspecList}, addAliases)
 		if o.has("-n", "-p", "-i", "-e") {
 			return ""
 		}
-		specs := append(append(o.pos, o.paths...), c.fileSpecs(g, o)...)
+		specs := o.listed(append(o.pos, o.paths...))
 		found = c.explicitSecrets(g, specs)
-		if o.has("-A", "-u", "--pathspec-from-file") || broad(g.dir, specs, c.opts.Home) {
+		if o.has("-A", "-u") || broad(g.dir, specs, c.opts.Home) {
 			found = append(found, c.wouldAdd(g, o, specs)...)
 		}
 	case "commit":
@@ -55,14 +53,14 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 		if o.has("--dry-run", "--short", "--porcelain", "--long", "-z", "-h", "--help") {
 			return ""
 		}
-		specs := append(append(o.pos, o.paths...), c.fileSpecs(g, o)...)
+		specs := o.listed(append(o.pos, o.paths...))
 		found = c.explicitSecrets(g, specs)
 		if o.has("-a") || broad(g.dir, specs, c.opts.Home) {
 			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs))...)
 		}
 		if commitsTheIndex(o, specs) {
 			staged := c.stagedSecrets(g)
-			if len(staged) > 0 && len(specs) > 0 && o.has("-i") { // --include first stages the deletion of a named file that is gone
+			if len(staged) > 0 && len(specs) > 0 && o.has("-i") && !o.has(pathspecList) { // --include first stages the deletion of a named file that is gone
 				gone, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--diff-filter=D", "--no-relative", "--"}, values(specs)...)...)
 				staged = slices.DeleteFunc(staged, func(p string) bool { return slices.Contains(strings.Split(gone, "\x00"), p) })
 			}
@@ -79,9 +77,10 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 
 // commitsTheIndex reports whether a commit records what is already staged.
 // With pathspecs git commits only those paths, unless --include, --patch, or
-// --interactive adds them to the index instead. -a restages every tracked
-// file, which the status check covers, and --only --amend and --fixup=reword:
-// rewrite a commit without reading the index.
+// --interactive adds them to the index instead, or they come from a list,
+// which may be empty. -a restages every tracked file, which the status check
+// covers, and --only --amend and --fixup=reword: rewrite a commit without
+// reading the index.
 func commitsTheIndex(o opts, specs []shell.Word) bool {
 	for _, fixup := range o.vals["--fixup"] {
 		if strings.HasPrefix(fixup.Val, "reword:") {
@@ -91,7 +90,7 @@ func commitsTheIndex(o opts, specs []shell.Word) bool {
 	if o.has("-a") || (o.has("-o") && o.has("--amend")) {
 		return false
 	}
-	return len(specs) == 0 || o.has("-i", "-p", "--interactive")
+	return len(specs) == 0 || o.has("-i", "-p", "--interactive", pathspecList)
 }
 
 func (c *ctx) stagedSecrets(g *gitCmd) []string {
@@ -158,53 +157,6 @@ func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 		}
 	}
 	return found
-}
-
-// fileSpecs is the pathspecs --pathspec-from-file adds: one per line, or per
-// NUL with --pathspec-file-nul, from a file or from standard input. A list the
-// hook cannot read (an expansion, a pipe, a missing file) could name anything,
-// so it stands for the whole tree.
-func (c *ctx) fileSpecs(g *gitCmd, o opts) []shell.Word {
-	nul := o.has("--pathspec-file-nul")
-	var specs []shell.Word
-	for _, file := range o.vals["--pathspec-from-file"] {
-		list, ok := "", false
-		switch {
-		case file.Dynamic:
-		case file.Val == "-":
-			if g.stdin != nil {
-				list, ok = *g.stdin, true
-			}
-		default:
-			if full := shell.Resolve(g.dir, file.Val, c.opts.Home); full != "" {
-				data, err := os.ReadFile(full)
-				list, ok = string(data), err == nil && len(data) <= 1<<20
-			}
-		}
-		if !ok {
-			specs = append(specs, shell.Word{Val: ":/"})
-			continue
-		}
-		sep := "\n"
-		if nul {
-			sep = "\x00"
-		}
-		for _, line := range strings.Split(list, sep) {
-			if !nul {
-				line = strings.TrimSuffix(line, "\r")
-				// git reads a line that opens with a quote as a C-style string, up to its closing quote.
-				if quoted, err := strconv.QuotedPrefix(line); err == nil && quoted[0] == '"' {
-					if plain, err := strconv.Unquote(quoted); err == nil {
-						line = plain
-					}
-				}
-			}
-			if line != "" {
-				specs = append(specs, shell.Word{Val: line})
-			}
-		}
-	}
-	return specs
 }
 
 func broad(dir string, specs []shell.Word, home string) bool {

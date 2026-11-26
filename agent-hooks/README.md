@@ -51,6 +51,10 @@ git and gh commands, the repository as it is at that moment.
   hook that has an override blocks with the reason and the override to use. A
   lookup that cannot be attempted allows the call: the working directory is
   unknown (a `cd` into an expansion), or `gh` is not installed.
+- **`--pathspec-from-file`** lists are not read. The list stands for the whole
+  tree, and for no pathspec at all where git then does something else (a forced
+  checkout moves HEAD, a commit records the index). Name the paths on the
+  command line to have only those checked.
 - **block-agy** counts a mention of agy only where it can reach a command the
   hook cannot read: at or before the end of that command's pipeline, or
   anywhere when the command sits in a function body. So `time grep agy notes.txt`
@@ -62,7 +66,8 @@ git and gh commands, the repository as it is at that moment.
 
 Not covered: commands started by an interpreter (`python -c`, `node -e`), by a
 wrapper the parser does not unwrap (`uv run`, `npx`, `find -exec`, `xargs -I{}`),
-or by a `bash -c` string built from an expansion (only block-agy reads those).
+or by a `bash -c` or `env -S` string built from an expansion (only block-agy
+reads those).
 The hooks guard against mistakes, not against an agent set on evading them.
 
 ## Install

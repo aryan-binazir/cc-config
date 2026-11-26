@@ -1,6 +1,8 @@
 package hooks
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -49,7 +51,8 @@ func TestPRTitleKeepsTheBranchType(t *testing.T) {
 		`gh pr create --base "$BASE" --title "fix(no-ticket): Unknown base"`,
 	)
 	r.git("config", "branch.amb/x.gh-merge-base", "release") // where gh opens this branch's pull request
-	r.expect("commit-format", false, `gh pr create --title "fix(no-ticket): Nothing ahead of release"`, `gh pr edit --title "fix(no-ticket): Nothing ahead of release"`)
+	r.expect("commit-format", false, `gh pr create --title "fix(no-ticket): Nothing ahead of release"`)
+	r.expect("commit-format", true, `gh pr edit --title "fix(no-ticket): An open pull request keeps its base"`)
 	r.git("config", "--unset", "branch.amb/x.gh-merge-base")
 	t.Setenv("GH_REPO", "upstream/repo")
 	r.expect("commit-format", false, `gh pr create --title "Fix it"`, `gh pr edit --title "fix(no-ticket): Other type"`)
@@ -64,5 +67,15 @@ func TestCommitFormatCanBeOverriddenWhereTheConventionDiffers(t *testing.T) {
 	}
 	if res := r.run("commit-format", `git commit -m "Fix parser crash"`); !strings.Contains(res.Stderr, "AGENT_HOOKS_ALLOW=commit-format") {
 		t.Errorf("the message should name the override: %q", res.Stderr)
+	}
+}
+
+func TestAMalformedPRTitleIsRejectedFromThePayloadAlone(t *testing.T) {
+	r := newRepo(t)
+	marker := filepath.Join(t.TempDir(), "ran")
+	fakeGit(t, "touch "+marker)
+	res := r.run("commit-format", "gh pr create --title wip")
+	if _, err := os.Stat(marker); err == nil || res.Exit != 2 {
+		t.Errorf("a title that fails the format needs no lookup: %+v", res)
 	}
 }

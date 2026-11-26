@@ -18,8 +18,9 @@ var commitAliases = map[string]string{
 	"--include": "-i", "--only": "-o", "--patch": "-p", "--null": "-z",
 	// Previews, listed so that their abbreviations are read too.
 	"--dry-run": "--dry-run", "--short": "--short", "--porcelain": "--porcelain", "--long": "--long", "--help": "--help",
+	pathspecList: pathspecList,
 }
-var commitLongValues = []string{"-m", "-F", "-C", "-c", "-t", "--fixup", "--squash", "--author", "--date", "--trailer", "--cleanup", "--pathspec-from-file"}
+var commitLongValues = []string{"-m", "-F", "-C", "-c", "-t", "--fixup", "--squash", "--author", "--date", "--trailer", "--cleanup", pathspecList}
 
 var commitFormat = hook{name: "commit-format", phase: "pre", override: "commit-format", check: func(c *ctx, inv shell.Invocation) string {
 	if pr := parseGhPr(inv); pr != nil {
@@ -71,6 +72,10 @@ func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 	if title.Val == "" || (title.Dynamic && strings.ContainsAny(title.Val, "$`")) {
 		return ""
 	}
+	subject := strings.TrimSpace(title.Val)
+	if problem := c.subjectProblem(nil, "PR titles", subject, false); problem != "" {
+		return problem // the format needs no lookup
+	}
 	var branch *gitCmd // only the current branch's pull request has commits to compare with
 	if len(pr.positionals) == 0 && len(pr.values["--head"]) == 0 {
 		branch = &gitCmd{dir: inv.Cwd}
@@ -82,13 +87,14 @@ func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 			branch = nil // the commits ahead of an unknown base cannot be counted
 		}
 		bases = []string{"origin/" + base.Val, base.Val}
-	} else if branch != nil {
-		// Without --base, gh opens the pull request against this setting when the branch has it.
+	} else if branch != nil && pr.action == "create" {
+		// Without --base, gh opens the pull request against this setting when
+		// the branch has it. One that is already open keeps its base.
 		if base, ok := c.git(branch, "config", "--get", "branch."+c.currentBranch(branch)+".gh-merge-base"); ok {
 			bases = []string{"origin/" + strings.TrimSpace(base), strings.TrimSpace(base)}
 		}
 	}
-	return c.subjectProblem(branch, "PR titles", strings.TrimSpace(title.Val), false, bases...)
+	return c.subjectProblem(branch, "PR titles", subject, false, bases...)
 }
 
 // subjectProblem checks a commit subject or PR title against the format, and

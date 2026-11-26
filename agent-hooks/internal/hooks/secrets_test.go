@@ -11,27 +11,20 @@ func TestCommitFlagsSecretsAlreadyInTheIndex(t *testing.T) {
 	r := newRepo(t)
 	r.write(".env", "SECRET=1")
 	r.write("notes.txt", "n")
-	r.write("only-notes.txt", "notes.txt\n")
-	r.write("with-env.txt", ".env\n")
-	r.write("quoted-env.txt", "\"\\056env\"\n")               // git decodes a quoted line: this names .env
-	r.write("quoted-env-then-text.txt", "\".env\" ignored\n") // git stops reading at the closing quote
-	r.write("empty.txt", "")
 	r.write("docs/a.txt", "a")
 	r.git("add", "-f", ".env", "notes.txt")
 	r.expect("no-secrets-commit", true,
 		`git commit -m "feat(no-ticket): x"`, "git commit", "git commit --amend --no-edit", "git commit --fixup=amend:HEAD",
-		"git commit -i notes.txt -m x", "git commit --include notes.txt -m x", "git commit --pathspec-from-file=with-env.txt -m x",
+		"git commit -i notes.txt -m x", "git commit --include notes.txt -m x",
 		"git commit --include docs/ -m x", "git commit --patch docs/", "git commit --interactive", // each keeps what is already staged
-		"git commit --pathspec-from-file=empty.txt -m x", "git commit --pathspec-from-file=quoted-env.txt -m x",
-		"git commit --pathspec-from-file=quoted-env-then-text.txt -m x",
-		"git commit --pathspec-from-file=- -m x <<<'./.env'", "git commit --pathspec-from-file=- -m x <<'EOF'\nnotes.txt\n.env\nEOF",
+		// A pathspec list is not read: it could be empty, and then git commits the index.
+		"git commit --pathspec-from-file=list.txt -m x", "git commit --pathspec-from-file=- -m x <<<notes.txt", "git commit --pathspec-from-file=- -m x </dev/null",
 	)
 	if res := r.run("no-secrets-commit", "git commit -m x"); !strings.Contains(res.Stderr, ".env") || !strings.Contains(res.Stderr, "AGENT_HOOKS_ALLOW=secrets") {
 		t.Errorf("the message should name the file and the override: %q", res.Stderr)
 	}
 	r.expect("no-secrets-commit", false,
-		"git commit notes.txt -m x", "git commit -o notes.txt -m x", "git commit --pathspec-from-file=only-notes.txt -m x", // git commits only those paths
-		"git commit --pathspec-from-file=- -m x <<<notes.txt",
+		"git commit notes.txt -m x", "git commit -o notes.txt -m x", // git commits only those paths
 		"git commit --only --amend --no-edit", "git commit --fixup=reword:HEAD", // neither reads the index
 		"git commit --dry-run", "git commit --short", "git commit --porcelain", "git commit --long", "git commit -z", "git commit --null", "git commit -h",
 		"git commit --porc", "git commit --dry",
@@ -52,15 +45,18 @@ func TestCommitFollowsWhatEachModeWouldRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.expect("no-secrets-commit", true, "git commit -m x", "git commit --include README.md -m x")        // the staged copy is still committed
+	r.expect("no-secrets-commit", true, "git commit --pathspec-from-file=- -m x </dev/null")             // and so it is with an empty list
 	r.expect("no-secrets-commit", false, "git commit -am x", "git commit --include README.md .env -m x") // each stages the deletion instead
 	r.git("rm", "-q", "--cached", ".env")
 	r.write("key.pem", "k")
 	r.git("add", "-N", "key.pem")
 	r.expect("no-secrets-commit", false, "git commit -m x") // intent-to-add records nothing
 	r.expect("no-secrets-commit", true, "git commit -am x")
-	// A list the hook cannot read could name any tracked file.
-	r.expect("no-secrets-commit", true, `git commit --pathspec-from-file="$LIST" -m x`, "printf 'key.pem' | git commit --pathspec-from-file=- -m x")
-	r.expect("no-secrets-commit", true, "git commit --pathspec-from-file=- -m x <<<key.pem")
+	// A pathspec list is not read: it could name any tracked file.
+	r.expect("no-secrets-commit", true,
+		`git commit --pathspec-from-file="$LIST" -m x`, "printf 'key.pem' | git commit --pathspec-from-file=- -m x",
+		"git commit --pathspec-from-file=list.txt -m x", "git commit --pathspec-fro=list.txt -m x", "git commit --pathspec-from-file=/dev/stdin -m x <<<key.pem",
+	)
 
 	fresh := t.TempDir()
 	gitIn(t, fresh, "init", "-q", "-b", "main")

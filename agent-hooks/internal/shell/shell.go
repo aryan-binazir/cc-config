@@ -38,8 +38,9 @@ type Invocation struct {
 	// Fed is the text that can feed this command: its source up to the end of
 	// the pipeline it is part of. Text after that cannot reach it.
 	Fed Reach
-	// Opaque marks a shell, or source, that runs text Parse was not shown: a
-	// script file, a pipe or terminal, or a string built by an expansion.
+	// Opaque marks a shell, source, or env -S that runs text Parse was not
+	// shown: a script file, a pipe or terminal, or a string built by an
+	// expansion.
 	Opaque bool
 
 	// Within its source: where the command starts, where its line of words
@@ -110,7 +111,6 @@ type walker struct {
 }
 
 func (w *walker) script(f frame, cwd string) {
-	f.heredocs = strings.Contains(f.src.Text, "<<")
 	// The parser hands over a statement before it has read the here-documents
 	// named on that line, so the walk waits until parsing is done.
 	var stmts []*syntax.Stmt
@@ -118,6 +118,9 @@ func (w *walker) script(f frame, cwd string) {
 		stmts = append(stmts, s)
 		return true
 	})
+	if strings.Contains(f.src.Text, "<<") {
+		f.docEnds = hereDocEnds(stmts)
+	}
 	f.stmts(w, stmts, dirs{cwd})
 	if err != nil {
 		read := 0
@@ -131,17 +134,43 @@ func (w *walker) script(f frame, cwd string) {
 // stmtEnd is the offset just past s, including the here-documents named
 // anywhere inside it, whose bodies sit after the line that names them.
 func (f frame) stmtEnd(s *syntax.Stmt) int {
-	end := int(s.End().Offset())
-	if !f.heredocs {
-		return end
+	return max(int(s.End().Offset()), f.docEnds[s])
+}
+
+// hereDocEnds maps each statement that names a here-document, itself or in a
+// statement nested inside it, to the end of the last such body.
+func hereDocEnds(stmts []*syntax.Stmt) map[*syntax.Stmt]int {
+	ends := map[*syntax.Stmt]int{}
+	var open []*syntax.Stmt // the statements around the node being visited
+	var path []bool         // for each node around it, whether it is a statement
+	for _, s := range stmts {
+		syntax.Walk(s, func(n syntax.Node) bool {
+			if n == nil { // the node on top of path is finished
+				last := len(path) - 1
+				if path[last] {
+					done := open[len(open)-1]
+					open = open[:len(open)-1]
+					if end, ok := ends[done]; ok && len(open) > 0 {
+						outer := open[len(open)-1]
+						ends[outer] = max(ends[outer], end)
+					}
+				}
+				path = path[:last]
+				return true
+			}
+			stmt, isStmt := n.(*syntax.Stmt)
+			if isStmt {
+				open = append(open, stmt)
+			}
+			if r, ok := n.(*syntax.Redirect); ok && r.Hdoc != nil && len(open) > 0 {
+				inner := open[len(open)-1]
+				ends[inner] = max(ends[inner], int(r.Hdoc.End().Offset()))
+			}
+			path = append(path, isStmt)
+			return true
+		})
 	}
-	syntax.Walk(s, func(n syntax.Node) bool {
-		if r, ok := n.(*syntax.Redirect); ok && r.Hdoc != nil {
-			end = max(end, int(r.Hdoc.End().Offset()))
-		}
-		return true
-	})
-	return end
+	return ends
 }
 
 type frame struct {
@@ -150,9 +179,9 @@ type frame struct {
 	depth int
 	home  string
 	end   int // Fed.End for the commands being walked
-	// heredocs says the source has a here-document, so a statement can end
-	// after the line it is written on.
-	heredocs bool
+	// docEnds is where the here-documents named inside a statement end, for
+	// the statements of this source that name one.
+	docEnds map[*syntax.Stmt]int
 }
 
 // reach is how far into the source can feed s: to the end of its pipeline or
@@ -496,7 +525,9 @@ func (f frame) emit(w *walker, inv Invocation) {
 		}
 		f.nested(w, strings.Join(parts, " "), inv, nil, inv.Stdin)
 	default:
-		if rest, env, chdir, ok := unwrap(name, args); ok && len(rest) > 0 {
+		rest, env, chdir, opaque, ok := unwrap(name, args)
+		w.out[at].Opaque = opaque
+		if ok && len(rest) > 0 {
 			inner := inv
 			inner.Args = rest
 			if chdir != nil {

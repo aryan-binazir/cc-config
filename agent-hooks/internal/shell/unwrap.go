@@ -25,23 +25,33 @@ var wrappers = map[string]wrapper{
 	"unbuffer": {},
 }
 
-func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir *Word, ok bool) {
+// unwrap returns the command a wrapper runs, with the environment and
+// directory the wrapper gives it. opaque says the wrapper runs a command the
+// parser cannot read: env -S with a string the shell expands.
+func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir *Word, opaque, ok bool) {
 	if name == "mise" {
 		for i, a := range args {
 			if a.Val == "--" && i > 0 && (args[0].Val == "exec" || args[0].Val == "x") {
-				return args[i+1:], nil, nil, true
+				return args[i+1:], nil, nil, false, true
 			}
 		}
-		return nil, nil, nil, false
+		return nil, nil, nil, false, false
 	}
 	spec, known := wrappers[name]
 	if !known {
-		return nil, nil, nil, false
+		return nil, nil, nil, false, false
 	}
 	if name == "command" && len(args) > 0 && (args[0].Val == "-v" || args[0].Val == "-V") {
-		return nil, nil, nil, false
+		return nil, nil, nil, false, false
 	}
 	i := 0
+	// env -S: the words of the string take the option's place, options
+	// included. env runs nothing when it rejects the string.
+	split := func(value Word) bool {
+		words, valid := splitEnv(value.Val)
+		args, i, opaque = append(words, args[i+1:]...), 0, value.Dynamic
+		return valid && !opaque
+	}
 options:
 	for i < len(args) {
 		a := args[i].Val
@@ -62,7 +72,9 @@ options:
 				chdir = &Word{Val: value, Dynamic: args[i].Dynamic}
 			}
 			if name == "env" && opt == "--split-string" {
-				args, i = resplit(value, args[i+1:]), 0
+				if !split(Word{Val: value, Dynamic: args[i].Dynamic}) {
+					return nil, nil, nil, opaque, false
+				}
 				continue
 			}
 			i++
@@ -79,7 +91,9 @@ options:
 					chdir = &value
 				}
 				if name == "env" && a[j] == 'S' {
-					args, i = resplit(value.Val, args[i+1:]), 0
+					if !split(value) {
+						return nil, nil, nil, opaque, false
+					}
 					continue options
 				}
 				break
@@ -101,16 +115,9 @@ options:
 		i++
 	}
 	if i >= len(args) {
-		return nil, nil, nil, false
+		return nil, nil, nil, false, false
 	}
-	return args[i:], env, chdir, true
-}
-
-// resplit is env's argument list after -S: env splits the string into words,
-// options included, and carries on with what follows.
-func resplit(value string, rest []Word) []Word {
-	words, _ := splitEnv(value)
-	return append(words, rest...)
+	return args[i:], env, chdir, false, true
 }
 
 // splitEnv divides the string of env -S by the rules of GNU env: whitespace
