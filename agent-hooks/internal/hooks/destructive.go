@@ -125,7 +125,6 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 
 var switchAliases = map[string]string{
 	"--force": "-f", "--discard-changes": "-f", "--create": "-c", "--force-create": "-C",
-	// Listed so that their abbreviations are read too.
 	pathspecList: pathspecList, "--guess": "--guess", "--no-guess": "--no-guess",
 }
 
@@ -225,7 +224,8 @@ func (c *ctx) worktree(g *gitCmd, arg string) (dir string, locked bool) {
 		return "", false
 	}
 	for _, line := range lines[found+1:] {
-		if line == "" { // the end of this worktree's lines
+		endOfRecord := line == ""
+		if endOfRecord {
 			break
 		}
 		locked = locked || line == "locked" || strings.HasPrefix(line, "locked ")
@@ -315,7 +315,6 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 	localSet := map[string]bool{}
 	var collapsed []string
 	for _, p := range local {
-		// The target has a file here, or where one of the directories above is.
 		for q := strings.TrimSuffix(p, "/"); q != "." && q != ""; q = path.Dir(q) {
 			if tracked[q] {
 				return true
@@ -398,7 +397,7 @@ func dangerousTarget(c *ctx, cwd string, target shell.Word) bool {
 	}
 	v = strings.TrimSuffix(v, "/*")
 	if v == "*" && !target.Quoted {
-		v = "." // an unquoted * is everything in the current directory
+		v = "."
 	}
 	if strings.HasPrefix(v, "~") && target.Quoted {
 		v = "./" + v

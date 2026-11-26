@@ -97,11 +97,9 @@ const unparsedMessage = "This command stops being valid bash partway through, an
 
 var guardedCommand = regexp.MustCompile("(^|[\\s;&|()<>'\"`/])(git|gh|rm)($|[\\s;&|()<>'\"`])")
 
-// unreadCouldBeGuarded reports whether shell text the parser gave up on names
-// a command the hooks guard. Typed input is exempt: it need not be shell.
 func (c *ctx) unreadCouldBeGuarded() bool {
 	for _, p := range c.parsed {
-		if !p.typed && slices.ContainsFunc(p.unread, guardedCommand.MatchString) {
+		if !p.keystrokes && slices.ContainsFunc(p.unread, guardedCommand.MatchString) {
 			return true
 		}
 	}

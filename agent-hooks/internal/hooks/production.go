@@ -89,11 +89,11 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 }
 
 func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghPr) bool {
-	named := slices.Clone(pr.positionals) // what picks the pull request
+	prSelectors := slices.Clone(pr.positionals)
 	args := append([]string{"pr", "view"}, values(pr.positionals)...)
 	repos := pr.values["--repo"]
 	if len(repos) > 0 { // gh takes the last --repo, and --repo over GH_REPO
-		named = append(named, repos[len(repos)-1])
+		prSelectors = append(prSelectors, repos[len(repos)-1])
 		args = append(args, "--repo", repos[len(repos)-1].Val)
 	}
 	var env []string
@@ -103,16 +103,16 @@ func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghPr) bool {
 		switch {
 		case !ok || (name == "GH_REPO" && len(repos) > 0):
 		case strings.HasSuffix(name, "_TOKEN"):
-			if !expands { // otherwise look up with the ambient login
+			if !expands {
 				env = append(env, name+"="+v)
 			}
 		default:
 			env = append(env, name+"="+v)
-			named = append(named, shell.Word{Val: v, Dynamic: expands})
+			prSelectors = append(prSelectors, shell.Word{Val: v, Dynamic: expands})
 		}
 	}
-	if slices.ContainsFunc(named, func(w shell.Word) bool { return w.Dynamic }) {
-		return false // the pull request is named by an expansion, so there is nothing to look up
+	if slices.ContainsFunc(prSelectors, func(w shell.Word) bool { return w.Dynamic }) {
+		return false
 	}
 	out, res := c.gh(inv.Cwd, env, append(args, "--json", "baseRefName,headRefName", "-q", `.baseRefName + " " + .headRefName`)...)
 	fields := strings.Fields(out)

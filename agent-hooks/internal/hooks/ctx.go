@@ -12,23 +12,23 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
-// Lookup limits. Together they stay under the process deadline in main.go, so
-// a slow lookup is reported instead of timing the whole hook out.
+// LookupBudget is how long the lookups of one call may take in total.
+const LookupBudget = 6 * time.Second
+
 var (
 	gitTimeout   = time.Second
 	ghTimeout    = 2 * time.Second
-	lookupBudget = 6 * time.Second
+	lookupBudget = LookupBudget
 )
 
 type ctx struct {
-	opts    Options
-	call    call
-	parsed  []parsed
-	invs    []shell.Invocation // every source's invocations
-	blocked bool
-	cache   map[string]lookup
-	stopAt  time.Time
-	// unanswered says why the current check could not learn what it asked.
+	opts       Options
+	call       call
+	parsed     []parsed
+	invs       []shell.Invocation
+	blocked    bool
+	cache      map[string]lookup
+	stopAt     time.Time
 	unanswered string
 	logErr     error
 }
@@ -46,10 +46,7 @@ const (
 	// missed: the program ran and exited non-zero, which is how git says no
 	// (unset config, missing ref, detached HEAD, not a repository).
 	missed
-	// skipped: not attempted, or it could not start. The real command would
-	// fail the same way, or there is nothing to compare it against.
 	skipped
-	// failed: it ran out of time or output room, so there is no answer.
 	failed
 )
 

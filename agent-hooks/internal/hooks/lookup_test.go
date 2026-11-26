@@ -15,8 +15,6 @@ func lookupLimits(t *testing.T, git, gh, budget time.Duration) {
 	t.Cleanup(func() { gitTimeout, ghTimeout, lookupBudget = oldGit, oldGh, oldBudget })
 }
 
-// fakeGit puts a git on PATH that runs body instead of the real one. Call it
-// after the repository is set up.
 func fakeGit(t *testing.T, body string) {
 	t.Helper()
 	bin := t.TempDir()
@@ -40,7 +38,6 @@ func TestProductionMergeIsBlockedWhenThePRBaseCannotBeRead(t *testing.T) {
 	if res.Exit != 0 || len(overrideLog(t, state)) != 1 {
 		t.Errorf("the override must still apply and be logged: %+v", res)
 	}
-	// A literal token reaches the lookup; one the hook cannot read is no reason to skip it.
 	t.Setenv("GH_TOKEN", "ambient")
 	fakeGhScript(t, `[ "$GH_TOKEN" = literal ] && echo production feature || echo main feature`)
 	r.expect("no-production", true, "GH_TOKEN=literal gh pr merge 5")

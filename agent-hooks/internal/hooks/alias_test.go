@@ -12,7 +12,7 @@ func TestGitAliasesAreCheckedAsTheCommandTheyStandFor(t *testing.T) {
 	r := newRepo(t)
 	for alias, value := range map[string]string{
 		"ci": "commit", "co": "checkout", "br": "branch", "pf": "push --force",
-		"quiet":  "-c advice.detachedHead=false ci -q", // options first, then another alias
+		"quiet":  "-c advice.detachedHead=false ci -q",
 		"loop":   "loop",
 		"status": "push --force", // git ignores an alias that shadows one of its own commands
 		"sh":     "!git push --force",

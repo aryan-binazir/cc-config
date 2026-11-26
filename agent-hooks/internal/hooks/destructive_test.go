@@ -10,7 +10,7 @@ import (
 func TestForcedCheckoutAndSwitchKeepUncommittedWork(t *testing.T) {
 	r := newRepo(t)
 	r.git("switch", "-q", "-c", "other")
-	r.git("switch", "-q", "main") // so that - names a previous branch
+	r.git("switch", "-q", "main")
 	forced := []string{
 		// A pathspec list is not read: it could name every file, or none, which leaves checkout moving HEAD.
 		"git checkout -f --pathspec-from-file=paths.txt", "git checkout -f --pathspec-from-file=- </dev/null", "git checkout -f --pathspec-fro=paths.txt",

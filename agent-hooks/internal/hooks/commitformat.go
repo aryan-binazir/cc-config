@@ -16,7 +16,6 @@ var commitType = regexp.MustCompile(`^(feat|fix|chore|refactor|test|docs|build|c
 var commitAliases = map[string]string{
 	"--message": "-m", "--file": "-F", "--reuse-message": "-C", "--reedit-message": "-c", "--template": "-t", "--all": "-a",
 	"--include": "-i", "--only": "-o", "--patch": "-p", "--null": "-z",
-	// Previews, listed so that their abbreviations are read too.
 	"--dry-run": "--dry-run", "--short": "--short", "--porcelain": "--porcelain", "--long": "--long", "--help": "--help",
 	pathspecList: pathspecList,
 }
@@ -58,8 +57,6 @@ var commitFormat = hook{name: "commit-format", phase: "pre", override: "commit-f
 	return c.subjectProblem(g, "Commit messages", subject, o.has("--amend"))
 }}
 
-// prTitleProblem checks an explicit --title on gh pr create or edit. A pull
-// request in another repository follows that repository's convention.
 func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 	titles := pr.values["--title"]
 	_, otherRepo := inv.Assigns["GH_REPO"]
@@ -73,18 +70,19 @@ func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 		return ""
 	}
 	subject := strings.TrimSpace(title.Val)
-	if problem := c.subjectProblem(nil, "PR titles", subject, false); problem != "" {
-		return problem // the format needs no lookup
+	if formatProblem := c.subjectProblem(nil, "PR titles", subject, false); formatProblem != "" {
+		return formatProblem
 	}
-	var branch *gitCmd // only the current branch's pull request has commits to compare with
-	if len(pr.positionals) == 0 && len(pr.values["--head"]) == 0 {
+	var branch *gitCmd
+	forCurrentBranch := len(pr.positionals) == 0 && len(pr.values["--head"]) == 0
+	if forCurrentBranch {
 		branch = &gitCmd{dir: inv.Cwd}
 	}
 	var bases []string
 	if given := pr.values["--base"]; len(given) > 0 {
 		base := given[len(given)-1]
 		if base.Dynamic {
-			branch = nil // the commits ahead of an unknown base cannot be counted
+			branch = nil
 		}
 		bases = []string{"origin/" + base.Val, base.Val}
 	} else if branch != nil && pr.action == "create" {
@@ -97,8 +95,6 @@ func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 	return c.subjectProblem(branch, "PR titles", subject, false, bases...)
 }
 
-// subjectProblem checks a commit subject or PR title against the format, and
-// against the type of the first commit on the branch in g, if g is given.
 func (c *ctx) subjectProblem(g *gitCmd, what, subject string, amending bool, bases ...string) string {
 	if !commitSubject.MatchString(subject) {
 		return fmt.Sprintf("%s must look like `type(PROJECT): description`: type is one of feat, fix, chore, refactor, test, docs, build, ci, revert; PROJECT is the Jira project key (e.g. BBA) or no-ticket. Got %q. If this repository uses another convention, rerun with AGENT_HOOKS_ALLOW=commit-format.", what, subject)

@@ -52,7 +52,6 @@ func TestCommitFollowsWhatEachModeWouldRecord(t *testing.T) {
 	r.git("add", "-N", "key.pem")
 	r.expect("no-secrets-commit", false, "git commit -m x") // intent-to-add records nothing
 	r.expect("no-secrets-commit", true, "git commit -am x")
-	// A pathspec list is not read: it could name any tracked file.
 	r.expect("no-secrets-commit", true,
 		`git commit --pathspec-from-file="$LIST" -m x`, "printf 'key.pem' | git commit --pathspec-from-file=- -m x",
 		"git commit --pathspec-from-file=list.txt -m x", "git commit --pathspec-fro=list.txt -m x", "git commit --pathspec-from-file=/dev/stdin -m x <<<key.pem",
@@ -91,5 +90,5 @@ func TestAddFromASubdirectorySeesTrackedSecretsAboveIt(t *testing.T) {
 	if err := os.Remove(filepath.Join(r.dir, ".env")); err != nil {
 		t.Fatal(err)
 	}
-	expect(false) // staging its deletion is fine
+	expect(false)
 }

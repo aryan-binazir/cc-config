@@ -12,23 +12,21 @@ import (
 
 type gitCmd struct {
 	sub    string
-	at     int // index of sub in the invocation's words
+	subAt  int
 	args   []shell.Word
 	dir    string
 	env    []string
 	config map[string]string
 }
 
-// parseGit reads a git invocation, following plain aliases to the command
-// they stand for. Shell aliases (alias.x = !cmd) are not followed.
 func (c *ctx) parseGit(inv shell.Invocation) *gitCmd {
 	g := parseGit(inv, c.opts.Home)
-	for hops := 0; g != nil && !gitInstalls[g.sub] && !inv.Args[g.at].Dynamic && hops < 4; hops++ {
+	for hops := 0; g != nil && !gitInstalls[g.sub] && !inv.Args[g.subAt].Dynamic && hops < 4; hops++ {
 		words := c.alias(g)
 		if len(words) == 0 {
 			break
 		}
-		inv.Args = slices.Concat(inv.Args[:g.at], words, inv.Args[g.at+1:])
+		inv.Args = slices.Concat(inv.Args[:g.subAt], words, inv.Args[g.subAt+1:])
 		g = parseGit(inv, c.opts.Home)
 	}
 	if g != nil && g.sub == "stage" {
@@ -41,7 +39,7 @@ func (c *ctx) alias(g *gitCmd) []shell.Word {
 	value, ok := g.config["alias."+strings.ToLower(g.sub)]
 	if !ok {
 		where, scope := *g, []string{"config"}
-		if where.dir == "" { // wherever the command runs, the user's own aliases apply
+		if where.dir == "" {
 			where.dir, where.env = cmp.Or(c.opts.Home, "/"), nil
 			scope = append(scope, "--global")
 		}
@@ -74,7 +72,7 @@ func parseGit(inv shell.Invocation, home string) *gitCmd {
 	for i := 0; i < len(args); i++ {
 		a := args[i].Val
 		if !strings.HasPrefix(a, "-") {
-			g.sub, g.at = a, i+1
+			g.sub, g.subAt = a, i+1
 			g.args = args[i+1:]
 			break
 		}
@@ -203,12 +201,10 @@ func parseOpts(args []shell.Word, shortValues string, longValues []string, alias
 	return o
 }
 
-// listed is specs plus what --pathspec-from-file adds. The hook does not read
-// the list, so it stands for the whole tree; callers that act differently on
-// no pathspec at all also allow for an empty one.
 func (o opts) listed(specs []shell.Word) []shell.Word {
 	if o.has(pathspecList) {
-		return append(specs, shell.Word{Val: ":/"})
+		wholeTree := shell.Word{Val: ":/"}
+		return append(specs, wholeTree)
 	}
 	return specs
 }
@@ -295,9 +291,9 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// gitInstalls lists the commands every git 2.56 has: the ones compiled in
-// (git --list-cmds=builtins) and the shell scripts installed beside them. An
-// alias cannot shadow one, so these never need an alias lookup.
+// gitInstalls lists commands every git 2.56 has: the ones compiled in (git
+// --list-cmds=builtins) and five of the scripts installed beside them. An
+// alias cannot shadow an installed command, so these need no alias lookup.
 var gitInstalls = func() map[string]bool {
 	installs := map[string]bool{}
 	for _, name := range strings.Fields(`

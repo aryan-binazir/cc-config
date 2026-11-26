@@ -24,7 +24,7 @@ func TestPRTitlesFollowTheCommitFormat(t *testing.T) {
 		`gh pr create --title "feat(no-ticket): Add x"`, `gh pr edit 23 --title "fix(BBA): y"`, "gh pr create --fill", "gh pr create",
 		`gh pr create --title "$TITLE"`, `gh pr create --title "feat(no-ticket): $WHAT"`, `gh pr create --title ""`,
 		`gh pr create --title wip --title "feat(no-ticket): ok"`,
-		`gh pr edit 23 --title "I found a bug" -R upstream/repo`, `GH_REPO=upstream/repo gh pr create --title "Fix it"`, // another repository's convention
+		`gh pr edit 23 --title "I found a bug" -R upstream/repo`, `GH_REPO=upstream/repo gh pr create --title "Fix it"`,
 		`gh pr edit https://github.com/upstream/repo/pull/5 --title "Fix it"`,
 		`gh pr edit --add-label "wip stuff"`, "gh issue create --title wip", "gh pr merge 5 --subject wip",
 		"AGENT_HOOKS_ALLOW=commit-format gh pr create --title wip",

@@ -21,14 +21,10 @@ Google's consumer-plan terms forbid third-party agents wrapping agy (print mode,
 Do not work around this with scripts, other binary paths, aliases or variables.
 If Gemini is needed, tell the user: use a GEMINI_API_KEY-based tool, or skip Gemini.`
 
-// runners start their arguments as a command somewhere the parser does not
-// follow: another host, a terminal multiplexer, a later moment.
-var runners = map[string]bool{
+var argumentRunners = map[string]bool{
 	"tmux": true, "screen": true, "ssh": true, "script": true, "systemd-run": true, "parallel": true, "watch": true,
 }
 
-// launchers put another command behind them. The parser unwraps the ones it
-// reads; this list is for text that did not parse.
 var launchers = map[string]bool{
 	"bash": true, "sh": true, "zsh": true, "dash": true, "fish": true, "eval": true, "source": true, ".": true,
 	"env": true, "exec": true, "command": true, "nohup": true, "setsid": true, "timeout": true, "stdbuf": true,
@@ -50,8 +46,7 @@ func isAgy(word string) bool {
 	return word == "agy" || word == "antigravity" || word == "acg"
 }
 
-// mentions lists the offsets of the words in text that name agy.
-func mentions(text string) []int {
+func agyOffsets(text string) []int {
 	var at []int
 	start := -1
 	for i, r := range text {
@@ -77,45 +72,40 @@ func checkAgy(c *ctx) string {
 	names := func(r shell.Reach) bool {
 		at, scanned := found[r.Source]
 		if !scanned {
-			at = mentions(r.Text)
+			at = agyOffsets(r.Text)
 			found[r.Source] = at
 		}
 		next, _ := slices.BinarySearch(at, r.Start)
 		return next < len(at) && at[next] < r.End
 	}
-	earlier := false // a previous source of this call names agy
+	namedSoFar := false
 	for _, p := range c.parsed {
 		for _, inv := range p.invs {
-			if launchesAgy(inv, earlier || names(inv.Fed) || slices.ContainsFunc(inv.Fed.Outer, names)) {
+			if launchesAgy(inv, namedSoFar || names(inv.Fed) || slices.ContainsFunc(inv.Fed.Outer, names)) {
 				return agyMessage
 			}
 		}
-		earlier = earlier || len(mentions(p.text)) > 0
-		if slices.ContainsFunc(p.unread, func(text string) bool { return unreadLaunchesAgy(text, earlier) }) {
+		namedSoFar = namedSoFar || len(agyOffsets(p.text)) > 0
+		if slices.ContainsFunc(p.unread, func(text string) bool { return unreadLaunchesAgy(text, namedSoFar) }) {
 			return agyMessage
 		}
 	}
 	return ""
 }
 
-// launchesAgy reports whether inv runs agy, or runs something the parser
-// cannot read while agy is named in text that can feed it (fed).
-func launchesAgy(inv shell.Invocation, fed bool) bool {
+func launchesAgy(inv shell.Invocation, fedNamesAgy bool) bool {
 	args := inv.Args[1:]
 	switch {
 	case isAgy(inv.Args[0].Val):
 		return true
-	case runners[inv.Name()]:
-		return slices.ContainsFunc(args, func(w shell.Word) bool { return len(mentions(w.Val)) > 0 || (fed && w.Dynamic) })
+	case argumentRunners[inv.Name()]:
+		return slices.ContainsFunc(args, func(w shell.Word) bool { return len(agyOffsets(w.Val)) > 0 || (fedNamesAgy && w.Dynamic) })
 	}
-	// "$HOME/bin/tool" names tool wherever HOME points; "$tool" names anything.
-	unknown := inv.Args[0].Dynamic && !plainName.MatchString(inv.Name())
-	return fed && (inv.Opaque || unknown)
+	nameFromExpansion := inv.Args[0].Dynamic && !plainName.MatchString(inv.Name())
+	return fedNamesAgy && (inv.Opaque || nameFromExpansion)
 }
 
-// unreadLaunchesAgy scans text the parser gave up on: agy as a command word,
-// or any launcher once agy is named anywhere in the command.
-func unreadLaunchesAgy(text string, mentioned bool) bool {
+func unreadLaunchesAgy(text string, agyNamed bool) bool {
 	for _, segment := range strings.FieldsFunc(text, func(r rune) bool { return strings.ContainsRune(separators, r) }) {
 		words := strings.Fields(segment)
 		for len(words) > 0 && assignment.MatchString(words[0]) {
@@ -126,7 +116,7 @@ func unreadLaunchesAgy(text string, mentioned bool) bool {
 		}
 		first := path.Base(strings.NewReplacer(`"`, "", "'", "").Replace(words[0]))
 		looksUp := first == "command" && len(words) > 1 && (words[1] == "-v" || words[1] == "-V")
-		if isAgy(words[0]) || (mentioned && launchers[first] && !looksUp) {
+		if isAgy(words[0]) || (agyNamed && launchers[first] && !looksUp) {
 			return true
 		}
 	}

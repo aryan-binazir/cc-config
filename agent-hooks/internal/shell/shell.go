@@ -43,10 +43,8 @@ type Invocation struct {
 	// expansion.
 	Opaque bool
 
-	// Within its source: where the command starts, where its line of words
-	// ends, and the here-document it reads (empty when there is none).
-	start, head int
-	doc         [2]int
+	start, wordsEnd int
+	hereDoc         [2]int
 }
 
 // Source is one piece of shell text Parse walked: the command it was given,
@@ -119,7 +117,7 @@ func (w *walker) script(f frame, cwd string) {
 		return true
 	})
 	if strings.Contains(f.src.Text, "<<") {
-		f.docEnds = hereDocEnds(stmts)
+		f.hereDocEnd = hereDocEnds(stmts)
 	}
 	f.stmts(w, stmts, dirs{cwd})
 	if err != nil {
@@ -131,42 +129,39 @@ func (w *walker) script(f frame, cwd string) {
 	}
 }
 
-// stmtEnd is the offset just past s, including the here-documents named
-// anywhere inside it, whose bodies sit after the line that names them.
 func (f frame) stmtEnd(s *syntax.Stmt) int {
-	return max(int(s.End().Offset()), f.docEnds[s])
+	return max(int(s.End().Offset()), f.hereDocEnd[s])
 }
 
-// hereDocEnds maps each statement that names a here-document, itself or in a
-// statement nested inside it, to the end of the last such body.
 func hereDocEnds(stmts []*syntax.Stmt) map[*syntax.Stmt]int {
 	ends := map[*syntax.Stmt]int{}
-	var open []*syntax.Stmt // the statements around the node being visited
-	var path []bool         // for each node around it, whether it is a statement
+	var openStmts []*syntax.Stmt
+	var openNodeIsStmt []bool
 	for _, s := range stmts {
 		syntax.Walk(s, func(n syntax.Node) bool {
-			if n == nil { // the node on top of path is finished
-				last := len(path) - 1
-				if path[last] {
-					done := open[len(open)-1]
-					open = open[:len(open)-1]
-					if end, ok := ends[done]; ok && len(open) > 0 {
-						outer := open[len(open)-1]
+			closingNode := n == nil
+			if closingNode {
+				last := len(openNodeIsStmt) - 1
+				if openNodeIsStmt[last] {
+					done := openStmts[len(openStmts)-1]
+					openStmts = openStmts[:len(openStmts)-1]
+					if end, ok := ends[done]; ok && len(openStmts) > 0 {
+						outer := openStmts[len(openStmts)-1]
 						ends[outer] = max(ends[outer], end)
 					}
 				}
-				path = path[:last]
+				openNodeIsStmt = openNodeIsStmt[:last]
 				return true
 			}
 			stmt, isStmt := n.(*syntax.Stmt)
 			if isStmt {
-				open = append(open, stmt)
+				openStmts = append(openStmts, stmt)
 			}
-			if r, ok := n.(*syntax.Redirect); ok && r.Hdoc != nil && len(open) > 0 {
-				inner := open[len(open)-1]
+			if r, ok := n.(*syntax.Redirect); ok && r.Hdoc != nil && len(openStmts) > 0 {
+				inner := openStmts[len(openStmts)-1]
 				ends[inner] = max(ends[inner], int(r.Hdoc.End().Offset()))
 			}
-			path = append(path, isStmt)
+			openNodeIsStmt = append(openNodeIsStmt, isStmt)
 			return true
 		})
 	}
@@ -178,31 +173,29 @@ type frame struct {
 	env   *exported
 	depth int
 	home  string
-	end   int // Fed.End for the commands being walked
-	// docEnds is where the here-documents named inside a statement end, for
-	// the statements of this source that name one.
-	docEnds map[*syntax.Stmt]int
+
+	fedEnd     int
+	hereDocEnd map[*syntax.Stmt]int
 }
 
-// reach is how far into the source can feed s: to the end of its pipeline or
-// loop, and for a function body, which runs wherever it is called, to the end.
-func (f frame) reach(s *syntax.Stmt) int {
+func (f frame) fedEndFor(s *syntax.Stmt) int {
 	switch c := s.Cmd.(type) {
 	case *syntax.FuncDecl:
 		return len(f.src.Text)
 	case *syntax.CallExpr, *syntax.WhileClause, *syntax.ForClause:
-		return max(f.end, f.stmtEnd(s))
+		return max(f.fedEnd, f.stmtEnd(s))
 	case *syntax.BinaryCmd:
 		piped := c.Op == syntax.Pipe || c.Op == syntax.PipeAll
-		if !piped || f.end >= int(s.End().Offset()) { // a list, or a stage of a pipeline already measured
-			return f.end
+		alreadyCovered := f.fedEnd >= int(s.End().Offset())
+		if !piped || alreadyCovered {
+			return f.fedEnd
 		}
-		return max(f.end, f.stmtEnd(s))
+		return max(f.fedEnd, f.stmtEnd(s))
 	}
 	if len(s.Redirs) > 0 {
-		return max(f.end, f.stmtEnd(s))
+		return max(f.fedEnd, f.stmtEnd(s))
 	}
-	return f.end
+	return f.fedEnd
 }
 
 // exported is the environment a shell passes to its commands. Updates replace
@@ -265,7 +258,7 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	if s.Background || s.Coprocess {
 		f = f.subshell()
 	}
-	f.end = f.reach(s)
+	f.fedEnd = f.fedEndFor(s)
 	for _, r := range s.Redirs {
 		f.substs(w, r.Word, cwd)
 		f.substs(w, r.Hdoc, cwd)
@@ -316,7 +309,7 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	case *syntax.FuncDecl:
 		f.subshell().stmt(w, c.Body, cwd)
 	case *syntax.TimeClause:
-		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s), Fed: Reach{f.src, 0, f.end}})
+		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s), Fed: Reach{f.src, 0, f.fedEnd}})
 		return f.stmt(w, c.Stmt, cwd)
 	case *syntax.CoprocClause:
 		f.subshell().stmt(w, c.Stmt, cwd)
@@ -378,13 +371,13 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 			}
 		}
 	}
-	head := int(c.End().Offset())
+	wordsEnd := int(c.End().Offset())
 	for _, r := range s.Redirs {
 		if r.Word != nil {
-			head = max(head, int(r.Word.End().Offset()))
+			wordsEnd = max(wordsEnd, int(r.Word.End().Offset()))
 		}
 	}
-	inv := Invocation{Assigns: env, Source: f.text(s), Fed: Reach{f.src, 0, f.end}, start: int(s.Pos().Offset()), head: head, doc: [2]int{head, head}}
+	inv := Invocation{Assigns: env, Source: f.text(s), Fed: Reach{f.src, 0, f.fedEnd}, start: int(s.Pos().Offset()), wordsEnd: wordsEnd, hereDoc: [2]int{wordsEnd, wordsEnd}}
 	for _, arg := range c.Args {
 		inv.Args = append(inv.Args, f.word(arg))
 	}
@@ -397,7 +390,7 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 		case syntax.Hdoc, syntax.DashHdoc:
 			body = f.heredoc(r)
 			if r.Hdoc != nil && len(r.Hdoc.Parts) > 0 {
-				inv.doc = [2]int{int(r.Hdoc.Pos().Offset()), int(r.Hdoc.End().Offset())}
+				inv.hereDoc = [2]int{int(r.Hdoc.Pos().Offset()), int(r.Hdoc.End().Offset())}
 			}
 		case syntax.WordHdoc:
 			body = f.word(r.Word)
@@ -549,25 +542,20 @@ func (f frame) emit(w *walker, inv Invocation) {
 	}
 }
 
-// nested walks src, a string parent runs as shell. Besides src itself, its
-// commands can be fed by what feeds parent (the text around parent's own
-// words and here-document, as far as parent's reach goes), by params (the
-// positional parameters), by parent's environment, and by input (parent's
-// standard input when that is not src).
-func (f frame) nested(w *walker, src string, parent Invocation, params []Word, input *string) {
+func (f frame) nested(w *walker, src string, parent Invocation, positional []Word, stdin *string) {
 	var around []string
-	for _, p := range params {
+	for _, p := range positional {
 		around = append(around, p.Val)
 	}
 	for _, value := range parent.Assigns {
 		around = append(around, value)
 	}
-	if input != nil {
-		around = append(around, *input)
+	if stdin != nil {
+		around = append(around, *stdin)
 	}
 	passed := &Source{Text: strings.Join(around, "\n")}
 	outer := append(slices.Clone(f.src.Outer),
-		Reach{f.src, 0, parent.start}, Reach{f.src, parent.head, parent.doc[0]}, Reach{f.src, parent.doc[1], parent.Fed.End},
+		Reach{f.src, 0, parent.start}, Reach{f.src, parent.wordsEnd, parent.hereDoc[0]}, Reach{f.src, parent.hereDoc[1], parent.Fed.End},
 		Reach{passed, 0, len(passed.Text)})
 	inner := &walker{home: w.home, out: w.out}
 	inner.script(frame{src: &Source{Text: src, Outer: outer}, env: &exported{parent.Assigns}, depth: f.depth + 1, home: w.home}, parent.Cwd)

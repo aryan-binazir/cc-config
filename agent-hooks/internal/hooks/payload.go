@@ -14,8 +14,8 @@ type call struct {
 }
 
 type source struct {
-	text  string
-	typed bool // keystrokes for a running program, which need not be shell
+	text       string
+	keystrokes bool
 }
 
 func (c call) text() string {
@@ -56,7 +56,7 @@ func decode(data []byte) call {
 	}
 	for _, key := range []string{"command", "cmd", "chars"} {
 		if src, ok := commandText(p.ToolInput[key]); ok {
-			c.sources = append(c.sources, source{text: src, typed: key == "chars"})
+			c.sources = append(c.sources, source{text: src, keystrokes: key == "chars"})
 		}
 	}
 	return c
@@ -80,10 +80,10 @@ func decodeAgy(tool string, args map[string]json.RawMessage) call {
 	return c
 }
 
-func (c *call) add(raw json.RawMessage, typed bool) {
+func (c *call) add(raw json.RawMessage, keystrokes bool) {
 	var s string
 	if json.Unmarshal(raw, &s) == nil && s != "" {
-		c.sources = append(c.sources, source{text: s, typed: typed})
+		c.sources = append(c.sources, source{text: s, keystrokes: keystrokes})
 	}
 }
 

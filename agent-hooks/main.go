@@ -21,7 +21,7 @@ import (
 
 const (
 	maxPayload = 16 << 20
-	deadline   = 8 * time.Second
+	deadline   = hooks.LookupBudget + 2*time.Second
 	usage      = "usage: agent-hooks pre|post [--agy] [--only=<hook>] | install | uninstall"
 )
 

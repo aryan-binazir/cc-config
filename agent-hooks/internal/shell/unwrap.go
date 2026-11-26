@@ -45,9 +45,6 @@ func (w wrapper) long(name string) string {
 	return match
 }
 
-// unwrap returns the command a wrapper runs, with the environment and
-// directory the wrapper gives it. opaque says the wrapper runs a command the
-// parser cannot read: env -S with a string the shell expands.
 func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir *Word, opaque, ok bool) {
 	if name == "mise" {
 		for i, a := range args {
