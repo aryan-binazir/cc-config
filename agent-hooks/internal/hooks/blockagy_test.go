@@ -73,6 +73,14 @@ func TestBlockAgyBlocksEveryAgentLaunch(t *testing.T) {
 		bash("for c in agy; do $c -p hi; done"),
 		bash("ls\n(( agy -p hi"),
 		bash("{ bash; } <<'EOF'\nagy -p hi\nEOF"),
+		bash("env -S '-i agy --help'"),
+		bash(`env -S 'FOO="a b" agy -p hi'`),
+		bash("bash <<'EOF'; echo after\nagy -p hi\nEOF"),
+		bash("bash -c 'x=agy; $x -p hi'"),
+		bash("a=agy; bash -c '$a -p hi'"),
+		bash("echo 'agy -p hi' | bash -c 'bash'"),
+		bash("bash -c 'bash' <<'EOF'\nagy -p hi\nEOF"),
+		map[string]any{"tool_name": "Bash", "tool_input": map[string]any{"command": []string{"bash", "-lc", "x=agy; $x -p hi"}}},
 	}
 	for _, p := range payloads {
 		r := run(t, "block-agy", p)
@@ -116,6 +124,12 @@ func TestBlockAgyAllowsCommandsThatOnlyMentionIt(t *testing.T) {
 		bash("(cd sub && bash build.sh) && rg agy"),
 		bash(`ssh "$HOST" uptime; rg agy notes.txt`),
 		bash("echo 'it is agy' > notes.txt\n(("),
+		bash(`env -S 'FOO="this agy" grep agy notes.txt'`),
+		bash("bash -c 'bash build.sh; rg agy notes.txt'"),
+		bash("bash <<'EOF'\nsource env.sh\nrg agy notes.txt\nEOF"),
+		bash("rg agy notes.txt; bash --version"),
+		map[string]any{"tool_name": "Bash", "tool_input": map[string]any{"command": []string{"bash", "-lc", "source .venv/bin/activate && rg agy README.md"}}},
+		map[string]any{"tool_name": "Bash", "tool_input": map[string]any{"command": []string{"bash", "-lc", `"$PAGER" --version; rg agy notes.txt`}}},
 	}
 	for _, p := range payloads {
 		if r := run(t, "block-agy", p); r.Exit != 0 || r.Stderr != "" {

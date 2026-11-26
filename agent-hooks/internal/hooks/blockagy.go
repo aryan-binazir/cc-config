@@ -72,15 +72,23 @@ func firstMention(text string) int {
 }
 
 func checkAgy(c *ctx) string {
+	first := map[*shell.Source]int{}
+	names := func(r shell.Reach) bool {
+		at, scanned := first[r.Source]
+		if !scanned {
+			at = firstMention(r.Text)
+			first[r.Source] = at
+		}
+		return at >= 0 && at < r.End
+	}
 	earlier := false // a previous source of this call names agy
 	for _, p := range c.parsed {
-		first := firstMention(p.text)
 		for _, inv := range p.invs {
-			if launchesAgy(inv, earlier || (first >= 0 && first < inv.End)) {
+			if launchesAgy(inv, earlier || names(inv.Fed) || slices.ContainsFunc(inv.Fed.Outer, names)) {
 				return agyMessage
 			}
 		}
-		earlier = earlier || first >= 0
+		earlier = earlier || firstMention(p.text) >= 0
 		if slices.ContainsFunc(p.unread, func(text string) bool { return unreadLaunchesAgy(text, earlier) }) {
 			return agyMessage
 		}

@@ -53,3 +53,23 @@ func TestUnparsedBlockNeedsAHookThatReadsCommands(t *testing.T) {
 		t.Errorf("post cannot block: %+v", r)
 	}
 }
+
+func TestHereDocumentsThatShareALineWithAnotherCommandAreRead(t *testing.T) {
+	for _, command := range []string{
+		"bash <<'EOF'; echo after\ngit push --force origin x\nEOF",
+		"echo before; bash <<'EOF'; echo after\ngit push --force origin x\nEOF",
+	} {
+		if res := run(t, "destructive-git", bash(command)); !blocked(t, res, "destructive-git") {
+			t.Errorf("%q: the here-document is a script bash runs, got %+v", command, res)
+		}
+	}
+	for _, command := range []string{
+		"cat <<'EOF'; echo after\ngit is only mentioned here\nEOF\n((",
+		"cat <<'A'; cat <<'B'\nrm -rf / is text\nA\ngh is text\nB\necho done\n((",
+		"bash <<'EOF'; ((\necho hi\nEOF",
+	} {
+		if res := runOpts(t, Options{Phase: "pre"}, bash(command)); res.Exit != 0 {
+			t.Errorf("%q: a here-document that was read is not unread text, got %+v", command, res)
+		}
+	}
+}

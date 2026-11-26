@@ -16,7 +16,7 @@ func TestUnknownHooksFlagsAndArgumentsAreUsageErrors(t *testing.T) {
 	env := []string{"HOME=" + t.TempDir(), "XDG_STATE_HOME=" + t.TempDir()}
 	for _, args := range [][]string{
 		{"pre", "--only=block-agi"}, {"pre", "--only="}, {"pre", "--bogus"}, {"post", "extra"},
-		{"install", "extra"}, {"uninstall", "--force"},
+		{"install", "extra"}, {"uninstall", "--force"}, {"pre", "--only=block-agy", "--only=draft-prs"},
 	} {
 		p := runBinary(t, env, payload("agy -p hi"), args...)
 		if p.exit != 64 || !strings.Contains(p.stderr, "usage") || p.stdout != "" {

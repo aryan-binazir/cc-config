@@ -126,7 +126,7 @@ func (c *ctx) exec(label string, timeout time.Duration, dir string, env []string
 		return lookup{res: failed, why: label + " printed more than the hook can read"}
 	case err == nil:
 		return lookup{out: out.String(), res: answered}
-	case errors.As(err, &exit):
+	case errors.As(err, &exit) && exit.Exited():
 		return lookup{res: missed}
 	}
 	return lookup{res: failed, why: label + " did not finish: " + err.Error()}

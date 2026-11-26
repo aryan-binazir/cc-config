@@ -70,19 +70,16 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if len(o.pos) > 0 && c.overwritesUntracked(g, o.pos[0].Val) {
 			return "git reset --hard " + o.pos[0].Val + " would overwrite untracked files that the target tracks. " + discardAdvice
 		}
-	case "checkout", "switch", "restore":
-		o := parseOpts(g.args, "s", []string{"--source"}, map[string]string{"--staged": "-S", "--worktree": "-W", "--force": "-f", "--discard-changes": "-f"})
-		if g.sub != "restore" && o.has("-f") && c.switchesBranch(g, o) {
-			target := o.pos
-			if o.has("-b", "-B", "-c", "-C") && len(target) > 0 {
-				target = target[1:] // the first word names the new branch
-			}
-			if c.dirty(g, nil, false) || (len(target) > 0 && c.overwritesUntracked(g, target[0].Val)) {
-				return fmt.Sprintf("git %s --force would discard uncommitted changes. %s", g.sub, discardAdvice)
-			}
+	case "checkout", "switch":
+		if moves, lost := c.forcedSwitch(g); lost {
+			return fmt.Sprintf("git %s --force would discard uncommitted changes. %s", g.sub, discardAdvice)
+		} else if moves || g.sub == "switch" {
 			return ""
 		}
-		if g.sub == "switch" || (g.sub == "restore" && o.has("-S") && !o.has("-W")) {
+		fallthrough
+	case "restore":
+		o := parseOpts(g.args, "s", []string{"--source"}, map[string]string{"--staged": "-S", "--worktree": "-W"})
+		if g.sub == "restore" && o.has("-S") && !o.has("-W") {
 			return ""
 		}
 		specs := o.paths
@@ -98,11 +95,15 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		}
 	case "worktree":
 		o := parseOpts(g.args, "", nil, map[string]string{"--force": "-f"})
-		if len(o.pos) < 2 || o.pos[0].Val != "remove" || !o.has("-f") || o.pos[1].Dynamic {
+		words := append(o.pos, o.paths...)
+		if len(words) < 2 || words[0].Val != "remove" || !o.has("-f") || words[1].Dynamic {
 			return ""
 		}
+		dir, locked := c.worktree(g, words[1].Val)
+		if locked && o.set["-f"] > 1 {
+			return fmt.Sprintf("git worktree remove --force --force would remove %s, which someone locked. Unlock it with git worktree unlock if it is yours; if the user asked for this, rerun with AGENT_HOOKS_ALLOW=destructive.", dir)
+		}
 		// Without --force git refuses exactly when this status is not empty.
-		dir := c.worktreeDir(g, o.pos[1].Val)
 		if entries, ok := c.status(&gitCmd{dir: dir}); ok && len(entries) > 0 {
 			return fmt.Sprintf("git worktree remove --force would delete uncommitted work in %s (%s, ...). %s", dir, entries[0].path, discardAdvice)
 		}
@@ -114,41 +115,76 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 	return ""
 }}
 
-// switchesBranch tells a forced checkout that moves HEAD from one that only
-// rewrites the named paths.
-func (c *ctx) switchesBranch(g *gitCmd, o opts) bool {
-	if g.sub == "switch" || o.has("-b", "-B") {
-		return true
+var switchAliases = map[string]string{"--force": "-f", "--discard-changes": "-f", "--create": "-c", "--force-create": "-C"}
+
+// forcedSwitch looks at checkout -f and switch -f. moves says the command
+// moves HEAD, where git throws local changes away instead of refusing; a
+// checkout that names paths only rewrites those. lost says the move would
+// discard tracked changes, or untracked files the target tracks.
+func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
+	o := parseOpts(g.args, "bBcC", []string{"-b", "-B", "-c", "-C", "--orphan", "--conflict", "--pathspec-from-file"}, switchAliases)
+	if !o.has("-f") {
+		return false, false
 	}
-	if o.dashed {
-		return false
+	pathsAllowed := g.sub == "checkout" && !o.has("-b", "-B", "--orphan")
+	if pathsAllowed && (len(o.paths) > 0 || len(o.pos) > 1) {
+		return false, false
 	}
-	return len(o.pos) == 0 || o.pos[0].Dynamic || o.pos[0].Val == "-" || c.refExists(g, o.pos[0].Val)
+	target := ""
+	if len(o.pos) > 0 && !o.pos[0].Dynamic {
+		target = o.pos[0].Val
+	}
+	if target == "-" {
+		target = "@{-1}"
+	}
+	if target != "" && !c.refExists(g, target) {
+		// Not a commit: git creates the branch from the one remote that has
+		// it, and failing that checkout reads the word as a path.
+		refs, _ := c.git(g, "for-each-ref", "--format=%(refname)", "refs/remotes/*/"+target)
+		target = strings.TrimSpace(refs)
+		if target == "" || strings.Contains(target, "\n") {
+			if pathsAllowed && !o.dashed {
+				return false, false
+			}
+			target = ""
+		}
+	}
+	return true, c.dirty(g, nil, false) || (target != "" && c.overwritesUntracked(g, target))
 }
 
-// worktreeDir finds the worktree git would remove for arg: its path, or a
-// unique trailing part of one.
-func (c *ctx) worktreeDir(g *gitCmd, arg string) string {
+// worktree finds the worktree git would remove for arg, its path or a unique
+// trailing part of one, and whether that worktree is locked.
+func (c *ctx) worktree(g *gitCmd, arg string) (dir string, locked bool) {
 	full := shell.Resolve(g.dir, arg, c.opts.Home)
 	if real, err := filepath.EvalSymlinks(full); err == nil {
 		full = real
 	}
-	out, _ := c.git(g, "worktree", "list", "--porcelain")
-	var trailing []string
-	for _, line := range strings.Split(out, "\n") {
-		dir, ok := strings.CutPrefix(line, "worktree ")
+	out, _ := c.git(g, "worktree", "list", "--porcelain", "-z")
+	found, trailing := -1, []int{}
+	lines := strings.Split(out, "\x00")
+	for i, line := range lines {
+		path, ok := strings.CutPrefix(line, "worktree ")
 		switch {
 		case !ok:
-		case dir == full:
-			return dir
-		case strings.HasSuffix(dir, "/"+strings.Trim(arg, "/")):
-			trailing = append(trailing, dir)
+		case path == full:
+			found = i
+		case strings.HasSuffix(path, "/"+strings.Trim(arg, "/")):
+			trailing = append(trailing, i)
 		}
 	}
-	if len(trailing) == 1 {
-		return trailing[0]
+	if found < 0 && len(trailing) == 1 {
+		found = trailing[0]
 	}
-	return ""
+	if found < 0 {
+		return "", false
+	}
+	for _, line := range lines[found+1:] {
+		if line == "" { // the end of this worktree's lines
+			break
+		}
+		locked = locked || line == "locked" || strings.HasPrefix(line, "locked ")
+	}
+	return strings.TrimPrefix(lines[found], "worktree "), locked
 }
 
 func hasAll(specs []shell.Word) bool {
@@ -284,17 +320,18 @@ func checkRm(c *ctx, inv shell.Invocation) string {
 func rmAsksFirst(args []shell.Word) bool {
 	asks := false
 	for _, arg := range args {
-		a := arg.Val
-		when, interactive := strings.CutPrefix(a, "--interactive")
+		name, when, _ := strings.Cut(arg.Val, "=")
+		// GNU rm accepts any unambiguous start of a long option, and of its value.
+		long := func(option string) bool { return len(name) > 2 && strings.HasPrefix(option, name) }
 		switch {
-		case a == "--":
+		case name == "--":
 			return asks
-		case a == "--force":
+		case long("--force"):
 			asks = false
-		case interactive:
-			asks = when != "=never" && when != "=no" && when != "=none"
-		case strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--"):
-			for _, flag := range a[1:] {
+		case long("--interactive"):
+			asks = !strings.HasPrefix(when, "n") // never, no, none
+		case strings.HasPrefix(name, "-") && !strings.HasPrefix(name, "--"):
+			for _, flag := range name[1:] {
 				switch flag {
 				case 'i', 'I':
 					asks = true

@@ -57,6 +57,8 @@ func check(phase string, flags []string, home string, stdin io.Reader, stdout, s
 		switch {
 		case f == "--agy":
 			o.Agy = true
+		case isOnly && len(o.Only) > 0:
+			misuse = "--only takes one hook"
 		case isOnly && slices.Contains(hooks.Names(), name):
 			o.Only = []string{name}
 		case isOnly:

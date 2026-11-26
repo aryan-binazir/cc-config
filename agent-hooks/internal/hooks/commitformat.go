@@ -2,7 +2,9 @@ package hooks
 
 import (
 	"fmt"
+	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -13,7 +15,7 @@ var commitType = regexp.MustCompile(`^(feat|fix|chore|refactor|test|docs|build|c
 
 var commitAliases = map[string]string{
 	"--message": "-m", "--file": "-F", "--reuse-message": "-C", "--reedit-message": "-c", "--template": "-t", "--all": "-a",
-	"--include": "-i", "--only": "-o",
+	"--include": "-i", "--only": "-o", "--patch": "-p", "--null": "-z",
 }
 var commitLongValues = []string{"-m", "-F", "-C", "-c", "-t", "--fixup", "--squash", "--author", "--date", "--trailer", "--cleanup", "--pathspec-from-file"}
 
@@ -58,7 +60,9 @@ var commitFormat = hook{name: "commit-format", phase: "pre", override: "commit-f
 func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 	titles := pr.values["--title"]
 	_, otherRepo := inv.Assigns["GH_REPO"]
-	if pr.action == "merge" || len(titles) == 0 || otherRepo || len(pr.values["--repo"]) > 0 {
+	otherRepo = otherRepo || os.Getenv("GH_REPO") != "" || len(pr.values["--repo"]) > 0 ||
+		slices.ContainsFunc(pr.positionals, func(w shell.Word) bool { return strings.Contains(w.Val, "://") })
+	if pr.action == "merge" || len(titles) == 0 || otherRepo {
 		return ""
 	}
 	title := titles[len(titles)-1]
@@ -70,8 +74,12 @@ func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 		branch = &gitCmd{dir: inv.Cwd}
 	}
 	var bases []string
-	if base := pr.values["--base"]; len(base) > 0 && !base[len(base)-1].Dynamic {
-		bases = []string{"origin/" + base[len(base)-1].Val, base[len(base)-1].Val}
+	if given := pr.values["--base"]; len(given) > 0 {
+		base := given[len(given)-1]
+		if base.Dynamic {
+			branch = nil // the commits ahead of an unknown base cannot be counted
+		}
+		bases = []string{"origin/" + base.Val, base.Val}
 	}
 	return c.subjectProblem(branch, "PR titles", strings.TrimSpace(title.Val), false, bases...)
 }
@@ -92,7 +100,7 @@ func (c *ctx) subjectProblem(g *gitCmd, what, subject string, amending bool, bas
 	want := commitType.FindStringSubmatch(first)
 	got := commitType.FindStringSubmatch(subject)
 	if want != nil && want[1] != got[1] {
-		return fmt.Sprintf("This branch's commits use type `%s` (first commit: %q). Keep the same type on every commit and the PR title; CI depends on it.", want[1], first)
+		return fmt.Sprintf("This branch's commits use type `%s` (first commit: %q). Keep the same type on every commit and the PR title; CI depends on it. If this repository uses another convention, rerun with AGENT_HOOKS_ALLOW=commit-format.", want[1], first)
 	}
 	return ""
 }

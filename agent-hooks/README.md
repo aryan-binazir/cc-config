@@ -21,7 +21,7 @@ delete its line there and run `make install`.
 | `no-production` | Pushing to, merging into, force-updating, resetting, or deleting a `production` branch, including `gh pr merge` into production | `production` |
 | `commit-format` | `git commit` messages, and `--title` on `gh pr create` / `gh pr edit`, that don't match `type(PROJECT): description`, or whose type differs from the branch's first commit | `commit-format` |
 | `no-secrets-commit` | `git add` / `git commit -a` staging, or `git commit` recording from the index, `.env*`, keys, certificates, `credentials*.json`, or `settings.local.json` | `secrets` |
-| `destructive-git` | `git push --force`; `rm -r` of `/`, `~`, or a repository root, including a bare `*` there; `git clean`, `reset --hard`, `checkout -- .`, `checkout -f`, `switch --discard-changes`, or `worktree remove --force` that would discard uncommitted work; `git stash clear` while stashes exist | `destructive` |
+| `destructive-git` | `git push --force`; `rm -r` of `/`, `~`, or a repository root, including a bare `*` there; `git clean`, `reset --hard`, `checkout -- .`, `checkout -f`, `switch --discard-changes`, or `worktree remove --force` that would discard uncommitted work; a twice-forced `worktree remove` of a locked worktree; `git stash clear` while stashes exist | `destructive` |
 | `rg-replace-flag` | Nothing. After `rg -r`, it adds a note that `-r` means `--replace` (Claude Code and Codex only) | n/a |
 
 To let one command through, put the override at its front:
@@ -39,6 +39,7 @@ git and gh commands, the repository as it is at that moment.
 
 - **Git aliases** are followed to the command they stand for, from `-c alias.x=…`
   or `git config`, up to four levels. Shell aliases (`alias.x = !cmd`) are not.
+  When the working directory is unknown, only the user's global aliases apply.
 - **A command that stops parsing partway** still has every complete statement
   before the error checked, as bash would still run them. If the part that
   could not be read mentions `git`, `gh`, or `rm`, the call is blocked as
@@ -54,7 +55,9 @@ git and gh commands, the repository as it is at that moment.
   hook cannot read: at or before the end of that command's pipeline, or
   anywhere when the command sits in a function body. So `time grep agy notes.txt`
   and `bash build.sh && rg agy` pass, while `a=agy; $a -p hi` and
-  `echo 'agy -p hi' | bash` are blocked.
+  `echo 'agy -p hi' | bash` are blocked. Inside a `bash -c` string or a
+  here-document fed to a shell the same rule applies to that text, together
+  with what comes before the shell and the shell's other arguments.
 
 Not covered: commands started by an interpreter (`python -c`, `node -e`), by a
 wrapper the parser does not unwrap (`uv run`, `npx`, `find -exec`, `xargs -I{}`),

@@ -19,7 +19,7 @@ type ghPr struct {
 var ghValueFlags = map[string][]string{
 	"create": {"--assignee", "--attach", "--base", "--body", "--body-file", "--head", "--label", "--milestone", "--project", "--recover", "--reviewer", "--template", "--title", "--repo"},
 	"merge":  {"--author-email", "--body", "--body-file", "--match-head-commit", "--subject", "--repo"},
-	"edit":   {"--add-assignee", "--add-label", "--add-project", "--add-reviewer", "--base", "--body", "--body-file", "--milestone", "--remove-assignee", "--remove-label", "--remove-project", "--remove-reviewer", "--title", "--repo"},
+	"edit":   {"--add-assignee", "--add-label", "--add-project", "--add-reviewer", "--attach", "--base", "--body", "--body-file", "--milestone", "--remove-assignee", "--remove-label", "--remove-project", "--remove-reviewer", "--title", "--repo"},
 }
 
 var ghShortValues = map[string]map[byte]string{

@@ -40,9 +40,15 @@ func TestProductionMergeIsBlockedWhenThePRBaseCannotBeRead(t *testing.T) {
 	if res.Exit != 0 || len(overrideLog(t, state)) != 1 {
 		t.Errorf("the override must still apply and be logged: %+v", res)
 	}
-	// A token the hook cannot read is no reason to skip the lookup.
-	fakeGhScript(t, `[ "${GH_TOKEN:-none}" = none ] || [ "$GH_TOKEN" = literal ] || exit 1; echo production feature`)
-	r.expect("no-production", true, `GH_TOKEN="$(cat token)" gh pr merge 5`, "GH_TOKEN=literal gh pr merge 5")
+	// A literal token reaches the lookup; one the hook cannot read is no reason to skip it.
+	t.Setenv("GH_TOKEN", "ambient")
+	fakeGhScript(t, `[ "$GH_TOKEN" = literal ] && echo production feature || echo main feature`)
+	r.expect("no-production", true, "GH_TOKEN=literal gh pr merge 5")
+	fakeGhScript(t, `[ "$GH_TOKEN" = ambient ] && echo production feature || echo main feature`)
+	r.expect("no-production", true, `GH_TOKEN="$(cat token)" gh pr merge 5`)
+	// gh takes the last --repo, and --repo over GH_REPO.
+	fakeGhScript(t, `case "$*" in *"--repo owner/repo"*) echo production feature ;; *) echo main feature ;; esac`)
+	r.expect("no-production", true, `gh pr merge 5 --repo "$R" --repo owner/repo`, `GH_REPO="$R" gh pr merge 5 --repo owner/repo`)
 	lookupLimits(t, time.Second, 100*time.Millisecond, time.Second)
 	fakeGhScript(t, "sleep 5; echo production feature")
 	if res := r.run("no-production", "gh pr merge 5"); !blocked(t, res, "no-production") || !strings.Contains(res.Stderr, "timed out") {
@@ -96,5 +102,13 @@ func TestLookupsShareOneBudget(t *testing.T) {
 	res := r.run("no-production", "git push")
 	if !blocked(t, res, "no-production") || !strings.Contains(res.Stderr, "ran out of time") {
 		t.Errorf("slow lookups must stop inside the budget and block, got %+v", res)
+	}
+}
+
+func TestALookupKilledByASignalHasNoAnswer(t *testing.T) {
+	r := newRepo(t)
+	fakeGit(t, "kill -TERM $$")
+	if res := r.run("destructive-git", "git reset --hard"); !blocked(t, res, "destructive-git") || !strings.Contains(res.Stderr, "AGENT_HOOKS_ALLOW=destructive") {
+		t.Errorf("want a block that names the override, got %+v", res)
 	}
 }

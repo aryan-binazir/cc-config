@@ -59,3 +59,19 @@ func TestOrdinaryGitCommandsStartNoSubprocess(t *testing.T) {
 		t.Errorf("read-only git commands must be decided from the payload alone: %+v", res)
 	}
 }
+
+func TestARepositoryAliasDoesNotFollowACommandIntoAnUnknownDirectory(t *testing.T) {
+	r := newRepo(t)
+	r.git("config", "alias.x", "push --force")
+	r.expect("destructive-git", true, "git x")
+	r.expect("destructive-git", false, `cd "$WORKTREE" && git x`)
+}
+
+func TestAliasWordsAreSplitTheWayGitSplitsThem(t *testing.T) {
+	r := newRepo(t)
+	r.git("config", "alias.cost", `commit -m "wip $5"`) // git passes $5 through; it is not a shell expansion
+	r.git("config", "alias.good", `commit -m "feat(no-ticket): Cost $5 #1; it's done"`)
+	r.git("config", "alias.open", `commit -m "unclosed`) // git rejects this alias
+	r.expect("commit-format", true, "git cost")
+	r.expect("commit-format", false, "git good", "git open")
+}

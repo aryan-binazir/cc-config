@@ -41,8 +41,8 @@ func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir
 	if name == "command" && len(args) > 0 && (args[0].Val == "-v" || args[0].Val == "-V") {
 		return nil, nil, nil, false
 	}
-	var split []Word // env -S: a string env itself splits into more arguments
 	i := 0
+options:
 	for i < len(args) {
 		a := args[i].Val
 		if a == "--" {
@@ -62,7 +62,8 @@ func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir
 				chdir = &Word{Val: value, Dynamic: args[i].Dynamic}
 			}
 			if name == "env" && opt == "--split-string" {
-				split = fields(value)
+				args, i = resplit(value, args[i+1:]), 0
+				continue
 			}
 			i++
 			continue
@@ -78,15 +79,13 @@ func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir
 					chdir = &value
 				}
 				if name == "env" && a[j] == 'S' {
-					split = fields(value.Val)
+					args, i = resplit(value.Val, args[i+1:]), 0
+					continue options
 				}
 				break
 			}
 		}
 		i++
-	}
-	if split != nil {
-		args, i = append(split, args[i:]...), 0
 	}
 	if spec.assigns {
 		for i < len(args) && isAssign(args[i].Val) {
@@ -107,12 +106,11 @@ func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir
 	return args[i:], env, chdir, true
 }
 
-func fields(s string) []Word {
-	var out []Word
-	for _, field := range strings.Fields(s) {
-		out = append(out, Word{Val: field})
-	}
-	return out
+// resplit is env's argument list after -S: env splits the string into words,
+// options included, and carries on with what follows.
+func resplit(value string, rest []Word) []Word {
+	words, _ := Split(value)
+	return append(words, rest...)
 }
 
 func isAssign(s string) bool {

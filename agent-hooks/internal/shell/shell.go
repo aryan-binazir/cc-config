@@ -35,12 +35,30 @@ type Invocation struct {
 	StdinDynamic bool
 	Cwd          string // directory it runs in; "" when unknown
 	Source       string // the source text of the whole command
-	// End is the offset, in the text given to Parse, just past the pipeline
-	// this command is part of. Text after it cannot feed the command.
-	End int
+	// Fed is the text that can feed this command: its source up to the end of
+	// the pipeline it is part of. Text after that cannot reach it.
+	Fed Reach
 	// Opaque marks a shell, or source, that runs text Parse was not shown: a
 	// script file, a pipe or terminal, or a string built by an expansion.
 	Opaque bool
+
+	start int // where the command begins in its source
+}
+
+// Source is one piece of shell text Parse walked: the command it was given,
+// or the string a nested shell runs.
+type Source struct {
+	Text string
+	// Outer is what else can feed the commands of a nested shell's string:
+	// the text ahead of that shell, then its other arguments, environment,
+	// and input.
+	Outer []Reach
+}
+
+// Reach is the part of a source before End.
+type Reach struct {
+	*Source
+	End int
 }
 
 // Name is the basename of the command word.
@@ -77,7 +95,7 @@ const maxDepth = 8
 // statements before it reaches such an error, so they are still reported.
 func Parse(src, cwd, home string) (invs []Invocation, unread []string) {
 	w := &walker{home: home}
-	w.script(frame{src: src, env: &exported{}, home: home}, cwd)
+	w.script(frame{src: &Source{Text: src}, env: &exported{}, home: home}, cwd)
 	return w.out, w.unread
 }
 
@@ -89,15 +107,20 @@ type walker struct {
 }
 
 func (w *walker) script(f frame, cwd string) {
-	at := dirs{cwd}
-	read := 0
-	err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Stmts(strings.NewReader(f.src), func(s *syntax.Stmt) bool {
-		at = f.stmt(w, s, at)
-		read = stmtEnd(s)
+	// The parser hands over a statement before it has read the here-documents
+	// named on that line, so the walk waits until parsing is done.
+	var stmts []*syntax.Stmt
+	err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Stmts(strings.NewReader(f.src.Text), func(s *syntax.Stmt) bool {
+		stmts = append(stmts, s)
 		return true
 	})
+	f.stmts(w, stmts, dirs{cwd})
 	if err != nil {
-		w.unread = append(w.unread, f.src[min(read, len(f.src)):])
+		read := 0
+		for _, s := range stmts {
+			read = max(read, stmtEnd(s))
+		}
+		w.unread = append(w.unread, f.src.Text[min(read, len(f.src.Text)):])
 	}
 }
 
@@ -117,12 +140,11 @@ func stmtEnd(s *syntax.Stmt) int {
 }
 
 type frame struct {
-	src   string
+	src   *Source
 	env   *exported
 	depth int
 	home  string
-	end   int  // Invocation.End for the commands being walked
-	inner bool // a nested shell: its commands end where the shell that runs them does
+	end   int // Fed.End for the commands being walked
 }
 
 // reach is how far into the source can feed s: to the end of its pipeline or
@@ -130,13 +152,15 @@ type frame struct {
 func (f frame) reach(s *syntax.Stmt) int {
 	switch c := s.Cmd.(type) {
 	case *syntax.FuncDecl:
-		return len(f.src)
+		return len(f.src.Text)
 	case *syntax.CallExpr, *syntax.WhileClause, *syntax.ForClause:
 		return max(f.end, stmtEnd(s))
 	case *syntax.BinaryCmd:
-		if c.Op == syntax.Pipe || c.Op == syntax.PipeAll {
-			return max(f.end, stmtEnd(s))
+		piped := c.Op == syntax.Pipe || c.Op == syntax.PipeAll
+		if !piped || f.end >= int(s.End().Offset()) { // a list, or a stage of a pipeline already measured
+			return f.end
 		}
+		return max(f.end, stmtEnd(s))
 	}
 	if len(s.Redirs) > 0 {
 		return max(f.end, stmtEnd(s))
@@ -168,10 +192,10 @@ func (f frame) subshell() frame {
 
 func (f frame) text(n syntax.Node) string {
 	start, end := int(n.Pos().Offset()), int(n.End().Offset())
-	if start < 0 || end > len(f.src) || start > end {
+	if start < 0 || end > len(f.src.Text) || start > end {
 		return ""
 	}
-	return f.src[start:end]
+	return f.src.Text[start:end]
 }
 
 type dirs []string
@@ -204,9 +228,7 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	if s.Background || s.Coprocess {
 		f = f.subshell()
 	}
-	if !f.inner {
-		f.end = f.reach(s)
-	}
+	f.end = f.reach(s)
 	for _, r := range s.Redirs {
 		f.substs(w, r.Word, cwd)
 		f.substs(w, r.Hdoc, cwd)
@@ -257,7 +279,7 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	case *syntax.FuncDecl:
 		f.subshell().stmt(w, c.Body, cwd)
 	case *syntax.TimeClause:
-		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s)})
+		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s), Fed: Reach{f.src, f.end}})
 		return f.stmt(w, c.Stmt, cwd)
 	case *syntax.CoprocClause:
 		f.subshell().stmt(w, c.Stmt, cwd)
@@ -319,7 +341,7 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 			}
 		}
 	}
-	inv := Invocation{Assigns: env, Source: f.text(s), End: f.end}
+	inv := Invocation{Assigns: env, Source: f.text(s), Fed: Reach{f.src, f.end}, start: int(s.Pos().Offset())}
 	for _, arg := range c.Args {
 		inv.Args = append(inv.Args, f.word(arg))
 	}
@@ -416,6 +438,8 @@ func (f frame) emit(w *walker, inv Invocation) {
 				break
 			}
 			switch {
+			case a == "--version" || a == "--help":
+				return
 			case a == "-o" || a == "+o" || a == "-O" || a == "+O":
 				i++ // the option name
 			case !strings.HasPrefix(a, "--") && strings.Contains(a, "c"):
@@ -429,7 +453,7 @@ func (f frame) emit(w *walker, inv Invocation) {
 				i++
 			}
 			if i < len(args) && !args[i].Dynamic {
-				f.nested(w, args[i].Val, inv)
+				f.nested(w, args[i].Val, inv, args[i+1:], inv.Stdin)
 			} else {
 				w.out[at].Opaque = true
 			}
@@ -439,7 +463,7 @@ func (f frame) emit(w *walker, inv Invocation) {
 			i++
 		}
 		if inv.Stdin != nil && (i == len(args) || fromStdin) {
-			f.nested(w, *inv.Stdin, inv)
+			f.nested(w, *inv.Stdin, inv, args[i:], nil)
 		} else {
 			w.out[at].Opaque = true
 		}
@@ -453,7 +477,7 @@ func (f frame) emit(w *walker, inv Invocation) {
 		for _, a := range args {
 			parts = append(parts, a.Val)
 		}
-		f.nested(w, strings.Join(parts, " "), inv)
+		f.nested(w, strings.Join(parts, " "), inv, nil, inv.Stdin)
 	default:
 		if rest, env, chdir, ok := unwrap(name, args); ok && len(rest) > 0 {
 			inner := inv
@@ -477,9 +501,25 @@ func (f frame) emit(w *walker, inv Invocation) {
 	}
 }
 
-func (f frame) nested(w *walker, src string, parent Invocation) {
+// nested walks src, a string parent runs as shell. Besides src itself, its
+// commands can be fed by the text ahead of parent, by params (the positional
+// parameters), by parent's environment, and by input (parent's standard input
+// when that is not src).
+func (f frame) nested(w *walker, src string, parent Invocation, params []Word, input *string) {
+	var around []string
+	for _, p := range params {
+		around = append(around, p.Val)
+	}
+	for _, value := range parent.Assigns {
+		around = append(around, value)
+	}
+	if input != nil {
+		around = append(around, *input)
+	}
+	passed := &Source{Text: strings.Join(around, "\n")}
+	outer := append(slices.Clone(f.src.Outer), Reach{f.src, parent.start}, Reach{passed, len(passed.Text)})
 	inner := &walker{home: w.home, out: w.out}
-	inner.script(frame{src: src, env: &exported{parent.Assigns}, depth: f.depth + 1, home: w.home, end: parent.End, inner: true}, parent.Cwd)
+	inner.script(frame{src: &Source{Text: src, Outer: outer}, env: &exported{parent.Assigns}, depth: f.depth + 1, home: w.home}, parent.Cwd)
 	w.out = inner.out
 	w.unread = append(w.unread, inner.unread...)
 }

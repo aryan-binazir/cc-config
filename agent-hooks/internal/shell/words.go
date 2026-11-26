@@ -3,6 +3,7 @@ package shell
 import (
 	"strconv"
 	"strings"
+	"unicode"
 
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -206,4 +207,43 @@ func ansiC(s string) string {
 
 func isHex(c byte) bool {
 	return c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F'
+}
+
+// Split divides s into words the way git splits an alias and env splits its
+// -S string: on whitespace, with single quotes, double quotes, and backslash
+// escapes, and nothing else special. It reports false for an unclosed quote
+// or a trailing backslash.
+func Split(s string) ([]Word, bool) {
+	var words []Word
+	var word strings.Builder
+	open, quote, escaped := false, rune(0), false
+	for _, r := range s {
+		switch {
+		case escaped:
+			word.WriteRune(r)
+			escaped = false
+		case r == '\\' && quote != '\'':
+			open, escaped = true, true
+		case quote == 0 && unicode.IsSpace(r):
+			if open {
+				words = append(words, Word{Val: word.String()})
+				word.Reset()
+				open = false
+			}
+		case quote == 0 && (r == '\'' || r == '"'):
+			open, quote = true, r
+		case r == quote:
+			quote = 0
+		default:
+			word.WriteRune(r)
+			open = true
+		}
+	}
+	if escaped || quote != 0 {
+		return nil, false
+	}
+	if open {
+		words = append(words, Word{Val: word.String()})
+	}
+	return words, true
 }

@@ -3,6 +3,7 @@ package hooks
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -50,7 +51,7 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 		}
 	case "commit":
 		o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
-		if o.has("--dry-run", "--short", "--porcelain") {
+		if o.has("--dry-run", "--short", "--porcelain", "--long", "-z", "-h", "--help") {
 			return ""
 		}
 		specs := append(o.pos, o.paths...)
@@ -60,10 +61,10 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 			}
 		}
 		found = c.explicitSecrets(g, specs)
-		switch {
-		case o.has("-a") || broad(g.dir, specs, c.opts.Home):
+		if o.has("-a") || broad(g.dir, specs, c.opts.Home) {
 			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs))...)
-		case commitsTheIndex(o, specs):
+		}
+		if commitsTheIndex(o, specs) {
 			found = append(found, c.stagedSecrets(g)...)
 		}
 	default:
@@ -76,18 +77,20 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 }}
 
 // commitsTheIndex reports whether a commit records what is already staged.
-// With pathspecs and no --include git commits only those paths, and
-// --only --amend and --fixup=reword: rewrite a commit without reading the index.
+// With pathspecs git commits only those paths, unless --include, --patch, or
+// --interactive adds them to the index instead. -a restages every tracked
+// file, which the status check covers, and --only --amend and --fixup=reword:
+// rewrite a commit without reading the index.
 func commitsTheIndex(o opts, specs []shell.Word) bool {
 	for _, fixup := range o.vals["--fixup"] {
 		if strings.HasPrefix(fixup.Val, "reword:") {
 			return false
 		}
 	}
-	if o.has("-o") && o.has("--amend") {
+	if o.has("-a") || (o.has("-o") && o.has("--amend")) {
 		return false
 	}
-	return len(specs) == 0 && len(o.vals["--pathspec-from-file"]) == 0 || o.has("-i")
+	return len(specs) == 0 || o.has("-i", "-p", "--interactive")
 }
 
 func (c *ctx) stagedSecrets(g *gitCmd) []string {
@@ -174,7 +177,13 @@ func (c *ctx) pathspecFile(g *gitCmd, file shell.Word, nul bool) []string {
 	}
 	var out []string
 	for _, line := range strings.Split(string(data), sep) {
-		if line = strings.TrimRight(line, "\r"); line != "" {
+		line = strings.TrimRight(line, "\r")
+		if !nul && strings.HasPrefix(line, `"`) { // git reads a quoted line as a C-style string
+			if plain, err := strconv.Unquote(line); err == nil {
+				line = plain
+			}
+		}
+		if line != "" {
 			out = append(out, line)
 		}
 	}

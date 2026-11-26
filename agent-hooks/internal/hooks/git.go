@@ -23,7 +23,7 @@ type gitCmd struct {
 // they stand for. Shell aliases (alias.x = !cmd) are not followed.
 func (c *ctx) parseGit(inv shell.Invocation) *gitCmd {
 	g := parseGit(inv, c.opts.Home)
-	for hops := 0; g != nil && !gitShips[g.sub] && !inv.Args[g.at].Dynamic && hops < 4; hops++ {
+	for hops := 0; g != nil && !gitBuiltins[g.sub] && !inv.Args[g.at].Dynamic && hops < 4; hops++ {
 		words := c.alias(g)
 		if len(words) == 0 {
 			break
@@ -40,23 +40,18 @@ func (c *ctx) parseGit(inv shell.Invocation) *gitCmd {
 func (c *ctx) alias(g *gitCmd) []shell.Word {
 	value, ok := g.config["alias."+strings.ToLower(g.sub)]
 	if !ok {
-		where := *g
-		if where.dir == "" { // global aliases still apply when the directory is unknown
-			where.dir, where.env = cmp.Or(c.call.cwd, c.opts.Home, "/"), nil
+		where, scope := *g, []string{"config"}
+		if where.dir == "" { // wherever the command runs, the user's own aliases apply
+			where.dir, where.env = cmp.Or(c.opts.Home, "/"), nil
+			scope = append(scope, "--global")
 		}
-		value, _ = c.git(&where, "config", "--get", "alias."+g.sub)
+		value, _ = c.git(&where, append(scope, "--get", "alias."+g.sub)...)
 	}
 	value = strings.TrimSpace(value)
-	if value == "" || strings.HasPrefix(value, "!") {
+	if strings.HasPrefix(value, "!") {
 		return nil
 	}
-	if invs, unread := shell.Parse(value, "", ""); len(invs) == 1 && len(unread) == 0 {
-		return invs[0].Args // git splits an alias on shell-style quoting
-	}
-	var words []shell.Word
-	for _, field := range strings.Fields(value) {
-		words = append(words, shell.Word{Val: field})
-	}
+	words, _ := shell.Split(value)
 	return words
 }
 
@@ -288,30 +283,29 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// gitShips lists the commands git 2.56 installs. An alias cannot shadow one,
-// so these never need an alias lookup.
-var gitShips = func() map[string]bool {
-	ships := map[string]bool{}
+// gitBuiltins lists the commands compiled into git 2.56
+// (git --list-cmds=builtins). An alias cannot shadow one, so these never need
+// an alias lookup.
+var gitBuiltins = func() map[string]bool {
+	builtins := map[string]bool{}
 	for _, name := range strings.Fields(`
-add am annotate apply archimport archive backfill bisect blame branch bugreport bundle cat-file check-attr
-check-ignore check-mailmap checkout checkout-index check-ref-format cherry cherry-pick citool clean clone
-column commit commit-graph commit-tree config count-objects credential credential-cache credential-libsecret
-credential-store cvsexportcommit cvsimport cvsserver daemon describe diagnose diff diff-files diff-index
-diff-pairs difftool diff-tree fast-export fast-import fetch fetch-pack filter-branch fmt-merge-msg
-for-each-ref for-each-repo format-patch format-rev fsck fsck-objects gc get-tar-commit-id grep gui
-hash-object help history hook http-backend http-fetch http-push imap-send index-pack init init-db instaweb
-interpret-trailers last-modified log ls-files ls-remote ls-tree mailinfo mailsplit maintenance merge
-merge-base merge-file merge-index merge-octopus merge-one-file merge-ours merge-recursive
-merge-recursive-ours merge-recursive-theirs merge-resolve merge-subtree mergetool merge-tree mktag mktree
-multi-pack-index mv name-rev notes p4 pack-objects pack-redundant pack-refs patch-id pickaxe prune
-prune-packed pull push quiltimport range-diff read-tree rebase receive-pack reflog refs remote remote-ext
-remote-fd remote-ftp remote-ftps remote-http remote-https repack replace replay repo request-pull rerere
-reset restore revert rev-list rev-parse rm send-email send-pack shell shortlog show show-branch show-index
-show-ref sparse-checkout stage stash status stripspace submodule subtree svn switch symbolic-ref tag
-unpack-file unpack-objects update-index update-ref update-server-info upload-archive upload-pack url-parse
-var verify-commit verify-pack verify-tag version whatchanged worktree write-tree
+add am annotate apply archive backfill bisect blame branch bugreport bundle cat-file check-attr check-ignore
+check-mailmap checkout checkout-index checkout--worker check-ref-format cherry cherry-pick clean clone column
+commit commit-graph commit-tree config count-objects credential credential-cache credential-cache--daemon
+credential-store describe diagnose diff diff-files diff-index diff-pairs difftool diff-tree fast-export
+fast-import fetch fetch-pack fmt-merge-msg for-each-ref for-each-repo format-patch format-rev fsck
+fsck-objects fsmonitor--daemon gc get-tar-commit-id grep hash-object help history hook index-pack init
+init-db interpret-trailers last-modified log ls-files ls-remote ls-tree mailinfo mailsplit maintenance merge
+merge-base merge-file merge-index merge-ours merge-recursive merge-recursive-ours merge-recursive-theirs
+merge-subtree merge-tree mktag mktree multi-pack-index mv name-rev notes pack-objects pack-redundant
+pack-refs patch-id pickaxe prune prune-packed pull push range-diff read-tree rebase receive-pack reflog refs
+remote remote-ext remote-fd repack replace replay repo rerere reset restore revert rev-list rev-parse rm
+send-pack shortlog show show-branch show-index show-ref sparse-checkout stage stash status stripspace
+submodule--helper switch symbolic-ref tag unpack-file unpack-objects update-index update-ref
+update-server-info upload-archive upload-archive--writer upload-pack url-parse var verify-commit verify-pack
+verify-tag version whatchanged worktree write-tree
 `) {
-		ships[name] = true
+		builtins[name] = true
 	}
-	return ships
+	return builtins
 }()

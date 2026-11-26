@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -15,6 +16,7 @@ func benchPayload(b *testing.B, dir, command string) []byte {
 
 func BenchmarkRunPayloadOnly(b *testing.B) {
 	for name, command := range map[string]string{
+		"long-pipe": "cat x" + strings.Repeat(" | grep -v y", 2000),
 		"echo":      "echo hello",
 		"pipeline":  "cd src && rg -n TODO | sort | uniq -c | head -20",
 		"gh-create": "gh pr create --draft --assignee @me --fill --body-file /tmp/body.md",
