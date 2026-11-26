@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"encoding/json"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -28,7 +29,7 @@ func encode(t *testing.T, payload any) []byte {
 
 func run(t *testing.T, enabled string, payload any) Result {
 	t.Helper()
-	return runOpts(t, Options{Phase: "pre", Enabled: switches(enabled)}, payload)
+	return runOpts(t, Options{Phase: "pre", Only: only(enabled)}, payload)
 }
 
 func runOpts(t *testing.T, o Options, payload any) Result {
@@ -40,15 +41,18 @@ func runOpts(t *testing.T, o Options, payload any) Result {
 	return Run(o)
 }
 
-func switches(names string) map[string]bool {
-	on := map[string]bool{}
-	for _, name := range strings.Split(names, ",") {
-		on[name] = true
-	}
-	return on
-}
+func only(names string) []string { return strings.Split(names, ",") }
 
 func blocked(t *testing.T, r Result, hook string) bool {
 	t.Helper()
 	return r.Exit == 2 && strings.Contains(r.Stderr, "[agent-hooks: "+hook+"]")
+}
+
+func mustLookPath(t *testing.T, name string) string {
+	t.Helper()
+	p, err := exec.LookPath(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
 }

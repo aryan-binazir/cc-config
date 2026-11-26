@@ -8,9 +8,22 @@ import (
 )
 
 type call struct {
-	agy      bool
-	commands []string
-	cwd      string
+	agy     bool
+	sources []source
+	cwd     string
+}
+
+type source struct {
+	text  string
+	typed bool // keystrokes for a running program, which need not be shell
+}
+
+func (c call) text() string {
+	texts := make([]string, len(c.sources))
+	for i, s := range c.sources {
+		texts[i] = s.text
+	}
+	return strings.Join(texts, "\n")
 }
 
 // shellTools are the tool names whose input runs in, or types into, a shell:
@@ -43,7 +56,7 @@ func decode(data []byte) call {
 	}
 	for _, key := range []string{"command", "cmd", "chars"} {
 		if src, ok := commandText(p.ToolInput[key]); ok {
-			c.commands = append(c.commands, src)
+			c.sources = append(c.sources, source{text: src, typed: key == "chars"})
 		}
 	}
 	return c
@@ -53,7 +66,7 @@ func decodeAgy(tool string, args map[string]json.RawMessage) call {
 	c := call{agy: true}
 	switch tool {
 	case "run_command":
-		c.commands = appendString(c.commands, args["CommandLine"])
+		c.add(args["CommandLine"], false)
 		var cwd string
 		if json.Unmarshal(args["Cwd"], &cwd) == nil {
 			c.cwd = cwd
@@ -61,18 +74,17 @@ func decodeAgy(tool string, args map[string]json.RawMessage) call {
 	case "manage_task":
 		var action string
 		if json.Unmarshal(args["Action"], &action) == nil && action == "send_input" {
-			c.commands = appendString(c.commands, args["Input"])
+			c.add(args["Input"], true)
 		}
 	}
 	return c
 }
 
-func appendString(list []string, raw json.RawMessage) []string {
+func (c *call) add(raw json.RawMessage, typed bool) {
 	var s string
 	if json.Unmarshal(raw, &s) == nil && s != "" {
-		return append(list, s)
+		c.sources = append(c.sources, source{text: s, typed: typed})
 	}
-	return list
 }
 
 func commandText(raw json.RawMessage) (string, bool) {

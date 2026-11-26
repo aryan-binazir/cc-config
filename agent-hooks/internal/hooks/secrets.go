@@ -32,7 +32,7 @@ var addAliases = map[string]string{
 }
 
 var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "secrets", check: func(c *ctx, inv shell.Invocation) string {
-	g := parseGit(inv, c.opts.Home)
+	g := c.parseGit(inv)
 	if g == nil {
 		return ""
 	}
@@ -50,10 +50,21 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 		}
 	case "commit":
 		o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
+		if o.has("--dry-run", "--short", "--porcelain") {
+			return ""
+		}
 		specs := append(o.pos, o.paths...)
+		for _, file := range o.vals["--pathspec-from-file"] {
+			for _, p := range c.pathspecFile(g, file, o.has("--pathspec-file-nul")) {
+				specs = append(specs, shell.Word{Val: p})
+			}
+		}
 		found = c.explicitSecrets(g, specs)
-		if o.has("-a") || broad(g.dir, specs, c.opts.Home) {
+		switch {
+		case o.has("-a") || broad(g.dir, specs, c.opts.Home):
 			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs))...)
+		case commitsTheIndex(o, specs):
+			found = append(found, c.stagedSecrets(g)...)
 		}
 	default:
 		return ""
@@ -63,6 +74,32 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 	}
 	return fmt.Sprintf("Don't stage credentials: %s. Unstage or .gitignore them. If the user explicitly asked to commit them, rerun with AGENT_HOOKS_ALLOW=secrets.", strings.Join(dedupe(found), ", "))
 }}
+
+// commitsTheIndex reports whether a commit records what is already staged.
+// With pathspecs and no --include git commits only those paths, and
+// --only --amend and --fixup=reword: rewrite a commit without reading the index.
+func commitsTheIndex(o opts, specs []shell.Word) bool {
+	for _, fixup := range o.vals["--fixup"] {
+		if strings.HasPrefix(fixup.Val, "reword:") {
+			return false
+		}
+	}
+	if o.has("-o") && o.has("--amend") {
+		return false
+	}
+	return len(specs) == 0 && len(o.vals["--pathspec-from-file"]) == 0 || o.has("-i")
+}
+
+func (c *ctx) stagedSecrets(g *gitCmd) []string {
+	out, _ := c.git(g, "diff", "--cached", "--name-only", "-z", "--diff-filter=d", "--no-renames", "--no-relative", "--ita-invisible-in-index")
+	var found []string
+	for _, p := range strings.Split(out, "\x00") {
+		if p != "" && isSecret(p) {
+			found = append(found, p)
+		}
+	}
+	return found
+}
 
 func (c *ctx) explicitSecrets(g *gitCmd, specs []shell.Word) []string {
 	var found []string

@@ -12,28 +12,30 @@ import (
 type ghPr struct {
 	action      string
 	flags       map[string]bool
-	values      map[string][]string
-	positionals []string
+	values      map[string][]shell.Word
+	positionals []shell.Word
 }
 
 var ghValueFlags = map[string][]string{
 	"create": {"--assignee", "--attach", "--base", "--body", "--body-file", "--head", "--label", "--milestone", "--project", "--recover", "--reviewer", "--template", "--title", "--repo"},
 	"merge":  {"--author-email", "--body", "--body-file", "--match-head-commit", "--subject", "--repo"},
+	"edit":   {"--add-assignee", "--add-label", "--add-project", "--add-reviewer", "--base", "--body", "--body-file", "--milestone", "--remove-assignee", "--remove-label", "--remove-project", "--remove-reviewer", "--title", "--repo"},
 }
 
 var ghShortValues = map[string]map[byte]string{
 	"create": {'a': "--assignee", 'B': "--base", 'b': "--body", 'F': "--body-file", 'H': "--head", 'l': "--label", 'm': "--milestone", 'p': "--project", 'r': "--reviewer", 'T': "--template", 't': "--title", 'R': "--repo"},
 	"merge":  {'A': "--author-email", 'b': "--body", 'F': "--body-file", 't': "--subject", 'R': "--repo"},
+	"edit":   {'B': "--base", 'b': "--body", 'F': "--body-file", 'm': "--milestone", 't': "--title", 'R': "--repo"},
 }
 
-func ghWords(inv shell.Invocation) (words, rest []string) {
+func ghWords(inv shell.Invocation) (words []string, rest []shell.Word) {
 	if inv.Name() != "gh" {
 		return nil, nil
 	}
-	rest = inv.Strings()
+	rest = append(rest, inv.Args[1:]...)
 	for level := 0; level < 2; level++ {
 		for i := 0; i < len(rest); i++ {
-			arg := rest[i]
+			arg := rest[i].Val
 			if arg == "--" {
 				break
 			}
@@ -63,10 +65,10 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 	if action == "new" {
 		action = "create"
 	}
-	if action != "create" && action != "merge" {
+	if action != "create" && action != "merge" && action != "edit" {
 		return nil
 	}
-	pr := &ghPr{action: action, flags: map[string]bool{}, values: map[string][]string{}}
+	pr := &ghPr{action: action, flags: map[string]bool{}, values: map[string][]shell.Word{}}
 	record := func(name, value string, hasValue bool) {
 		if truthy(value) {
 			hasValue = false
@@ -78,7 +80,7 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 		}
 	}
 	for i := 0; i < len(rest); i++ {
-		arg := rest[i]
+		arg := rest[i].Val
 		switch {
 		case arg == "--":
 			pr.positionals = append(pr.positionals, rest[i+1:]...)
@@ -86,11 +88,12 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 		case strings.HasPrefix(arg, "--"):
 			name, value, hasValue := strings.Cut(arg, "=")
 			if slices.Contains(ghValueFlags[action], name) {
+				word := shell.Word{Val: value, Dynamic: rest[i].Dynamic}
 				if !hasValue && i+1 < len(rest) {
 					i++
-					value = rest[i]
+					word = rest[i]
 				}
-				pr.values[name] = append(pr.values[name], value)
+				pr.values[name] = append(pr.values[name], word)
 			} else {
 				record(name, value, hasValue)
 			}
@@ -98,15 +101,15 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 			for j := 1; j < len(arg); j++ {
 				flag := arg[j]
 				if long, ok := ghShortValues[action][flag]; ok {
-					value := strings.TrimPrefix(arg[j+1:], "=")
+					word := shell.Word{Val: strings.TrimPrefix(arg[j+1:], "="), Dynamic: rest[i].Dynamic}
 					if j == len(arg)-1 {
-						value = ""
+						word = shell.Word{}
 						if i+1 < len(rest) {
 							i++
-							value = rest[i]
+							word = rest[i]
 						}
 					}
-					pr.values[long] = append(pr.values[long], value)
+					pr.values[long] = append(pr.values[long], word)
 					break
 				}
 				value, hasValue := "", j+1 < len(arg) && arg[j+1] == '='
@@ -128,7 +131,7 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 				}
 			}
 		default:
-			pr.positionals = append(pr.positionals, arg)
+			pr.positionals = append(pr.positionals, rest[i])
 		}
 	}
 	if pr.flags["--help"] {
@@ -142,9 +145,9 @@ func parseGhPr(inv shell.Invocation) *ghPr {
 func (pr *ghPr) has(name string) bool {
 	vals := pr.values[name]
 	if name == "--assignee" {
-		return slices.ContainsFunc(vals, func(v string) bool { return v != "" })
+		return slices.ContainsFunc(vals, func(v shell.Word) bool { return v.Val != "" })
 	}
-	return len(vals) > 0 && vals[len(vals)-1] != ""
+	return len(vals) > 0 && vals[len(vals)-1].Val != ""
 }
 
 var draftPrs = hook{name: "draft-prs", phase: "pre", check: func(_ *ctx, inv shell.Invocation) string {

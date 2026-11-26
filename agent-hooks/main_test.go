@@ -10,62 +10,25 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/aryan-binazir/cc-config/agent-hooks/internal/hooks"
 )
 
-func TestShippedSwitchesNameEveryHook(t *testing.T) {
-	on, err := parseSwitches(hooksYAML)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var names []string
-	for name, enabled := range on {
-		if !enabled {
-			t.Errorf("%s is off", name)
-		}
-		names = append(names, name)
-	}
-	want := hooks.Names()
-	slices.Sort(names)
-	slices.Sort(want)
-	if !slices.Equal(names, want) {
-		t.Errorf("hooks.yaml lists %v, catalog has %v", names, want)
-	}
-}
-
-func TestParseSwitches(t *testing.T) {
-	on, err := parseSwitches("# c\nhooks:\n  a: true\n  b: false # off\n\n")
-	if err != nil || !on["a"] || on["b"] {
-		t.Fatalf("%v %v", on, err)
-	}
-	for _, bad := range []string{"a: true", "hooks:\n  a: yes", "hooks:\n  a true", "other:\nhooks:\n  a: true", "hooks:\n\ta: true", "hooks:\n  a: true\nx: 1"} {
-		if _, err := parseSwitches(bad); err == nil {
-			t.Errorf("accepted %q", bad)
+func TestUnknownHooksFlagsAndArgumentsAreUsageErrors(t *testing.T) {
+	env := []string{"HOME=" + t.TempDir(), "XDG_STATE_HOME=" + t.TempDir()}
+	for _, args := range [][]string{
+		{"pre", "--only=block-agi"}, {"pre", "--only="}, {"pre", "--bogus"}, {"post", "extra"},
+		{"install", "extra"}, {"uninstall", "--force"},
+	} {
+		p := runBinary(t, env, payload("agy -p hi"), args...)
+		if p.exit != 64 || !strings.Contains(p.stderr, "usage") || p.stdout != "" {
+			t.Errorf("%v: got %+v", args, p)
 		}
 	}
-}
-
-func TestBadSwitchesAreAFault(t *testing.T) {
-	var out, errb bytes.Buffer
-	code := check("pre", nil, "hooks:\n  block-agy: maybe\n", "", strings.NewReader(payload("agy")), &out, &errb)
-	if code != 1 || !strings.Contains(errb.String(), "hooks.yaml") {
-		t.Errorf("exit %d stderr %q", code, errb.String())
+	p := runBinary(t, env, `{"toolCall":{"name":"run_command","args":{"CommandLine":"ls"}}}`, "pre", "--bogus", "--agy")
+	if p.exit != 64 || p.stdout != `{"decision":"allow"}`+"\n" {
+		t.Errorf("agy must still get an answer: %+v", p)
 	}
-}
-
-func TestInstallRefusesBadSwitches(t *testing.T) {
-	var out, errb bytes.Buffer
-	if code := wire("install", "hooks:\n  x: maybe\n", t.TempDir(), &out, &errb); code != 1 || !strings.Contains(errb.String(), "hooks.yaml") {
-		t.Errorf("exit %d stderr %q", code, errb.String())
-	}
-}
-
-func BenchmarkParseSwitches(b *testing.B) {
-	for b.Loop() {
-		if _, err := parseSwitches(hooksYAML); err != nil {
-			b.Fatal(err)
-		}
+	if p := runBinary(t, env, payload("agy -p hi"), "post", "--only=block-agy"); p.exit != 0 || p.stdout != "" {
+		t.Errorf("a pre hook named in post runs nothing: %+v", p)
 	}
 }
 
@@ -219,7 +182,7 @@ func TestBinaryLatency(t *testing.T) {
 		{"payload-only", 20 * time.Millisecond, []string{
 			in("/nonexistent", "echo hello"),
 			in("/nonexistent", "cd src && rg -n TODO | sort | uniq -c | head -20"),
-			in("/nonexistent", "gh pr create --draft --assignee @me --title t --body-file b.md"),
+			in("/nonexistent", "gh pr create --draft --assignee @me --fill --body-file b.md"),
 			in("/nonexistent", "git status && git diff --stat"),
 			`{"tool_name":"Read","tool_input":{"file_path":"/x"}}`,
 		}},
@@ -228,6 +191,7 @@ func TestBinaryLatency(t *testing.T) {
 			in(repo, "git add -A"),
 			in(repo, "git reset --hard"),
 			in(repo, "git push"),
+			in(repo, "gh pr create --draft --assignee @me --title 'feat(no-ticket): More' --body-file b.md"),
 		}},
 	}
 	binary(t)

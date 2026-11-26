@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -30,10 +31,10 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 		return api.method != "GET" && productionRef.MatchString(api.endpoint)
 	}
 	if words, rest := ghWords(inv); len(words) == 2 && words[0] == "repo" && words[1] == "sync" {
-		o := parseOpts(wordsOf(rest), "bs", []string{"-b", "-s"}, map[string]string{"--branch": "-b", "--source": "-s"})
+		o := parseOpts(rest, "bs", []string{"-b", "-s"}, map[string]string{"--branch": "-b", "--source": "-s"})
 		return names(o.vals["-b"], production)
 	}
-	g := parseGit(inv, c.opts.Home)
+	g := c.parseGit(inv)
 	if g == nil {
 		return false
 	}
@@ -88,20 +89,36 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 }
 
 func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghPr) bool {
-	args := []string{"pr", "view"}
-	args = append(args, pr.positionals...)
-	for _, repo := range pr.values["--repo"] {
-		args = append(args, "--repo", repo)
-	}
+	selector := append(append([]shell.Word{}, pr.positionals...), pr.values["--repo"]...)
 	var env []string
-	for _, name := range []string{"GH_REPO", "GH_HOST"} {
-		if v, ok := inv.Assigns[name]; ok {
+	for _, name := range []string{"GH_REPO", "GH_HOST", "GH_TOKEN", "GITHUB_TOKEN"} {
+		v, ok := inv.Assigns[name]
+		expands := strings.ContainsAny(v, "$`")
+		switch {
+		case !ok:
+		case strings.HasSuffix(name, "_TOKEN"):
+			if !expands { // otherwise look up with the ambient login
+				env = append(env, name+"="+v)
+			}
+		default:
 			env = append(env, name+"="+v)
+			selector = append(selector, shell.Word{Val: v, Dynamic: expands})
 		}
 	}
-	out, ok := c.gh(inv.Cwd, env, append(args, "--json", "baseRefName,headRefName", "-q", `.baseRefName + " " + .headRefName`)...)
+	if slices.ContainsFunc(selector, func(w shell.Word) bool { return w.Dynamic }) {
+		return false // the PR is named by an expansion, so there is nothing to look up
+	}
+	args := append([]string{"pr", "view"}, values(pr.positionals)...)
+	for _, repo := range pr.values["--repo"] {
+		args = append(args, "--repo", repo.Val)
+	}
+	out, res := c.gh(inv.Cwd, env, append(args, "--json", "baseRefName,headRefName", "-q", `.baseRefName + " " + .headRefName`)...)
 	fields := strings.Fields(out)
-	if !ok || len(fields) != 2 {
+	switch {
+	case res == skipped || res == failed:
+		return false
+	case res == missed || len(fields) != 2:
+		c.unanswered = "gh pr view could not say which branch this pull request merges into"
 		return false
 	}
 	return fields[0] == production || (fields[1] == production && (pr.flags["--delete-branch"] || pr.flags["-d"]))
@@ -256,14 +273,6 @@ func names(words []shell.Word, name string) bool {
 		}
 	}
 	return false
-}
-
-func wordsOf(vals []string) []shell.Word {
-	out := make([]shell.Word, len(vals))
-	for i, v := range vals {
-		out[i] = shell.Word{Val: v}
-	}
-	return out
 }
 
 func shellPath(dir, p, home string) string {

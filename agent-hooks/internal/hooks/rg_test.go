@@ -9,7 +9,7 @@ const rgNote = "[agent-hooks: rg-replace-flag] In rg, -r means --replace: it rew
 
 func advice(t *testing.T, o Options, payload any) string {
 	t.Helper()
-	o.Phase, o.Enabled = "post", switches("rg-replace-flag")
+	o.Phase, o.Only = "post", only("rg-replace-flag")
 	r := runOpts(t, o, payload)
 	if r.Exit != 0 || r.Stderr != "" {
 		t.Fatalf("post must not block: %+v", r)
@@ -52,7 +52,7 @@ func TestRgAdviceIsNotPreAndAgyGetsEmptyObject(t *testing.T) {
 	if r := run(t, "rg-replace-flag", bash("rg -r x")); r.Exit != 0 || r.Stdout != "" {
 		t.Errorf("rg advice ran in pre: %+v", r)
 	}
-	r := runOpts(t, Options{Phase: "post", Enabled: switches("rg-replace-flag"), Agy: true}, agyPayload("run_command", map[string]any{"CommandLine": "rg -r x"}))
+	r := runOpts(t, Options{Phase: "post", Only: only("rg-replace-flag"), Agy: true}, agyPayload("run_command", map[string]any{"CommandLine": "rg -r x"}))
 	if r.Stdout != "{}" || r.Exit != 0 {
 		t.Errorf("agy post must answer {}: %+v", r)
 	}
