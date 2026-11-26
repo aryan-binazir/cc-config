@@ -68,3 +68,28 @@ func TestCommitFollowsWhatEachModeWouldRecord(t *testing.T) {
 		t.Errorf("first commit of a repository: %+v", res)
 	}
 }
+
+func TestAddFromASubdirectorySeesTrackedSecretsAboveIt(t *testing.T) {
+	r := newRepo(t)
+	r.write(".env", "SECRET=1")
+	r.write("sub/a.txt", "a")
+	r.git("add", "-f", ".env", "sub/a.txt")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Track them")
+	sub := filepath.Join(r.dir, "sub")
+	whole := []string{"git add --pathspec-from-file=list.txt", "git add -A", "git add -u", "git add :/", "git add .."}
+	expect := func(wantBlock bool) {
+		t.Helper()
+		for _, command := range whole {
+			if res := run(t, "no-secrets-commit", bashIn(sub, command)); (res.Exit == 2) != wantBlock {
+				t.Errorf("%q from sub/: want block=%v, got %+v", command, wantBlock, res)
+			}
+		}
+	}
+	expect(false)
+	r.write(".env", "SECRET=2")
+	expect(true) // each stages the change to ../.env
+	if err := os.Remove(filepath.Join(r.dir, ".env")); err != nil {
+		t.Fatal(err)
+	}
+	expect(false) // staging its deletion is fine
+}

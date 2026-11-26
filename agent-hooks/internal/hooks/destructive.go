@@ -92,8 +92,9 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if !hasAll(specs) {
 			return ""
 		}
-		fromCommit := g.sub == "checkout" && len(o.pos) > 0 && (o.dashed || !hasAll(o.pos[:1]))
-		if c.dirty(g, specs, !fromCommit) {
+		// From a commit, checkout rewrites the index too, and so does restore --staged --worktree.
+		rewritesIndex := o.has("-S") || (g.sub == "checkout" && len(o.pos) > 0 && (o.dashed || !hasAll(o.pos[:1])))
+		if c.dirty(g, specs, !rewritesIndex) {
 			return fmt.Sprintf("git %s would discard uncommitted changes. %s", g.sub, discardAdvice)
 		}
 	case "worktree":
@@ -122,7 +123,11 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 	return ""
 }}
 
-var switchAliases = map[string]string{"--force": "-f", "--discard-changes": "-f", "--create": "-c", "--force-create": "-C", pathspecList: pathspecList}
+var switchAliases = map[string]string{
+	"--force": "-f", "--discard-changes": "-f", "--create": "-c", "--force-create": "-C",
+	// Listed so that their abbreviations are read too.
+	pathspecList: pathspecList, "--guess": "--guess", "--no-guess": "--no-guess",
+}
 
 // forcedSwitch looks at checkout -f and switch -f. moves says the command
 // moves HEAD, where git throws local changes away instead of refusing; a
@@ -310,15 +315,16 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 	localSet := map[string]bool{}
 	var collapsed []string
 	for _, p := range local {
-		if strings.HasSuffix(p, "/") {
-			collapsed = append(collapsed, p)
-			continue
-		}
-		localSet[p] = true
-		for q := p; q != "." && q != ""; q = path.Dir(q) {
+		// The target has a file here, or where one of the directories above is.
+		for q := strings.TrimSuffix(p, "/"); q != "." && q != ""; q = path.Dir(q) {
 			if tracked[q] {
 				return true
 			}
+		}
+		if strings.HasSuffix(p, "/") {
+			collapsed = append(collapsed, p)
+		} else {
+			localSet[p] = true
 		}
 	}
 	root := ""

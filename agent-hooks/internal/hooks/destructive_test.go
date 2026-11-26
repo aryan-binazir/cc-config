@@ -59,9 +59,42 @@ func TestForcedCheckoutKeepsUntrackedFilesTheTargetTracks(t *testing.T) {
 	r.git("fetch", "-q", "fork")
 	r.expect("destructive-git", false, "git checkout -f remote-only", "git switch -f remote-only") // two remotes have it: git refuses to guess
 	r.expect("destructive-git", true, "git -c checkout.defaultRemote=origin checkout -f remote-only")
-	r.expect("destructive-git", false, "git -c checkout.defaultRemote=origin checkout -f --no-guess remote-only") // no remote is tried`
+	r.expect("destructive-git", true, "git -c checkout.defaultRemote=origin checkout -f --no-guess --guess remote-only")
+	r.expect("destructive-git", false, // no remote is tried
+		"git -c checkout.defaultRemote=origin checkout -f --no-guess remote-only", "git -c checkout.defaultRemote=origin checkout -f --no-gue remote-only")
 	r.git("config", "checkout.defaultRemote", "origin")
 	r.expect("destructive-git", true, "git checkout -f remote-only", "git switch -f remote-only")
+}
+
+func TestForcedSwitchKeepsADirectoryTheTargetReplacesWithAFile(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "other")
+	r.write("cache", "a file on other")
+	r.git("add", "-f", "cache")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Track a file named cache")
+	r.git("switch", "-q", "main")
+	forced := []string{"git switch --discard-changes other", "git checkout -f other", "git reset --hard other"}
+	r.expect("destructive-git", false, forced...)
+	r.write(".git/info/exclude", "cache/\n")
+	r.write("cache/work.txt", "ignored, and only here")
+	r.expect("destructive-git", true, forced...) // git removes the directory to put the file there
+}
+
+func TestRestoringIndexAndWorktreeKeepsStagedWork(t *testing.T) {
+	r := newRepo(t)
+	both := []string{
+		"git restore --staged --worktree .", "git restore -SW .", "git restore -S -W :/", "git restore --source=HEAD --staged --worktree .",
+		"git restore -S -W --pathspec-from-file=- <<<README.md",
+	}
+	r.expect("destructive-git", false, both...)
+	r.write("README.md", "edited\n")
+	r.git("add", "README.md")
+	r.expect("destructive-git", true, both...) // the edit is in the index and the working copy, and both are rewritten
+	r.expect("destructive-git", false,
+		"git restore --staged .",                                                   // the working copy keeps the edit
+		"git restore .", "git restore --worktree .", "git restore --source=HEAD .", // the index keeps the edit
+		"git restore -SW notes.txt",
+	)
 }
 
 func TestForcedWorktreeRemovalKeepsUncommittedWork(t *testing.T) {

@@ -25,6 +25,26 @@ var wrappers = map[string]wrapper{
 	"unbuffer": {},
 }
 
+// long is the option that name abbreviates: getopt accepts any prefix of a
+// long option that fits no other.
+func (w wrapper) long(name string) string {
+	match := ""
+	for _, option := range w.longValues {
+		switch {
+		case option == name:
+			return name
+		case strings.HasPrefix(option, name) && match != "":
+			return name
+		case strings.HasPrefix(option, name):
+			match = option
+		}
+	}
+	if match == "" {
+		return name
+	}
+	return match
+}
+
 // unwrap returns the command a wrapper runs, with the environment and
 // directory the wrapper gives it. opaque says the wrapper runs a command the
 // parser cannot read: env -S with a string the shell expands.
@@ -64,7 +84,8 @@ options:
 		}
 		if strings.HasPrefix(a, "--") {
 			opt, value, hasValue := strings.Cut(a, "=")
-			if !hasValue && contains(spec.longValues, a) && i+1 < len(args) {
+			opt = spec.long(opt)
+			if !hasValue && contains(spec.longValues, opt) && i+1 < len(args) {
 				i++
 				value = args[i].Val
 			}

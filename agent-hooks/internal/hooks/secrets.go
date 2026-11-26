@@ -149,12 +149,9 @@ func (c *ctx) wouldAdd(g *gitCmd, o opts, specs []shell.Word) []string {
 		}
 	}
 	if len(tracked) > 0 {
-		out, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--relative", "--"}, tracked...)...)
-		for _, p := range strings.Split(out, "\x00") {
-			if p != "" && exists(shellPath(g.dir, p, c.opts.Home)) {
-				found = append(found, p)
-			}
-		}
+		// Changed and still there: staging a secret's deletion is fine.
+		out, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--diff-filter=d", "--no-relative", "--"}, tracked...)...)
+		keep(out)
 	}
 	return found
 }
