@@ -3,6 +3,7 @@ package hooks
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -65,7 +66,12 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 			found = append(found, c.secretChanges(g, withPaths([]string{"--untracked-files=no"}, specs))...)
 		}
 		if commitsTheIndex(o, specs) {
-			found = append(found, c.stagedSecrets(g)...)
+			staged := c.stagedSecrets(g)
+			if len(staged) > 0 && len(specs) > 0 && o.has("-i") { // --include first stages the deletion of a named file that is gone
+				gone, _ := c.git(g, append([]string{"diff-files", "--name-only", "-z", "--diff-filter=D", "--no-relative", "--"}, values(specs)...)...)
+				staged = slices.DeleteFunc(staged, func(p string) bool { return slices.Contains(strings.Split(gone, "\x00"), p) })
+			}
+			found = append(found, staged...)
 		}
 	default:
 		return ""
@@ -177,10 +183,13 @@ func (c *ctx) pathspecFile(g *gitCmd, file shell.Word, nul bool) []string {
 	}
 	var out []string
 	for _, line := range strings.Split(string(data), sep) {
-		line = strings.TrimRight(line, "\r")
-		if !nul && strings.HasPrefix(line, `"`) { // git reads a quoted line as a C-style string
-			if plain, err := strconv.Unquote(line); err == nil {
-				line = plain
+		if !nul {
+			line = strings.TrimSuffix(line, "\r")
+			// git reads a line that opens with a quote as a C-style string, up to its closing quote.
+			if quoted, err := strconv.QuotedPrefix(line); err == nil && quoted[0] == '"' {
+				if plain, err := strconv.Unquote(quoted); err == nil {
+					line = plain
+				}
 			}
 		}
 		if line != "" {

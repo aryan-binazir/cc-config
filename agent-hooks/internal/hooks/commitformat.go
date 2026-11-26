@@ -16,6 +16,8 @@ var commitType = regexp.MustCompile(`^(feat|fix|chore|refactor|test|docs|build|c
 var commitAliases = map[string]string{
 	"--message": "-m", "--file": "-F", "--reuse-message": "-C", "--reedit-message": "-c", "--template": "-t", "--all": "-a",
 	"--include": "-i", "--only": "-o", "--patch": "-p", "--null": "-z",
+	// Previews, listed so that their abbreviations are read too.
+	"--dry-run": "--dry-run", "--short": "--short", "--porcelain": "--porcelain", "--long": "--long", "--help": "--help",
 }
 var commitLongValues = []string{"-m", "-F", "-C", "-c", "-t", "--fixup", "--squash", "--author", "--date", "--trailer", "--cleanup", "--pathspec-from-file"}
 

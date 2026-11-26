@@ -26,6 +26,7 @@ func TestForcedCheckoutAndSwitchKeepUncommittedWork(t *testing.T) {
 	r.expect("destructive-git", false,
 		"git checkout other", "git switch other", // without force git refuses on its own
 		"git checkout -f -- notes.txt", "git checkout -f notes.txt", "git checkout -f HEAD notes.txt", "git checkout -f other -- notes.txt", // path mode touches only that path
+		"git checkout -f --pathspec-from-file=paths.txt", "git checkout -f --pathspec-from-file paths.txt",
 		"git switch --force-create fresh", // resets the branch, keeps the changes
 		"AGENT_HOOKS_ALLOW=destructive git checkout -f",
 	)
@@ -49,6 +50,12 @@ func TestForcedCheckoutKeepsUntrackedFilesTheTargetTracks(t *testing.T) {
 		"git checkout -f remote-only", "git switch -f remote-only", // git creates it from origin/remote-only
 	)
 	r.expect("destructive-git", false, "git checkout -f", "git checkout -f main")
+
+	r.git("remote", "add", "fork", filepath.Join(r.root, "remote.git"))
+	r.git("fetch", "-q", "fork")
+	r.expect("destructive-git", false, "git checkout -f remote-only", "git switch -f remote-only") // two remotes have it: git refuses to guess
+	r.git("config", "checkout.defaultRemote", "origin")
+	r.expect("destructive-git", true, "git checkout -f remote-only", "git switch -f remote-only")
 }
 
 func TestForcedWorktreeRemovalKeepsUncommittedWork(t *testing.T) {
@@ -88,6 +95,38 @@ func TestForcedWorktreeRemovalKeepsUncommittedWork(t *testing.T) {
 	r.expect("destructive-git", true, forced...)
 }
 
+func TestForcedWorktreeRemovalKeepsSubmoduleRepositories(t *testing.T) {
+	r := newRepo(t)
+	lib := filepath.Join(r.root, "lib")
+	gitIn(t, r.root, "init", "-q", "-b", "main", lib)
+	gitIn(t, lib, "commit", "-q", "--allow-empty", "-m", "chore(no-ticket): Init")
+
+	// Status is clean in both worktrees, yet git removes neither without
+	// --force: the submodule's own repository, stashes included, would go too.
+	registered := filepath.Join(r.root, "registered")
+	r.git("worktree", "add", "-q", registered, "-b", "registered")
+	r.expect("destructive-git", false, "git worktree remove --force "+registered)
+	gitIn(t, registered, "-c", "protocol.file.allow=always", "submodule", "add", "-q", lib, "lib")
+	gitIn(t, registered, "commit", "-q", "-m", "chore(no-ticket): Add lib")
+
+	embedded := filepath.Join(r.root, "embedded")
+	r.git("worktree", "add", "-q", embedded, "-b", "embedded")
+	gitIn(t, embedded, "clone", "-q", lib, "vendored")
+	gitIn(t, embedded, "-c", "advice.addEmbeddedRepo=false", "add", "vendored")
+	gitIn(t, embedded, "commit", "-q", "-m", "chore(no-ticket): Vendor lib")
+
+	for _, wt := range []string{registered, embedded} {
+		if status := gitIn(t, wt, "status", "--porcelain"); status != "" {
+			t.Fatalf("the fixture should be clean: %q", status)
+		}
+		r.expect("destructive-git", true, "git worktree remove --force "+wt, "git worktree remove -f -- "+wt)
+		r.expect("destructive-git", false, "git worktree remove "+wt, "AGENT_HOOKS_ALLOW=destructive git worktree remove --force "+wt)
+	}
+	if res := r.run("destructive-git", "git worktree remove --force "+registered); !strings.Contains(res.Stderr, "submodule") || !strings.Contains(res.Stderr, "AGENT_HOOKS_ALLOW=destructive") {
+		t.Errorf("the message should say what would be lost and name the override: %q", res.Stderr)
+	}
+}
+
 func TestTwiceForcedRemovalKeepsALockedWorktree(t *testing.T) {
 	r := newRepo(t)
 	wt := filepath.Join(r.root, "wt")
@@ -122,4 +161,10 @@ func TestRecursiveRmOfARootBlocksWithoutForceAndThroughABareGlob(t *testing.T) {
 	if res := r.run("destructive-git", "rm -r *"); !strings.Contains(res.Stderr, "rm -r *") {
 		t.Errorf("the message should quote the command: %q", res.Stderr)
 	}
+	link := filepath.Join(r.root, "link")
+	if err := os.Symlink(r.dir, link); err != nil {
+		t.Fatal(err)
+	}
+	r.expect("destructive-git", false, "rm -r "+link, "rm -rf "+link, "rm -rf ../link") // rm removes the link, not the repository behind it
+	r.expect("destructive-git", true, "rm -rf "+link+"/*")                              // the glob reaches through it
 }

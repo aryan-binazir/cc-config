@@ -21,7 +21,7 @@ delete its line there and run `make install`.
 | `no-production` | Pushing to, merging into, force-updating, resetting, or deleting a `production` branch, including `gh pr merge` into production | `production` |
 | `commit-format` | `git commit` messages, and `--title` on `gh pr create` / `gh pr edit`, that don't match `type(PROJECT): description`, or whose type differs from the branch's first commit | `commit-format` |
 | `no-secrets-commit` | `git add` / `git commit -a` staging, or `git commit` recording from the index, `.env*`, keys, certificates, `credentials*.json`, or `settings.local.json` | `secrets` |
-| `destructive-git` | `git push --force`; `rm -r` of `/`, `~`, or a repository root, including a bare `*` there; `git clean`, `reset --hard`, `checkout -- .`, `checkout -f`, `switch --discard-changes`, or `worktree remove --force` that would discard uncommitted work; a twice-forced `worktree remove` of a locked worktree; `git stash clear` while stashes exist | `destructive` |
+| `destructive-git` | `git push --force`; `rm -r` of `/`, `~`, or a repository root, including a bare `*` there; `git clean`, `reset --hard`, `checkout -- .`, `checkout -f`, `switch --discard-changes`, or `worktree remove --force` that would discard uncommitted work or a submodule's repository; a twice-forced `worktree remove` of a locked worktree; `git stash clear` while stashes exist | `destructive` |
 | `rg-replace-flag` | Nothing. After `rg -r`, it adds a note that `-r` means `--replace` (Claude Code and Codex only) | n/a |
 
 To let one command through, put the override at its front:
@@ -57,7 +57,8 @@ git and gh commands, the repository as it is at that moment.
   and `bash build.sh && rg agy` pass, while `a=agy; $a -p hi` and
   `echo 'agy -p hi' | bash` are blocked. Inside a `bash -c` string or a
   here-document fed to a shell the same rule applies to that text, together
-  with what comes before the shell and the shell's other arguments.
+  with the text that can reach the shell itself and the shell's other
+  arguments.
 
 Not covered: commands started by an interpreter (`python -c`, `node -e`), by a
 wrapper the parser does not unwrap (`uv run`, `npx`, `find -exec`, `xargs -I{}`),

@@ -42,7 +42,7 @@ type Invocation struct {
 	// script file, a pipe or terminal, or a string built by an expansion.
 	Opaque bool
 
-	start int // where the command begins in its source
+	start, stop int // the command's own text within its source
 }
 
 // Source is one piece of shell text Parse walked: the command it was given,
@@ -50,15 +50,15 @@ type Invocation struct {
 type Source struct {
 	Text string
 	// Outer is what else can feed the commands of a nested shell's string:
-	// the text ahead of that shell, then its other arguments, environment,
+	// the text around that shell, then its other arguments, environment,
 	// and input.
 	Outer []Reach
 }
 
-// Reach is the part of a source before End.
+// Reach is the part of a source from Start up to End.
 type Reach struct {
 	*Source
-	End int
+	Start, End int
 }
 
 // Name is the basename of the command word.
@@ -124,18 +124,16 @@ func (w *walker) script(f frame, cwd string) {
 	}
 }
 
-// stmtEnd is the offset just past s, including the here-documents of a
-// pipeline, which sit after the line that names them.
+// stmtEnd is the offset just past s, including the here-documents named
+// anywhere inside it, whose bodies sit after the line that names them.
 func stmtEnd(s *syntax.Stmt) int {
 	end := int(s.End().Offset())
-	for _, r := range s.Redirs {
-		if r.Hdoc != nil {
+	syntax.Walk(s, func(n syntax.Node) bool {
+		if r, ok := n.(*syntax.Redirect); ok && r.Hdoc != nil {
 			end = max(end, int(r.Hdoc.End().Offset()))
 		}
-	}
-	if b, ok := s.Cmd.(*syntax.BinaryCmd); ok {
-		end = max(end, stmtEnd(b.X), stmtEnd(b.Y))
-	}
+		return true
+	})
 	return end
 }
 
@@ -279,7 +277,7 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	case *syntax.FuncDecl:
 		f.subshell().stmt(w, c.Body, cwd)
 	case *syntax.TimeClause:
-		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s), Fed: Reach{f.src, f.end}})
+		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s), Fed: Reach{f.src, 0, f.end}})
 		return f.stmt(w, c.Stmt, cwd)
 	case *syntax.CoprocClause:
 		f.subshell().stmt(w, c.Stmt, cwd)
@@ -341,7 +339,7 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 			}
 		}
 	}
-	inv := Invocation{Assigns: env, Source: f.text(s), Fed: Reach{f.src, f.end}, start: int(s.Pos().Offset())}
+	inv := Invocation{Assigns: env, Source: f.text(s), Fed: Reach{f.src, 0, f.end}, start: int(s.Pos().Offset()), stop: stmtEnd(s)}
 	for _, arg := range c.Args {
 		inv.Args = append(inv.Args, f.word(arg))
 	}
@@ -502,9 +500,10 @@ func (f frame) emit(w *walker, inv Invocation) {
 }
 
 // nested walks src, a string parent runs as shell. Besides src itself, its
-// commands can be fed by the text ahead of parent, by params (the positional
-// parameters), by parent's environment, and by input (parent's standard input
-// when that is not src).
+// commands can be fed by what feeds parent (the text around it, as far as
+// parent's own reach goes), by params (the positional parameters), by
+// parent's environment, and by input (parent's standard input when that is
+// not src).
 func (f frame) nested(w *walker, src string, parent Invocation, params []Word, input *string) {
 	var around []string
 	for _, p := range params {
@@ -517,7 +516,8 @@ func (f frame) nested(w *walker, src string, parent Invocation, params []Word, i
 		around = append(around, *input)
 	}
 	passed := &Source{Text: strings.Join(around, "\n")}
-	outer := append(slices.Clone(f.src.Outer), Reach{f.src, parent.start}, Reach{passed, len(passed.Text)})
+	outer := append(slices.Clone(f.src.Outer),
+		Reach{f.src, 0, parent.start}, Reach{f.src, parent.stop, parent.Fed.End}, Reach{passed, 0, len(passed.Text)})
 	inner := &walker{home: w.home, out: w.out}
 	inner.script(frame{src: &Source{Text: src, Outer: outer}, env: &exported{parent.Assigns}, depth: f.depth + 1, home: w.home}, parent.Cwd)
 	w.out = inner.out

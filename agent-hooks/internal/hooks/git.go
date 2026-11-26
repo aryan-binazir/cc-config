@@ -23,7 +23,7 @@ type gitCmd struct {
 // they stand for. Shell aliases (alias.x = !cmd) are not followed.
 func (c *ctx) parseGit(inv shell.Invocation) *gitCmd {
 	g := parseGit(inv, c.opts.Home)
-	for hops := 0; g != nil && !gitBuiltins[g.sub] && !inv.Args[g.at].Dynamic && hops < 4; hops++ {
+	for hops := 0; g != nil && !gitInstalls[g.sub] && !inv.Args[g.at].Dynamic && hops < 4; hops++ {
 		words := c.alias(g)
 		if len(words) == 0 {
 			break
@@ -47,7 +47,7 @@ func (c *ctx) alias(g *gitCmd) []shell.Word {
 		}
 		value, _ = c.git(&where, append(scope, "--get", "alias."+g.sub)...)
 	}
-	value = strings.TrimSpace(value)
+	value = strings.TrimSuffix(value, "\n") // git config prints one after the value
 	if strings.HasPrefix(value, "!") {
 		return nil
 	}
@@ -283,11 +283,11 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// gitBuiltins lists the commands compiled into git 2.56
-// (git --list-cmds=builtins). An alias cannot shadow one, so these never need
-// an alias lookup.
-var gitBuiltins = func() map[string]bool {
-	builtins := map[string]bool{}
+// gitInstalls lists the commands every git 2.56 has: the ones compiled in
+// (git --list-cmds=builtins) and the shell scripts installed beside them. An
+// alias cannot shadow one, so these never need an alias lookup.
+var gitInstalls = func() map[string]bool {
+	installs := map[string]bool{}
 	for _, name := range strings.Fields(`
 add am annotate apply archive backfill bisect blame branch bugreport bundle cat-file check-attr check-ignore
 check-mailmap checkout checkout-index checkout--worker check-ref-format cherry cherry-pick clean clone column
@@ -304,8 +304,9 @@ send-pack shortlog show show-branch show-index show-ref sparse-checkout stage st
 submodule--helper switch symbolic-ref tag unpack-file unpack-objects update-index update-ref
 update-server-info upload-archive upload-archive--writer upload-pack url-parse var verify-commit verify-pack
 verify-tag version whatchanged worktree write-tree
+filter-branch mergetool quiltimport request-pull submodule
 `) {
-		builtins[name] = true
+		installs[name] = true
 	}
-	return builtins
+	return installs
 }()

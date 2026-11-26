@@ -80,6 +80,12 @@ func TestBlockAgyBlocksEveryAgentLaunch(t *testing.T) {
 		bash("a=agy; bash -c '$a -p hi'"),
 		bash("echo 'agy -p hi' | bash -c 'bash'"),
 		bash("bash -c 'bash' <<'EOF'\nagy -p hi\nEOF"),
+		bash(`env -S 'agy\_--help'`),
+		bash(`env -S '-i\_agy\_--help'`),
+		bash(`env -S '\c' agy`), // \c ends the string; what follows it on the command line still runs
+		bash(`X=agy env -S '${X} --help'`),
+		bash(`run() { bash -c '"$0" --help' "$1"; }; run agy`),
+		bash(`while read -r c; do bash -c '"$0" --help' "$c"; done <<< agy`),
 		map[string]any{"tool_name": "Bash", "tool_input": map[string]any{"command": []string{"bash", "-lc", "x=agy; $x -p hi"}}},
 	}
 	for _, p := range payloads {
@@ -128,6 +134,9 @@ func TestBlockAgyAllowsCommandsThatOnlyMentionIt(t *testing.T) {
 		bash("bash -c 'bash build.sh; rg agy notes.txt'"),
 		bash("bash <<'EOF'\nsource env.sh\nrg agy notes.txt\nEOF"),
 		bash("rg agy notes.txt; bash --version"),
+		bash(`env -S 'FOO=x\_echo agy'`),
+		bash(`env -S 'echo hi' agy`),
+		bash("check() { bash -c 'bash build.sh; rg agy notes.txt'; }; check"),
 		map[string]any{"tool_name": "Bash", "tool_input": map[string]any{"command": []string{"bash", "-lc", "source .venv/bin/activate && rg agy README.md"}}},
 		map[string]any{"tool_name": "Bash", "tool_input": map[string]any{"command": []string{"bash", "-lc", `"$PAGER" --version; rg agy notes.txt`}}},
 	}

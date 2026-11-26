@@ -67,6 +67,9 @@ func TestHereDocumentsThatShareALineWithAnotherCommandAreRead(t *testing.T) {
 		"cat <<'EOF'; echo after\ngit is only mentioned here\nEOF\n((",
 		"cat <<'A'; cat <<'B'\nrm -rf / is text\nA\ngh is text\nB\necho done\n((",
 		"bash <<'EOF'; ((\necho hi\nEOF",
+		"{ cat <<'EOF'; }; echo done\nrm is just text\nEOF\n((",
+		"if true; then cat <<'EOF'; fi; echo done\ngit is just text\nEOF\n((",
+		"(cat <<'EOF'); echo \"$(cat <<'INNER'\ngh is just text\nINNER\n)\"\nrm is just text\nEOF\n((",
 	} {
 		if res := runOpts(t, Options{Phase: "pre"}, bash(command)); res.Exit != 0 {
 			t.Errorf("%q: a here-document that was read is not unread text, got %+v", command, res)

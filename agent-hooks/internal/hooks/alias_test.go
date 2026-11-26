@@ -54,7 +54,7 @@ func TestOrdinaryGitCommandsStartNoSubprocess(t *testing.T) {
 	r := newRepo(t)
 	marker := filepath.Join(t.TempDir(), "ran")
 	fakeGit(t, "touch "+marker)
-	res := runOpts(t, Options{Phase: "pre"}, bashIn(r.dir, "git status && git log -3 --oneline && git diff --stat && git show HEAD && git fetch origin && git rev-parse HEAD"))
+	res := runOpts(t, Options{Phase: "pre"}, bashIn(r.dir, "git status && git log -3 --oneline && git diff --stat && git show HEAD && git fetch origin && git rev-parse HEAD && git submodule status"))
 	if _, err := os.Stat(marker); err == nil || res.Exit != 0 {
 		t.Errorf("read-only git commands must be decided from the payload alone: %+v", res)
 	}
@@ -72,6 +72,14 @@ func TestAliasWordsAreSplitTheWayGitSplitsThem(t *testing.T) {
 	r.git("config", "alias.cost", `commit -m "wip $5"`) // git passes $5 through; it is not a shell expansion
 	r.git("config", "alias.good", `commit -m "feat(no-ticket): Cost $5 #1; it's done"`)
 	r.git("config", "alias.open", `commit -m "unclosed`) // git rejects this alias
-	r.expect("commit-format", true, "git cost")
+	r.git("config", "alias.padded", `commit -m wip\ `)   // an escaped space ends the message
+	r.expect("commit-format", true, "git cost", "git padded")
 	r.expect("commit-format", false, "git good", "git open")
+}
+
+func TestAnAliasNamedAfterACommandGitInstallsIsNeverUsed(t *testing.T) {
+	r := newRepo(t)
+	r.git("config", "alias.submodule", "push --force")
+	r.git("config", "alias.status", "push --force")
+	r.expect("destructive-git", false, "git submodule status", "git status")
 }

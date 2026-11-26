@@ -107,9 +107,13 @@ options:
 }
 
 // resplit is env's argument list after -S: env splits the string into words,
-// options included, and carries on with what follows.
+// options included, and carries on with what follows. A word with ${NAME} in
+// it is filled in from the environment.
 func resplit(value string, rest []Word) []Word {
-	words, _ := Split(value)
+	words, _ := split(value, true)
+	for i := range words {
+		words[i].Dynamic = strings.Contains(words[i].Val, "$")
+	}
 	return append(words, rest...)
 }
 

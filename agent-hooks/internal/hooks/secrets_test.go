@@ -13,7 +13,8 @@ func TestCommitFlagsSecretsAlreadyInTheIndex(t *testing.T) {
 	r.write("notes.txt", "n")
 	r.write("only-notes.txt", "notes.txt\n")
 	r.write("with-env.txt", ".env\n")
-	r.write("quoted-env.txt", "\"\\056env\"\n") // git decodes a quoted line: this names .env
+	r.write("quoted-env.txt", "\"\\056env\"\n")               // git decodes a quoted line: this names .env
+	r.write("quoted-env-then-text.txt", "\".env\" ignored\n") // git stops reading at the closing quote
 	r.write("empty.txt", "")
 	r.write("docs/a.txt", "a")
 	r.git("add", "-f", ".env", "notes.txt")
@@ -22,6 +23,7 @@ func TestCommitFlagsSecretsAlreadyInTheIndex(t *testing.T) {
 		"git commit -i notes.txt -m x", "git commit --include notes.txt -m x", "git commit --pathspec-from-file=with-env.txt -m x",
 		"git commit --include docs/ -m x", "git commit --patch docs/", "git commit --interactive", // each keeps what is already staged
 		"git commit --pathspec-from-file=empty.txt -m x", "git commit --pathspec-from-file=quoted-env.txt -m x",
+		"git commit --pathspec-from-file=quoted-env-then-text.txt -m x",
 	)
 	if res := r.run("no-secrets-commit", "git commit -m x"); !strings.Contains(res.Stderr, ".env") || !strings.Contains(res.Stderr, "AGENT_HOOKS_ALLOW=secrets") {
 		t.Errorf("the message should name the file and the override: %q", res.Stderr)
@@ -30,6 +32,7 @@ func TestCommitFlagsSecretsAlreadyInTheIndex(t *testing.T) {
 		"git commit notes.txt -m x", "git commit -o notes.txt -m x", "git commit --pathspec-from-file=only-notes.txt -m x", // git commits only those paths
 		"git commit --only --amend --no-edit", "git commit --fixup=reword:HEAD", // neither reads the index
 		"git commit --dry-run", "git commit --short", "git commit --porcelain", "git commit --long", "git commit -z", "git commit --null", "git commit -h",
+		"git commit --porc", "git commit --dry",
 		"AGENT_HOOKS_ALLOW=secrets git commit -m x", "git status", "git diff --cached",
 	)
 	r.git("config", "diff.relative", "true")
@@ -46,8 +49,8 @@ func TestCommitFollowsWhatEachModeWouldRecord(t *testing.T) {
 	if err := os.Remove(filepath.Join(r.dir, ".env")); err != nil {
 		t.Fatal(err)
 	}
-	r.expect("no-secrets-commit", true, "git commit -m x")   // the staged copy is still committed
-	r.expect("no-secrets-commit", false, "git commit -am x") // -a stages the deletion instead
+	r.expect("no-secrets-commit", true, "git commit -m x", "git commit --include README.md -m x")        // the staged copy is still committed
+	r.expect("no-secrets-commit", false, "git commit -am x", "git commit --include README.md .env -m x") // each stages the deletion instead
 	r.git("rm", "-q", "--cached", ".env")
 	r.write("key.pem", "k")
 	r.git("add", "-N", "key.pem")

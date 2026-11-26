@@ -2,9 +2,11 @@ package hooks
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -103,9 +105,13 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		if locked && o.set["-f"] > 1 {
 			return fmt.Sprintf("git worktree remove --force --force would remove %s, which someone locked. Unlock it with git worktree unlock if it is yours; if the user asked for this, rerun with AGENT_HOOKS_ALLOW=destructive.", dir)
 		}
-		// Without --force git refuses exactly when this status is not empty.
+		// Without --force git refuses exactly when this status is not empty,
+		// or the worktree has a submodule checked out.
 		if entries, ok := c.status(&gitCmd{dir: dir}); ok && len(entries) > 0 {
 			return fmt.Sprintf("git worktree remove --force would delete uncommitted work in %s (%s, ...). %s", dir, entries[0].path, discardAdvice)
+		}
+		if c.holdsSubmodules(dir) {
+			return fmt.Sprintf("git worktree remove --force would delete the submodule repositories in %s, with any commits and stashes only they hold. Git refuses this without --force; if the user asked for it, rerun with AGENT_HOOKS_ALLOW=destructive.", dir)
 		}
 	case "stash":
 		if len(g.args) > 0 && g.args[0].Val == "clear" && c.refExists(g, "refs/stash") {
@@ -127,7 +133,7 @@ func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
 		return false, false
 	}
 	pathsAllowed := g.sub == "checkout" && !o.has("-b", "-B", "--orphan")
-	if pathsAllowed && (len(o.paths) > 0 || len(o.pos) > 1) {
+	if pathsAllowed && (len(o.paths) > 0 || len(o.pos) > 1 || o.has("--pathspec-from-file")) {
 		return false, false
 	}
 	target := ""
@@ -139,17 +145,43 @@ func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
 	}
 	if target != "" && !c.refExists(g, target) {
 		// Not a commit: git creates the branch from the one remote that has
-		// it, and failing that checkout reads the word as a path.
-		refs, _ := c.git(g, "for-each-ref", "--format=%(refname)", "refs/remotes/*/"+target)
-		target = strings.TrimSpace(refs)
-		if target == "" || strings.Contains(target, "\n") {
-			if pathsAllowed && !o.dashed {
-				return false, false
-			}
+		// it, or from the remote checkout.defaultRemote names, and failing
+		// that checkout reads the word as a path.
+		out, _ := c.git(g, "for-each-ref", "--format=%(refname)", "refs/remotes/*/"+target)
+		refs := strings.Fields(out)
+		if len(refs) > 1 {
+			preferred, _ := c.git(g, "config", "--get", "checkout.defaultRemote")
+			refs = slices.DeleteFunc(refs, func(ref string) bool { return ref != "refs/remotes/"+strings.TrimSpace(preferred)+"/"+target })
+		}
+		switch {
+		case len(refs) == 1:
+			target = refs[0]
+		case pathsAllowed && !o.dashed:
+			return false, false
+		default:
 			target = ""
 		}
 	}
 	return true, c.dirty(g, nil, false) || (target != "" && c.overwritesUntracked(g, target))
+}
+
+// holdsSubmodules mirrors the other reason git refuses to remove a worktree
+// without --force: a submodule's repository sits in the worktree, or in the
+// worktree's git directory, and is deleted with it.
+func (c *ctx) holdsSubmodules(dir string) bool {
+	wt := &gitCmd{dir: dir}
+	gitDir, _ := c.git(wt, "rev-parse", "--absolute-git-dir")
+	if gitDir = strings.TrimSpace(gitDir); gitDir != "" && isDir(gitDir, "modules", "") {
+		return true
+	}
+	index, _ := c.git(wt, "ls-files", "--stage", "-z")
+	for _, entry := range strings.Split(index, "\x00") {
+		mode, name, _ := strings.Cut(entry, "\t")
+		if strings.HasPrefix(mode, "160000 ") && exists(filepath.Join(dir, name, ".git")) {
+			return true
+		}
+	}
+	return false
 }
 
 // worktree finds the worktree git would remove for arg, its path or a unique
@@ -364,6 +396,9 @@ func dangerousTarget(c *ctx, cwd string, target shell.Word) bool {
 		return false
 	}
 	full = path.Clean(full)
+	if info, err := os.Lstat(full); err == nil && info.Mode()&os.ModeSymlink != 0 && !strings.HasSuffix(target.Val, "/") && !strings.HasSuffix(target.Val, "*") {
+		return false // rm removes a link itself, not what it points to
+	}
 	bare := exists(path.Join(full, "HEAD")) && exists(path.Join(full, "objects")) && exists(path.Join(full, "refs"))
 	return full == "/" || (c.opts.Home != "" && full == path.Clean(c.opts.Home)) || exists(path.Join(full, ".git")) || bare
 }

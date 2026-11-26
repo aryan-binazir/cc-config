@@ -50,8 +50,9 @@ func isAgy(word string) bool {
 	return word == "agy" || word == "antigravity" || word == "acg"
 }
 
-// firstMention is the offset of the first word in text that names agy, or -1.
-func firstMention(text string) int {
+// mentions lists the offsets of the words in text that name agy.
+func mentions(text string) []int {
+	var at []int
 	start := -1
 	for i, r := range text {
 		separator := unicode.IsSpace(r) || strings.ContainsRune(separators, r)
@@ -60,26 +61,27 @@ func firstMention(text string) int {
 			start = i
 		case separator && start >= 0:
 			if isAgy(text[start:i]) {
-				return start
+				at = append(at, start)
 			}
 			start = -1
 		}
 	}
 	if start >= 0 && isAgy(text[start:]) {
-		return start
+		at = append(at, start)
 	}
-	return -1
+	return at
 }
 
 func checkAgy(c *ctx) string {
-	first := map[*shell.Source]int{}
+	found := map[*shell.Source][]int{}
 	names := func(r shell.Reach) bool {
-		at, scanned := first[r.Source]
+		at, scanned := found[r.Source]
 		if !scanned {
-			at = firstMention(r.Text)
-			first[r.Source] = at
+			at = mentions(r.Text)
+			found[r.Source] = at
 		}
-		return at >= 0 && at < r.End
+		next, _ := slices.BinarySearch(at, r.Start)
+		return next < len(at) && at[next] < r.End
 	}
 	earlier := false // a previous source of this call names agy
 	for _, p := range c.parsed {
@@ -88,7 +90,7 @@ func checkAgy(c *ctx) string {
 				return agyMessage
 			}
 		}
-		earlier = earlier || firstMention(p.text) >= 0
+		earlier = earlier || len(mentions(p.text)) > 0
 		if slices.ContainsFunc(p.unread, func(text string) bool { return unreadLaunchesAgy(text, earlier) }) {
 			return agyMessage
 		}
@@ -104,7 +106,7 @@ func launchesAgy(inv shell.Invocation, fed bool) bool {
 	case isAgy(inv.Args[0].Val):
 		return true
 	case runners[inv.Name()]:
-		return slices.ContainsFunc(args, func(w shell.Word) bool { return firstMention(w.Val) >= 0 || (fed && w.Dynamic) })
+		return slices.ContainsFunc(args, func(w shell.Word) bool { return len(mentions(w.Val)) > 0 || (fed && w.Dynamic) })
 	}
 	// "$HOME/bin/tool" names tool wherever HOME points; "$tool" names anything.
 	unknown := inv.Args[0].Dynamic && !plainName.MatchString(inv.Name())
