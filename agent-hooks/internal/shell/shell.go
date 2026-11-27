@@ -467,8 +467,8 @@ func (f frame) emit(w *walker, inv Invocation) {
 	}
 	name := inv.Name()
 	args := inv.Args[1:]
-	switch name {
-	case "bash", "sh", "zsh", "dash", "ksh", "fish":
+	switch {
+	case isShell(name):
 		command, fromStdin := false, false
 		i := 0
 		for ; i < len(args); i++ {
@@ -506,9 +506,9 @@ func (f frame) emit(w *walker, inv Invocation) {
 		} else {
 			w.out[at].Opaque = true
 		}
-	case "source", ".":
+	case name == "source" || name == ".":
 		w.out[at].Opaque = true
-	case "eval":
+	case name == "eval":
 		if len(args) > 0 && args[0].Val == "--" {
 			args = args[1:]
 		}

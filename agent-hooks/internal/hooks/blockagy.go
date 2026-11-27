@@ -25,13 +25,6 @@ var argumentRunners = map[string]bool{
 	"tmux": true, "screen": true, "ssh": true, "script": true, "systemd-run": true, "parallel": true, "watch": true,
 }
 
-var launchers = map[string]bool{
-	"bash": true, "sh": true, "zsh": true, "dash": true, "fish": true, "eval": true, "source": true, ".": true,
-	"env": true, "exec": true, "command": true, "nohup": true, "setsid": true, "timeout": true, "stdbuf": true,
-	"nice": true, "time": true, "sudo": true, "doas": true, "xargs": true, "parallel": true, "watch": true,
-	"unbuffer": true, "script": true, "systemd-run": true, "tmux": true, "screen": true, "ssh": true, "mise": true,
-}
-
 var (
 	assignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
 	plainName  = regexp.MustCompile(`^[A-Za-z0-9._+-]+$`)
@@ -115,8 +108,11 @@ func unreadLaunchesAgy(text string, agyNamed bool) bool {
 			continue
 		}
 		first := path.Base(strings.NewReplacer(`"`, "", "'", "").Replace(words[0]))
-		looksUp := first == "command" && len(words) > 1 && (words[1] == "-v" || words[1] == "-V")
-		if isAgy(words[0]) || (agyNamed && launchers[first] && !looksUp) {
+		firstArg := ""
+		if len(words) > 1 {
+			firstArg = words[1]
+		}
+		if isAgy(words[0]) || (agyNamed && (argumentRunners[first] || shell.MayRunCommand(first, firstArg))) {
 			return true
 		}
 	}

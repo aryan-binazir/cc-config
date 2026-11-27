@@ -45,6 +45,32 @@ func (w wrapper) long(name string) string {
 	return match
 }
 
+func isShell(name string) bool {
+	switch name {
+	case "bash", "sh", "zsh", "dash", "ksh", "fish":
+		return true
+	}
+	return false
+}
+
+// looksUp reports whether command only looks its operand up instead of
+// running it.
+func looksUp(name, firstArg string) bool {
+	return name == "command" && (firstArg == "-v" || firstArg == "-V")
+}
+
+// MayRunCommand reports whether a command named name, with firstArg as its
+// first argument ("" if none), can run another command: a shell, eval,
+// source, or a wrapper the parser unwraps.
+func MayRunCommand(name, firstArg string) bool {
+	switch {
+	case isShell(name), name == "eval", name == "source", name == ".", name == "mise":
+		return true
+	}
+	_, known := wrappers[name]
+	return known && !looksUp(name, firstArg)
+}
+
 func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir *Word, opaque, ok bool) {
 	if name == "mise" {
 		for i, a := range args {
@@ -58,7 +84,7 @@ func unwrap(name string, args []Word) (rest []Word, env map[string]string, chdir
 	if !known {
 		return nil, nil, nil, false, false
 	}
-	if name == "command" && len(args) > 0 && (args[0].Val == "-v" || args[0].Val == "-V") {
+	if len(args) > 0 && looksUp(name, args[0].Val) {
 		return nil, nil, nil, false, false
 	}
 	i := 0
