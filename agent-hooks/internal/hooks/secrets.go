@@ -27,11 +27,6 @@ func isSecret(p string) bool {
 	return false
 }
 
-var addAliases = map[string]string{
-	"--all": "-A", "--no-ignore-removal": "-A", "--update": "-u", "--force": "-f", "--dry-run": "-n",
-	"--patch": "-p", "--interactive": "-i", "--edit": "-e", pathspecList: pathspecList,
-}
-
 var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "secrets", check: func(c *ctx, inv shell.Invocation) string {
 	g := c.parseGit(inv)
 	if g == nil {
@@ -40,7 +35,7 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 	var found []string
 	switch g.sub {
 	case "add":
-		o := parseOpts(g.args, "", []string{"--chmod", pathspecList}, addAliases)
+		o := g.opts()
 		if o.has("-n", "-p", "-i", "-e") {
 			return ""
 		}
@@ -50,7 +45,7 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 			found = append(found, c.wouldAdd(g, o, specs)...)
 		}
 	case "commit":
-		o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
+		o := g.opts()
 		if o.has("--dry-run", "--short", "--porcelain", "--long", "-z", "-h", "--help") {
 			return ""
 		}

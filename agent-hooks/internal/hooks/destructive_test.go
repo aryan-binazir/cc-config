@@ -18,7 +18,7 @@ func TestForcedCheckoutAndSwitchKeepUncommittedWork(t *testing.T) {
 		"git checkout --pathspec-from-file=- <<<notes.txt", `git checkout --pathspec-from-file="$LIST"`,
 		"git checkout -f", "git checkout --force", "git checkout -f other", "git checkout -f -B fresh", `git checkout -f "$BRANCH"`,
 		"git switch -f other", "git switch --force other", "git switch --discard-changes other", "git switch -f -",
-		"git checkout -f other --", "git checkout -f -bfresh", "git checkout -f --orphan fresh", "git checkout -f -",
+		"git checkout -f other --", "git checkout -f -bfresh", "git checkout -f --orphan fresh", "git checkout -f --orph fresh", "git checkout -f -",
 		"git switch -f --force-create fresh", "git switch -f --orphan fresh",
 	}
 	r.expect("destructive-git", false, forced...)

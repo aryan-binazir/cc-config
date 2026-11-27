@@ -18,6 +18,8 @@ var noProduction = hook{name: "no-production", phase: "pre", override: "producti
 	return ""
 }}
 
+var repoSyncOptions = grammar("-b|--branch= -s|--source=")
+
 var productionRef = regexp.MustCompile(`(^|/)git/refs/heads/production/?$`)
 
 func isProduction(ref string) bool {
@@ -32,7 +34,7 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 		return api.method != "GET" && productionRef.MatchString(api.endpoint)
 	}
 	if words, rest := ghWords(inv); len(words) == 2 && words[0] == "repo" && words[1] == "sync" {
-		o := parseOpts(rest, "bs", []string{"-b", "-s"}, map[string]string{"--branch": "-b", "--source": "-s"})
+		o := parseOpts(rest, repoSyncOptions)
 		return namesProduction(o.vals["-b"])
 	}
 	g := c.parseGit(inv)
@@ -43,14 +45,14 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 	case "push":
 		return pushesProduction(c, g)
 	case "fetch":
-		o := parseOpts(g.args, "oj", []string{"--upload-pack", "--depth", "--deepen", "--shallow-since", "--shallow-exclude", "--refmap", "--recurse-submodules-default", "--server-option", "--negotiation-tip", "-o", "-j"}, nil)
+		o := g.opts()
 		for _, r := range append(o.pos[min(1, len(o.pos)):], o.paths...) {
 			if _, dst, ok := strings.Cut(strings.TrimPrefix(r.Val, "+"), ":"); ok && isProduction(dst) {
 				return true
 			}
 		}
 	case "branch":
-		o := parseOpts(g.args, "", []string{"--set-upstream-to"}, map[string]string{"--delete": "-d", "--force": "-f", "--move": "-m", "--copy": "-c"})
+		o := g.opts()
 		refs := append(append([]shell.Word{}, o.pos...), o.paths...)
 		switch {
 		case o.has("-d", "-D", "-f"):
@@ -61,14 +63,14 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 			return len(refs) > 0 && refs[len(refs)-1].Val == production
 		}
 	case "checkout", "switch":
-		o := parseOpts(g.args, "BCbc", []string{"-C"}, map[string]string{"--force-create": "-C"})
+		o := g.opts()
 		return namesProduction(o.vals["-B"]) || namesProduction(o.vals["-C"])
 	case "update-ref":
-		o := parseOpts(g.args, "m", nil, nil)
+		o := g.opts()
 		refs := append(append([]shell.Word{}, o.pos...), o.paths...)
 		return len(refs) > 0 && isProduction(refs[0].Val)
 	case "reset":
-		o := parseOpts(g.args, "", nil, resetModes)
+		o := g.opts()
 		moves := o.has("--hard", "--soft", "--keep", "--merge", "--mixed")
 		for _, p := range o.pos {
 			if full := cmp.Or(shell.Resolve(g.dir, p.Val, c.opts.Home), p.Val); !exists(full) {
@@ -77,7 +79,7 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 		}
 		return moves && c.currentBranch(g) == production
 	case "merge", "pull", "rebase":
-		o := parseOpts(g.args, "sXm", []string{"--strategy", "--strategy-option", "--onto"}, nil)
+		o := g.opts()
 		if o.has("--abort", "--continue", "--skip", "--quit") {
 			return false
 		}
@@ -128,7 +130,7 @@ func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghPr) bool {
 }
 
 func pushesProduction(c *ctx, g *gitCmd) bool {
-	o := parseOpts(g.args, "o", pushLongValues, pushLongNames)
+	o := g.opts()
 	if o.has("-n") {
 		return false
 	}

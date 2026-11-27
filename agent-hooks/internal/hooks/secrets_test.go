@@ -26,6 +26,7 @@ func TestCommitFlagsSecretsAlreadyInTheIndex(t *testing.T) {
 	r.expect("no-secrets-commit", false,
 		"git commit notes.txt -m x", "git commit -o notes.txt -m x", // git commits only those paths
 		"git commit --only --amend --no-edit", "git commit --fixup=reword:HEAD", // neither reads the index
+		"git commit --only --amen --no-edit", "git commit --fix=reword:HEAD",
 		"git commit --dry-run", "git commit --short", "git commit --porcelain", "git commit --long", "git commit -z", "git commit --null", "git commit -h",
 		"git commit --porc", "git commit --dry",
 		"AGENT_HOOKS_ALLOW=secrets git commit -m x", "git status", "git diff --cached",
