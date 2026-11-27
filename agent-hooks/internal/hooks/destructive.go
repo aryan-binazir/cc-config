@@ -12,15 +12,6 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
-var pushLongNames = map[string]string{
-	"--force": "-f", "--dry-run": "-n", "--delete": "-d", "--set-upstream": "-u", "--push-option": "-o",
-	"--mirror": "--mirror", "--all": "--all", "--branches": "--branches", "--prune": "--prune",
-	"--force-with-lease": "--force-with-lease", "--repo": "--repo", "--tags": "--tags",
-}
-
-var resetModes = map[string]string{"--hard": "--hard", "--soft": "--soft", "--mixed": "--mixed", "--keep": "--keep", "--merge": "--merge"}
-var pushLongValues = []string{"--repo", "--receive-pack", "--exec", "-o"}
-
 const discardAdvice = "Commit or stash them first; if the user asked to throw them away, rerun with AGENT_HOOKS_ALLOW=destructive."
 
 var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "destructive", check: func(c *ctx, inv shell.Invocation) string {
@@ -33,7 +24,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 	}
 	switch g.sub {
 	case "push":
-		o := parseOpts(g.args, "o", pushLongValues, pushLongNames)
+		o := g.opts()
 		if o.has("-n") {
 			return ""
 		}
@@ -50,7 +41,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 			}
 		}
 	case "clean":
-		o := parseOpts(g.args, "e", []string{"-e"}, map[string]string{"--force": "-f", "--dry-run": "-n", "--interactive": "-i", "--exclude": "-e"})
+		o := g.opts()
 		if o.has("-n", "-i") {
 			return ""
 		}
@@ -62,7 +53,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 			return "git clean would delete untracked files (" + strings.TrimPrefix(first, "Would remove ") + ", ...). " + discardAdvice
 		}
 	case "reset":
-		o := parseOpts(g.args, "", nil, resetModes)
+		o := g.opts()
 		if !o.has("--hard") {
 			return ""
 		}
@@ -80,7 +71,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 		}
 		fallthrough
 	case "restore":
-		o := parseOpts(g.args, "s", []string{"--source", pathspecList}, map[string]string{"--staged": "-S", "--worktree": "-W", pathspecList: pathspecList})
+		o := g.opts()
 		if g.sub == "restore" && o.has("-S") && !o.has("-W") {
 			return ""
 		}
@@ -98,7 +89,7 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 			return fmt.Sprintf("git %s would discard uncommitted changes. %s", g.sub, discardAdvice)
 		}
 	case "worktree":
-		o := parseOpts(g.args, "", nil, map[string]string{"--force": "-f"})
+		o := g.opts()
 		words := append(o.pos, o.paths...)
 		if len(words) < 2 || words[0].Val != "remove" || !o.has("-f") || words[1].Dynamic {
 			return ""
@@ -123,18 +114,13 @@ var destructiveGit = hook{name: "destructive-git", phase: "pre", override: "dest
 	return ""
 }}
 
-var switchAliases = map[string]string{
-	"--force": "-f", "--discard-changes": "-f", "--create": "-c", "--force-create": "-C",
-	pathspecList: pathspecList, "--guess": "--guess", "--no-guess": "--no-guess",
-}
-
 // forcedSwitch looks at checkout -f and switch -f. moves says the command
 // moves HEAD, where git throws local changes away instead of refusing; a
 // checkout that names paths only rewrites those. A pathspec list may be
 // empty, which moves HEAD. lost says the move would discard tracked changes,
 // or untracked files the target tracks.
 func (c *ctx) forcedSwitch(g *gitCmd) (moves, lost bool) {
-	o := parseOpts(g.args, "bBcC", []string{"-b", "-B", "-c", "-C", "--orphan", "--conflict", pathspecList}, switchAliases)
+	o := g.opts()
 	if !o.has("-f") {
 		return false, false
 	}
@@ -348,8 +334,10 @@ func (c *ctx) overwritesUntracked(g *gitCmd, target string) bool {
 
 var homeVar = regexp.MustCompile(`^\$(HOME|\{HOME\})/?(\*)?$`)
 
+var rmOptions = grammar("-r|-R|--recursive")
+
 func checkRm(c *ctx, inv shell.Invocation) string {
-	o := parseOpts(inv.Args[1:], "", nil, map[string]string{"--recursive": "-r", "-R": "-r"})
+	o := parseOpts(inv.Args[1:], rmOptions)
 	if !o.has("-r") || rmAsksFirst(inv.Args[1:]) {
 		return ""
 	}

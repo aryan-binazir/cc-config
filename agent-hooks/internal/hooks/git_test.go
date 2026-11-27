@@ -146,7 +146,8 @@ func TestCommitFormatKeepsTheBranchType(t *testing.T) {
 	r.write("a.txt", "a")
 	r.git("add", "a.txt")
 	r.git("commit", "-q", "-m", "feat(no-ticket): First")
-	r.expect("commit-format", false, `git commit -m "feat(BBA): more"`, `git commit --amend -m "fix(no-ticket): retype the only commit"`)
+	r.expect("commit-format", false, `git commit -m "feat(BBA): more"`, `git commit --amend -m "fix(no-ticket): retype the only commit"`,
+		`git commit --amen -m "fix(no-ticket): git reads --amen as --amend"`)
 	r.expect("commit-format", true, `git commit -m "fix(no-ticket): other type"`)
 	r.write("b.txt", "b")
 	r.git("add", "b.txt")
@@ -313,6 +314,8 @@ func TestNoProduction(t *testing.T) {
 		"git checkout production", "git log production", "git branch production-2", "git push", "git push origin HEAD",
 		"git merge origin/production", "git reset --hard origin/main", "gh pr merge 5 --match-head-commit abc",
 		"gh api repos/o/r/git/refs/heads/production", "echo git push origin production", "git diff main production",
+		"git checkout --force production", "git switch --force production", // --force is not --force-create
+		"git switch -B production", "git checkout -C production", // each is the other's spelling, and git rejects it
 	)
 	if res := r.run("no-production", "git push origin production"); res.Stderr != productionMessage {
 		t.Errorf("message: %q", res.Stderr)
@@ -384,6 +387,13 @@ func TestNoProductionCoversEveryPushDestination(t *testing.T) {
 		"git fetch origin production", "git fetch origin production:refs/remotes/origin/production", "gh repo sync --branch main",
 		"git branch -c production backup", "git branch -C production prod-copy",
 	)
+	// rebase's -m is --merge and takes no value, while -x runs a command: both
+	// still check out production and rebase it.
+	r.expect("no-production", true, "git rebase -m main production", "git rebase -x true main production", "git rebase --exec true main production",
+		"git rebase -C 3 main production", "git rebase --empty drop main production",
+		"git rebase -Sx main production", "git rebase -SC main production") // -S takes only an attached key
+	r.expect("no-production", true, "git push --branches origin")
+	r.expect("no-production", false, "git push --all --no-branches origin", "git push --branches --no-all origin") // one option, two names
 	r.git("config", "remote.origin.push", "refs/heads/main:refs/heads/production")
 	r.expect("no-production", true, "git push", "git push origin")
 }
@@ -392,7 +402,9 @@ func TestNoProductionOnTheProductionBranch(t *testing.T) {
 	r := newRepo(t)
 	r.git("switch", "-q", "-c", "production", "--track", "origin/production")
 	r.expect("no-production", true, "git branch -m renamed", "git branch -M renamed")
-	r.expect("no-production", false, "git merge --abort", "git rebase --abort", "git rebase --continue", "git merge --continue", "git pull --abort 2>/dev/null; true", "git branch -c backup")
+	r.expect("no-production", false, "git merge --abort", "git rebase --abort", "git rebase --continue", "git merge --continue", "git pull --abort 2>/dev/null; true", "git branch -c backup",
+		"git merge --abo", "git rebase --cont")
+	r.expect("no-production", true, "git merge --message --abo feature", "git merge -F --abo feature") // --abo is the message, or its file
 }
 
 func TestNoProductionPRLookupKeepsSelectorAndRepository(t *testing.T) {
@@ -433,6 +445,7 @@ func TestCommitFormatValidatesTheMessageGitUses(t *testing.T) {
 	r.expect("commit-format", false,
 		"git commit -F - 3<<'EOF'\nbad\nEOF", "git commit -F - <<EOF\nfeat(no-ticket): $X\nEOF",
 		"git commit -F - <<EOF\nfeat(no-ticket): ok\n\n$BODY\nEOF",
+		"git commit -Sm bad", // m is -S's key: no message is given
 	)
 }
 
@@ -441,7 +454,8 @@ func TestDestructiveCheckoutFromACommitAndClean(t *testing.T) {
 	r.write("README.md", "staged\n")
 	r.git("add", "README.md")
 	r.expect("destructive-git", true, "git checkout HEAD .", "git checkout HEAD -- .")
-	r.expect("destructive-git", false, "git restore --source=HEAD .") // writes only the worktree; the index keeps the staged change
+	r.expect("destructive-git", false, "git restore --source=HEAD .")        // writes only the worktree; the index keeps the staged change
+	r.expect("destructive-git", false, "git checkout --conflict merge -- .") // merge is the conflict style: this checks out from the index
 	r.git("commit", "-q", "-m", "chore(no-ticket): X")
 	r.write("nested/deep/file.txt", "x")
 	r.write("scratch.txt", "x")

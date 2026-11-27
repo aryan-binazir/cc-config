@@ -13,14 +13,6 @@ import (
 var commitSubject = regexp.MustCompile(`^(feat|fix|chore|refactor|test|docs|build|ci|revert)\((no-ticket|[A-Z][A-Z0-9]+)\): \S`)
 var commitType = regexp.MustCompile(`^(feat|fix|chore|refactor|test|docs|build|ci|revert)\(`)
 
-var commitAliases = map[string]string{
-	"--message": "-m", "--file": "-F", "--reuse-message": "-C", "--reedit-message": "-c", "--template": "-t", "--all": "-a",
-	"--include": "-i", "--only": "-o", "--patch": "-p", "--null": "-z",
-	"--dry-run": "--dry-run", "--short": "--short", "--porcelain": "--porcelain", "--long": "--long", "--help": "--help",
-	pathspecList: pathspecList,
-}
-var commitLongValues = []string{"-m", "-F", "-C", "-c", "-t", "--fixup", "--squash", "--author", "--date", "--trailer", "--cleanup", pathspecList}
-
 var commitFormat = hook{name: "commit-format", phase: "pre", override: "commit-format", check: func(c *ctx, inv shell.Invocation) string {
 	if pr := parseGhPr(inv); pr != nil {
 		return prTitleProblem(c, inv, pr)
@@ -29,7 +21,7 @@ var commitFormat = hook{name: "commit-format", phase: "pre", override: "commit-f
 	if g == nil || g.sub != "commit" {
 		return ""
 	}
-	o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
+	o := g.opts()
 	if o.has("--fixup", "--squash", "-C", "-c", "--dry-run") {
 		return ""
 	}

@@ -27,11 +27,6 @@ func isSecret(p string) bool {
 	return false
 }
 
-var addAliases = map[string]string{
-	"--all": "-A", "--no-ignore-removal": "-A", "--update": "-u", "--force": "-f", "--dry-run": "-n",
-	"--patch": "-p", "--interactive": "-i", "--edit": "-e", pathspecList: pathspecList,
-}
-
 var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "secrets", check: func(c *ctx, inv shell.Invocation) string {
 	g := c.parseGit(inv)
 	if g == nil {
@@ -40,7 +35,7 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 	var found []string
 	switch g.sub {
 	case "add":
-		o := parseOpts(g.args, "", []string{"--chmod", pathspecList}, addAliases)
+		o := g.opts()
 		if o.has("-n", "-p", "-i", "-e") {
 			return ""
 		}
@@ -50,7 +45,7 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 			found = append(found, c.wouldAdd(g, o, specs)...)
 		}
 	case "commit":
-		o := parseOpts(g.args, "mFCct", commitLongValues, commitAliases)
+		o := g.opts()
 		if o.has("--dry-run", "--short", "--porcelain", "--long", "-z", "-h", "--help") {
 			return ""
 		}
@@ -83,10 +78,8 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 // covers, and --only --amend and --fixup=reword: rewrite a commit without
 // reading the index.
 func commitsTheIndex(o opts, specs []shell.Word) bool {
-	for _, fixup := range o.vals["--fixup"] {
-		if strings.HasPrefix(fixup.Val, "reword:") {
-			return false
-		}
+	if fixups := o.vals["--fixup"]; len(fixups) > 0 && strings.HasPrefix(fixups[len(fixups)-1].Val, "reword:") {
+		return false
 	}
 	if o.has("-a") || (o.has("-o") && o.has("--amend")) {
 		return false
