@@ -60,7 +60,7 @@ func TestNoProductionCoversEveryPushDestination(t *testing.T) {
 	r.git("branch", "production", "origin/production")
 	r.expect("no-production", true,
 		"git push origin :", "git push origin 'refs/heads/*:refs/heads/*'", "git push --mirror origin", "git push --all origin",
-		"git push origin -- production", "git branch -D -- production", "git fetch origin main:production",
+		"git push origin -- production", "git branch -D -- production", "git update-ref -d -- refs/heads/production", "git push --repo=origin --all", "git fetch origin main:production",
 		"git fetch origin +refs/heads/main:refs/heads/production", "gh repo sync --branch production", "gh repo sync -b production",
 	)
 	r.expect("no-production", false,
@@ -81,9 +81,8 @@ func TestNoProductionCoversEveryPushDestination(t *testing.T) {
 func TestNoProductionFollowsGlobRefspecs(t *testing.T) {
 	r := newRepo(t)
 	r.git("branch", "staging/production")
-	r.expect("no-production", true, "git push origin 'refs/heads/staging/*:refs/heads/*'", "git update-ref -d -- refs/heads/production")
+	r.expect("no-production", true, "git push origin 'refs/heads/staging/*:refs/heads/*'")
 	r.git("branch", "production", "origin/production")
-	r.expect("no-production", true, "git push --repo=origin --all")
 	r.expect("no-production", false, "git push origin 'refs/tags/*:refs/tags/*'", "git push origin 'refs/heads/feature/*:refs/heads/feature/*'")
 }
 

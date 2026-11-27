@@ -211,7 +211,7 @@ func TestRecursiveRmOfARootBlocksWithoutForceAndThroughABareGlob(t *testing.T) {
 func TestDestructiveGitPushAndRm(t *testing.T) {
 	r := newRepo(t)
 	r.expect("destructive-git", true,
-		"git push --force", "git push -f origin x", "git push -fu origin x", "git push --force --force-with-lease", "git push --force-with-lease origin +x",
+		"git push --force", "git push -n --no-dry --force", "git push -f origin x", "git push -fu origin x", "git push --force --force-with-lease", "git push --force-with-lease origin +x",
 		"git push origin +x", "git push origin +HEAD:x", "git push --mirror",
 		"rm -rf /", "rm -fr ~", "rm -r -f $HOME", `rm -Rf "$HOME"`, "rm --recursive --force /*", "rm -rf ~/", "rm -rf ${HOME}",
 		"sudo rm -rf /", "rm -rf "+r.dir, "rm -rf "+r.dir+"/", "rm -rf .", "cd "+r.dir+"/sub && rm -rf ..", "rm -rf -- ~/*",
@@ -260,7 +260,7 @@ func TestConfiguredForcedRefspecsAreForcePushes(t *testing.T) {
 	r.git("config", "remote.backup.url", r.root+"/remote.git")
 	r.git("config", "remote.backup.push", "+refs/heads/main:refs/heads/main")
 	r.git("config", "branch.main.pushRemote", "backup")
-	r.expect("destructive-git", true, "git push", "git push -n --no-dry --force")
+	r.expect("destructive-git", true, "git push")
 }
 
 func TestDestructiveCheckoutFromACommitAndClean(t *testing.T) {
@@ -306,6 +306,8 @@ func TestResetHardToACommitThatTracksAnUntrackedFile(t *testing.T) {
 	r.git("add", "collide.txt")
 	r.git("commit", "-q", "-m", "chore(no-ticket): Collide")
 	r.git("switch", "-q", "main")
+	r.write(".env", "x")
+	r.write("list.txt", ".env\n")
 	r.write("collide.txt", "untracked work")
 	r.expect("destructive-git", true, "git reset --hard other")
 	r.expect("destructive-git", false, "git reset --hard")

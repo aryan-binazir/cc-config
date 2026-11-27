@@ -141,7 +141,7 @@ func TestNoSecretsCoversForcedAndStagedFiles(t *testing.T) {
 	r.expect("no-secrets-commit", false, "git add key.pem", "git add -A")
 }
 
-func TestAPathspecFileIsNotRead(t *testing.T) {
+func TestAddFromAPathspecFileBlocksWhileASecretIsUntracked(t *testing.T) {
 	r := newRepo(t)
 	r.write(".env", "x")
 	r.write("list.txt", ".env\n")

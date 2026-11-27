@@ -3,7 +3,6 @@ package shell_test
 import (
 	"reflect"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -95,7 +94,7 @@ func TestParseSplitsEnvSplitStringTheWayEnvDoes(t *testing.T) {
 		{`env -S 'echo \q' target x`, [][]string{}}, // env rejects the string and runs nothing
 	} {
 		got := argv(parse(t, tc.src))
-		if got[0][0] != "env" || !reflect.DeepEqual(got[1:], tc.inner) {
+		if len(got) == 0 || got[0][0] != "env" || !reflect.DeepEqual(got[1:], tc.inner) {
 			t.Errorf("%q:\n got %q\nwant env then %q", tc.src, got, tc.inner)
 		}
 	}
@@ -135,7 +134,7 @@ func TestParseRunsACommandInEveryDirectoryACdCanLeave(t *testing.T) {
 	}{
 		{"target", []string{"/w"}},
 		{"cd a && target", []string{"/w/a"}},
-		{"cd a || cd b; target", []string{"/w/a", "/w/b"}},
+		{"cd a || cd b || exit 1; target", []string{"/w/a", "/w/b"}},
 		{"cd a || exit 1; target", []string{"/w/a"}},
 		{"{ cd a; false; } || target", []string{"/w", "/w/a"}},
 		{"cd a && cd b && false || target", []string{"/w", "/w/a", "/w/a/b"}},
@@ -159,11 +158,9 @@ func TestParseRunsACommandInEveryDirectoryACdCanLeave(t *testing.T) {
 			t.Errorf("%q: target runs in %q, want %q", tc.src, got, tc.dirs)
 		}
 	}
-	if _, unread := shell.Parse("cd a; target", "", home); unread != nil {
-		t.Fatal(unread)
-	}
-	if invs, _ := shell.Parse("cd a; target", "", home); invs[1].Cwd != "" {
-		t.Errorf("a relative cd from an unknown directory stays unknown: %q", invs[1].Cwd)
+	invs, unread := shell.Parse("cd a; target", "", home)
+	if unread != nil || len(invs) != 2 || invs[1].Cwd != "" {
+		t.Errorf("a relative cd from an unknown directory stays unknown: %+v %q", invs, unread)
 	}
 }
 
@@ -210,6 +207,9 @@ func TestParseCarriesExportsTheWayTheShellDoes(t *testing.T) {
 		}
 	}
 	invs := named(parse(t, "target; export V=1; target"), "target")
+	if len(invs) != 2 {
+		t.Fatalf("%d targets", len(invs))
+	}
 	if _, before := invs[0].Assigns["V"]; before || invs[1].Assigns["V"] != "1" {
 		t.Errorf("an export reaches only the commands after it: %+v", invs)
 	}
@@ -223,7 +223,7 @@ func TestParseReadsHereDocumentsAndHereStringsAsStdin(t *testing.T) {
 	}
 	read := func(inv shell.Invocation) stdin {
 		if inv.Stdin == nil {
-			return stdin{}
+			return stdin{dynamic: inv.StdinDynamic}
 		}
 		return stdin{*inv.Stdin, true, inv.StdinDynamic}
 	}
@@ -236,6 +236,7 @@ func TestParseReadsHereDocumentsAndHereStringsAsStdin(t *testing.T) {
 		{"cat <<EOF\n$X\nEOF", []stdin{{"$X\n", true, true}}},
 		{"cat <<<word", []stdin{{"word\n", true, false}}},
 		{"cat <<'EOF' < file\nx\nEOF", []stdin{{}}},
+		{"cat <<EOF < file\n$X\nEOF", []stdin{{}}},
 		{"cat <<'EOF' 0<&3\nx\nEOF", []stdin{{}}},
 		{"cat 3<<'EOF'\nx\nEOF", []stdin{{}}},
 		{"{ cat <<'EOF'; }; echo done\nbody\nEOF", []stdin{{"body\n", true, false}, {}}},
@@ -289,21 +290,31 @@ EOF
 		{Val: "heredoc", Quoted: true},
 		{Val: "$(date)", Dynamic: true, Quoted: true},
 	}
-	if got := named(invs, "echo")[0].Args; !slices.Equal(got, want) {
+	echo := named(invs, "echo")
+	if len(echo) != 1 {
+		t.Fatalf("%d echo invocations", len(echo))
+	}
+	if got := echo[0].Args; !slices.Equal(got, want) {
 		t.Errorf("words:\n got %+v\nwant %+v", got, want)
 	}
 }
 
 func TestParseFeedsACommandTheTextUpToTheEndOfItsPipeline(t *testing.T) {
-	invs := parse(t, "echo before | target; echo after")
-	fed := named(invs, "target")[0].Fed
-	text := fed.Text[fed.Start:fed.End]
-	if !strings.Contains(text, "before") || strings.Contains(text, "after") {
-		t.Errorf("target is fed %q", text)
+	fed := func(src string) string {
+		targets := named(parse(t, src), "target")
+		if len(targets) != 1 {
+			t.Fatalf("%q: %d targets", src, len(targets))
+		}
+		r := targets[0].Fed
+		if r.Source == nil || r.Start < 0 || r.Start > r.End || r.End > len(r.Text) {
+			t.Fatalf("%q: bad reach %+v", src, r)
+		}
+		return r.Text[r.Start:r.End]
 	}
-	invs = parse(t, "f() { target; }; echo after")
-	fed = named(invs, "target")[0].Fed
-	if text := fed.Text[fed.Start:fed.End]; !strings.Contains(text, "after") {
-		t.Errorf("a function body can be called with any later text, got %q", text)
+	if got := fed("echo before | target; echo after"); got != "echo before | target;" {
+		t.Errorf("target is fed %q", got)
+	}
+	if got := fed("f() { target; }; echo after"); got != "f() { target; }; echo after" {
+		t.Errorf("a function body can be called with any later text, got %q", got)
 	}
 }
