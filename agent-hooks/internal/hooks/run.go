@@ -54,8 +54,9 @@ const (
 
 // Command answers `agent-hooks pre|post [--agy] [--only=<hook>]` and returns
 // the exit code. A usage error returns 64 and leaves the usage line to the
-// caller. A call still undecided after the deadline exits the process with 1
-// and is allowed. agy, flagged by --agy, gets a JSON decision either way.
+// caller. If reading, deciding, and writing the answer take longer than the
+// deadline, the process exits 1 and the call is allowed. On both of those
+// paths `pre --agy` still prints an allow decision.
 func Command(phase string, flags []string, home string, stdin io.Reader, stdout, stderr io.Writer) int {
 	o := Options{Phase: phase, Home: home, StateDir: stateDir(home)}
 	misuse := ""
@@ -79,7 +80,9 @@ func Command(phase string, flags []string, home string, stdin io.Reader, stdout,
 		agyAllow = respond(o, nil).Stdout + "\n"
 	}
 	allowWith := func(exit int, reason string) int {
-		io.WriteString(stdout, agyAllow)
+		if agyAllow != "" {
+			io.WriteString(stdout, agyAllow)
+		}
 		fmt.Fprintln(stderr, "agent-hooks:", reason)
 		return exit
 	}

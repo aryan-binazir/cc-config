@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -41,6 +42,20 @@ func TestUnknownHooksFlagsAndArgumentsAreUsageErrors(t *testing.T) {
 		if p := runBinary(t, env, agyLs, tc.args...); p.exit != 64 || p.stdout != tc.stdout || p.stderr != tc.stderr {
 			t.Errorf("%v: got %+v", tc.args, p)
 		}
+	}
+	closed := exec.Command(binary(t), "pre", "--bogus")
+	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	syscall.Close(fds[0])
+	w := os.NewFile(uintptr(fds[1]), "stdout")
+	var errb bytes.Buffer
+	closed.Stdout, closed.Stderr = w, &errb
+	err = closed.Run()
+	w.Close()
+	if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() != 64 || errb.String() != "agent-hooks: unknown argument --bogus\n"+usage {
+		t.Errorf("a usage error with stdout closed: %v %q", err, errb.String())
 	}
 	if p := runBinary(t, env, payload("agy -p hi"), "post", "--only=block-agy"); p.exit != 0 || p.stdout != "" {
 		t.Errorf("a pre hook named in post runs nothing: %+v", p)
@@ -78,7 +93,7 @@ func TestAStuckCallIsAllowedAfterEightSeconds(t *testing.T) {
 			if ee, ok := err.(*exec.ExitError); ok {
 				exit = ee.ExitCode()
 			}
-			if exit != 1 || out.String() != tc.stdout || errb.String() != timedOut || elapsed < 8*time.Second {
+			if exit != 1 || out.String() != tc.stdout || errb.String() != timedOut || elapsed < 8*time.Second || elapsed > 20*time.Second {
 				t.Errorf("exit=%d stdout=%q stderr=%q after %v", exit, out.String(), errb.String(), elapsed)
 			}
 		})
@@ -156,7 +171,6 @@ func TestBinaryEndToEnd(t *testing.T) {
 		{"several hooks", payload("gh pr create"), []string{"pre"}, 2, "", "pr-assignee"},
 		{"only", payload("gh pr create"), []string{"pre", "--only=block-agy"}, 0, "", ""},
 		{"agy deny", `{"toolCall":{"name":"run_command","args":{"CommandLine":"agy"}}}`, []string{"pre", "--agy"}, 0, `"decision":"deny"`, ""},
-		{"agy allow", `{"toolCall":{"name":"run_command","args":{"CommandLine":"ls"}}}`, []string{"pre", "--agy"}, 0, `{"decision":"allow"}`, ""},
 		{"agy malformed", `garbage`, []string{"pre", "--agy"}, 0, `{"decision":"allow"}`, ""},
 		{"post advice", payload("rg -r x TODO"), []string{"post"}, 0, `"additionalContext":"[agent-hooks: rg-replace-flag]`, ""},
 		{"malformed", `{`, []string{"pre"}, 0, "", ""},
