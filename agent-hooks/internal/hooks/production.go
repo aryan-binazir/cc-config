@@ -37,8 +37,10 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 			if len(branches) == 0 {
 				return false
 			}
-			last := branches[len(branches)-1] // gh takes the last, which may expand to an earlier one
-			return last.Val == production || (last.Dynamic && namesProduction(branches))
+			// gh takes the last; one that expands or is empty (the default
+			// branch) may still be an earlier one.
+			last := branches[len(branches)-1]
+			return last.Val == production || ((last.Dynamic || last.Val == "") && namesProduction(branches))
 		}
 		return false
 	}
