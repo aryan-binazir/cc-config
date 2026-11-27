@@ -220,3 +220,46 @@ func TestShellFormsFromReview(t *testing.T) {
 	)
 	expectBlocked(t, "draft-prs", "bash -o pipefail -c 'gh pr create'", "eval -- gh pr create", "case x in $(gh pr create)) ;; esac")
 }
+
+// gh, like cobra, skips a value after any flag before the command word that it
+// does not know to be a boolean, so a flag before api can hide neither the
+// command nor its method.
+func TestGhLocatesApiAsCobraDoes(t *testing.T) {
+	expectBlocked(t, "no-admin-merge",
+		"gh -X PUT api repos/o/r/pulls/1/merge", "gh --hostname github.com api -X PUT repos/o/r/pulls/1/merge")
+	expectBlocked(t, "no-production", "gh -X DELETE api repos/o/r/git/refs/heads/production")
+	expectAllowed(t, "no-admin-merge,no-production",
+		"gh --paginate api -X PUT repos/o/r/pulls/1/merge", // gh reads api as --paginate's value: unknown command
+		"gh api -i=false repos/o/r/git/refs/heads/production",
+	)
+}
+
+// gh repo sync reads its flags as pflag does: no abbreviated long names, -b=x
+// is the value x, and help runs nothing.
+func TestGhRepoSyncReadsFlagsAsGhDoes(t *testing.T) {
+	expectBlocked(t, "no-production", "gh repo sync -b=production", "gh repo sync --branch=production")
+	expectAllowed(t, "no-production", "gh repo sync --bra production", "gh repo sync -b production -h", "gh repo sync -b production --help")
+}
+
+// pflag keeps the last of -d and --delete-branch, one flag under two names.
+func TestGhMergeDeleteBranchLastWins(t *testing.T) {
+	r := newRepo(t)
+	fakeGhScript(t, `case "$*" in *'pr view 9'*) echo main production ;; *) exit 1 ;; esac`)
+	r.expect("no-production", true, "gh pr merge 9 --delete-branch=false -d", `gh pr merge 9 --delete-branch="$X" -d`)
+	// An expanded value reads as false, whichever name carries it.
+	r.expect("no-production", false, "gh pr merge 9 -d --delete-branch=false", `gh pr merge 9 -d --delete-branch="$X"`, `gh pr merge 9 --delete-branch --delete-branch="$X"`)
+}
+
+// gh shows help for any -h, even -h=false or one followed by --help=false.
+func TestGhShortHelpAlwaysShowsHelp(t *testing.T) {
+	expectAllowed(t, both, "gh pr merge 1 --admin -h --help=false", "gh pr merge 1 --admin -h=false", "gh pr create -sh=0")
+	expectBlocked(t, both, "gh pr merge 1 --admin --help --help=false", "gh pr create --help=false")
+}
+
+// A flag built from an expansion may carry its own =value, so it does not hide
+// the word after it.
+func TestGhDynamicFlagBeforeTheCommandHidesNothing(t *testing.T) {
+	expectBlocked(t, "no-admin-merge", "gh --$OPT api -X PUT repos/o/r/pulls/1/merge")
+	expectBlocked(t, "draft-prs", `gh "--$OPT" pr create`)
+	expectBlocked(t, "pr-assignee", "gh --$OPT --hostname pr new --draft") // or the expansion takes the next word
+}
