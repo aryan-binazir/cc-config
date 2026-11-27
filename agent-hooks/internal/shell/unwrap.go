@@ -53,15 +53,15 @@ func isShell(name string) bool {
 	return false
 }
 
-// looksUp reports whether command only looks its operand up instead of
-// running it.
 func looksUp(name, firstArg string) bool {
 	return name == "command" && (firstArg == "-v" || firstArg == "-V")
 }
 
 // MayRunCommand reports whether a command named name, with firstArg as its
-// first argument ("" if none), can run another command: a shell, eval,
-// source, or a wrapper the parser unwraps.
+// first argument ("" if none), may run another command: a shell, eval,
+// source, mise, or a wrapper the parser unwraps. It errs toward yes for text
+// the parser could not read: any mise subcommand counts, and only
+// command -v and -V are excluded.
 func MayRunCommand(name, firstArg string) bool {
 	switch {
 	case isShell(name), name == "eval", name == "source", name == ".", name == "mise":
