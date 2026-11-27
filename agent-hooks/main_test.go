@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -23,12 +24,64 @@ func TestUnknownHooksFlagsAndArgumentsAreUsageErrors(t *testing.T) {
 			t.Errorf("%v: got %+v", args, p)
 		}
 	}
-	p := runBinary(t, env, `{"toolCall":{"name":"run_command","args":{"CommandLine":"ls"}}}`, "pre", "--bogus", "--agy")
-	if p.exit != 64 || p.stdout != `{"decision":"allow"}`+"\n" {
-		t.Errorf("agy must still get an answer: %+v", p)
+	const usage = "usage: agent-hooks pre|post [--agy] [--only=<hook>] | install | uninstall\n"
+	agyLs := `{"toolCall":{"name":"run_command","args":{"CommandLine":"ls"}}}`
+	for _, tc := range []struct {
+		args           []string
+		stdout, stderr string
+	}{
+		{[]string{"pre", "--bogus", "--agy"}, `{"decision":"allow"}` + "\n", "agent-hooks: unknown argument --bogus\n" + usage},
+		{[]string{"pre", "--agy", "--only=nope"}, `{"decision":"allow"}` + "\n", `agent-hooks: no hook named "nope"` + "\n" + usage},
+		{[]string{"pre", "--only=block-agy", "--agy", "--only=nope"}, `{"decision":"allow"}` + "\n", "agent-hooks: --only takes one hook\n" + usage},
+		{[]string{"pre", "--only=nope", "--only=block-agy"}, "", `agent-hooks: no hook named "nope"` + "\n" + usage},
+		{[]string{"post", "--agy", "--bogus"}, "", "agent-hooks: unknown argument --bogus\n" + usage},
+		{[]string{"bogus"}, "", usage},
+		{nil, "", usage},
+	} {
+		if p := runBinary(t, env, agyLs, tc.args...); p.exit != 64 || p.stdout != tc.stdout || p.stderr != tc.stderr {
+			t.Errorf("%v: got %+v", tc.args, p)
+		}
 	}
 	if p := runBinary(t, env, payload("agy -p hi"), "post", "--only=block-agy"); p.exit != 0 || p.stdout != "" {
 		t.Errorf("a pre hook named in post runs nothing: %+v", p)
+	}
+}
+
+func TestAStuckCallIsAllowedAfterEightSeconds(t *testing.T) {
+	if testing.Short() {
+		t.Skip("timing")
+	}
+	bin := binary(t)
+	const timedOut = "agent-hooks: timed out; allowing the call\n"
+	for _, tc := range []struct{ args, stdout string }{
+		{"pre", ""}, {"pre --agy", `{"decision":"allow"}` + "\n"}, {"post --agy", ""},
+	} {
+		t.Run(tc.args, func(t *testing.T) {
+			t.Parallel()
+			outer, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(outer, bin, strings.Fields(tc.args)...)
+			stdin, err := cmd.StdinPipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer stdin.Close()
+			var out, errb bytes.Buffer
+			cmd.Stdout, cmd.Stderr = &out, &errb
+			start := time.Now()
+			err = cmd.Run()
+			elapsed := time.Since(start)
+			if outer.Err() != nil {
+				t.Fatalf("still running after %v", elapsed)
+			}
+			exit := -1
+			if ee, ok := err.(*exec.ExitError); ok {
+				exit = ee.ExitCode()
+			}
+			if exit != 1 || out.String() != tc.stdout || errb.String() != timedOut || elapsed < 8*time.Second {
+				t.Errorf("exit=%d stdout=%q stderr=%q after %v", exit, out.String(), errb.String(), elapsed)
+			}
+		})
 	}
 }
 
@@ -114,6 +167,13 @@ func TestBinaryEndToEnd(t *testing.T) {
 		if p.exit != tc.exit || !strings.Contains(p.stdout, tc.stdout) || !strings.Contains(p.stderr, tc.stderrIn) || (tc.stdout == "" && p.stdout != "") {
 			t.Errorf("%s: got %+v", tc.name, p)
 		}
+	}
+	agyLs := `{"toolCall":{"name":"run_command","args":{"CommandLine":"ls"}}}`
+	if p := runBinary(t, env, agyLs, "pre", "--agy"); p != (proc{stdout: `{"decision":"allow"}`}) {
+		t.Errorf("an agy answer ends without a newline: %+v", p)
+	}
+	if p := runBinary(t, env, agyLs, "post", "--agy"); p != (proc{stdout: "{}"}) {
+		t.Errorf("agy post: %+v", p)
 	}
 	p := runBinary(t, env, payload("AGENT_HOOKS_ALLOW=destructive git push --force"), "pre")
 	log, _ := os.ReadFile(filepath.Join(state, "agent-hooks", "overrides.log"))
