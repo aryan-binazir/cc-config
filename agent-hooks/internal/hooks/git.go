@@ -52,9 +52,10 @@ func (c *ctx) alias(g *gitCmd) []shell.Word {
 	return splitAlias(value)
 }
 
-// splitAlias divides an alias into words the way git does: on whitespace, with
+// splitAlias divides an alias into words much as git does: on whitespace, with
 // single quotes, double quotes, and backslash escapes, and nothing else
-// special. It returns nil for an unclosed quote or a trailing backslash.
+// special. Unlike git, it also splits on non-ASCII spaces such as U+00A0. It
+// returns nil for an unclosed quote or a trailing backslash.
 func splitAlias(s string) []shell.Word {
 	var words []shell.Word
 	var word strings.Builder

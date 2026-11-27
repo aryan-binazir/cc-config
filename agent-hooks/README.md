@@ -79,7 +79,8 @@ make uninstall   # remove the entries again
 
 `agent-hooks install` edits these files in place. It keeps their other settings
 and writes a `.bak-<timestamp>` copy before any change. It also points any old
-`block-agy.sh` entry under `PreToolUse` or `PostToolUse` at agent-hooks instead.
+`block-agy.sh` entry under Claude Code's or Codex's `PreToolUse` or
+`PostToolUse` at agent-hooks instead.
 
 - **Claude Code** (`~/.claude/settings.json`): `PreToolUse` and `PostToolUse`, with matcher `Bash`.
 - **Codex** (`~/.codex/hooks.json`): the same entries. Codex runs a hook only after
@@ -110,7 +111,7 @@ The hooks run on every tool call, so:
 
 - Calls decided from the payload alone never start a subprocess.
 - `git` and `gh` run only for git/gh commands that need repository state. Their results are cached within the call and skipped once a hook has blocked.
-- A git subcommand that git itself ships (`status`, `log`, `diff`, …) never needs an alias lookup. Any other costs one `git config` call, unless the command sets the alias with `-c`.
+- A git subcommand that git itself ships (`status`, `log`, `diff`, …) never needs an alias lookup. Any other costs one `git config` call per alias level it follows, except a level the command sets with `-c`.
 
 `make check` prints the first two rows. Measured end to end on the built binary, process start included, with all ten hooks on:
 
