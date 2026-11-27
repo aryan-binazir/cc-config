@@ -176,35 +176,41 @@ type opts struct {
 }
 
 // optSpec is one command's option grammar: every name it lists, mapped to
-// the option's canonical name, and the canonical names that take a value.
+// the option's canonical name, the canonical names that take a value, and
+// those whose value is optional and so only ever attached (-S<key>).
 // Options it does not list are read as flags.
 type optSpec struct {
-	canon  map[string]string
-	values map[string]bool
+	canon    map[string]string
+	values   map[string]bool
+	attached map[string]bool
 }
 
 // grammar reads entries like "-m|--message=": one option's names, the first
-// canonical, with a trailing = when it takes a value.
+// canonical, with a trailing = when it takes a value, or ? when it may take
+// an attached one.
 func grammar(entries string) optSpec {
-	s := optSpec{canon: map[string]string{}, values: map[string]bool{}}
+	s := optSpec{canon: map[string]string{}, values: map[string]bool{}, attached: map[string]bool{}}
 	for _, entry := range strings.Fields(entries) {
-		names := strings.Split(strings.TrimSuffix(entry, "="), "|")
+		names := strings.Split(strings.TrimRight(entry, "=?"), "|")
 		for _, name := range names {
 			if _, dup := s.canon[name]; dup {
 				panic("option listed twice: " + name)
 			}
 			s.canon[name] = names[0]
 		}
-		if strings.HasSuffix(entry, "=") {
+		switch {
+		case strings.HasSuffix(entry, "="):
 			s.values[names[0]] = true
+		case strings.HasSuffix(entry, "?"):
+			s.attached[names[0]] = true
 		}
 	}
 	return s
 }
 
 // gitOptions holds what the hooks read of each git subcommand's grammar, from
-// git 2.56's: the options a hook checks, and every option that takes a value
-// before the words a hook reads. Any unambiguous prefix of a listed long name
+// git 2.56's: the options a hook checks, and the options that take a value
+// that a hook would otherwise misread as an operand. Any unambiguous prefix of a listed long name
 // stands for it, as in git, so a real option that is itself a prefix of one
 // (--recurse-submodules, --set-upstream) is listed too.
 var gitOptions = map[string]optSpec{
@@ -212,13 +218,13 @@ var gitOptions = map[string]optSpec{
 	"branch":   grammar("-d|--delete -f|--force -m|--move -c|--copy -u|--set-upstream-to= --set-upstream"),
 	"checkout": grammar("-f|--force -b= -B= --orphan= --conflict= --guess --no-guess --pathspec-from-file="),
 	"clean":    grammar("-f|--force -n|--dry-run -i|--interactive -e|--exclude="),
-	"commit": grammar("-m|--message= -F|--file= -C|--reuse-message= -c|--reedit-message= -t|--template= -a|--all -i|--include -o|--only -p|--patch -z|--null " +
+	"commit": grammar("-m|--message= -F|--file= -C|--reuse-message= -c|--reedit-message= -t|--template= -S|--gpg-sign? -a|--all -i|--include -o|--only -p|--patch -z|--null " +
 		"--interactive --amend --dry-run --short --porcelain --long --help --fixup= --squash= --author= --date= --trailer= --cleanup= --pathspec-from-file="),
 	"fetch":      grammar("-o|--server-option= -j= --upload-pack= --depth= --deepen= --shallow-since= --shallow-exclude= --refmap= --recurse-submodules-default= --recurse-submodules --negotiation-tip="),
-	"merge":      grammar("-m= -s|--strategy= -X|--strategy-option= --abort --continue --quit"),
+	"merge":      grammar("-m|--message= -F|--file= -s|--strategy= -X|--strategy-option= -S|--gpg-sign? --into-name= --cleanup= --abort --continue --quit"),
 	"pull":       grammar("-s|--strategy= -X|--strategy-option="),
-	"push":       grammar("-f|--force -n|--dry-run -d|--delete -u|--set-upstream -o|--push-option= --repo= --receive-pack= --exec= --mirror --all --branches --prune --force-with-lease --tags"),
-	"rebase":     grammar("-s|--strategy= -X|--strategy-option= -x|--exec= -C= --onto= --empty= --trailer= --whitespace= --abort --continue --skip --quit"),
+	"push":       grammar("-f|--force -n|--dry-run -d|--delete -u|--set-upstream -o|--push-option= --repo= --receive-pack= --exec= --mirror --all|--branches --prune --force-with-lease --tags"),
+	"rebase":     grammar("-s|--strategy= -X|--strategy-option= -x|--exec= -S|--gpg-sign? -C= --onto= --empty= --trailer= --whitespace= --abort --continue --skip --quit"),
 	"reset":      grammar("--hard --soft --mixed --keep --merge"),
 	"restore":    grammar("-s|--source= -S|--staged -W|--worktree --conflict= --pathspec-from-file="),
 	"switch":     grammar("-f|--force|--discard-changes -c|--create= -C|--force-create= --orphan= --conflict= --guess --no-guess"),
@@ -274,6 +280,12 @@ func parseOpts(args []shell.Word, spec optSpec) opts {
 			for j := 1; j < len(a); j++ {
 				name := canon("-" + string(a[j]))
 				o.set[name]++
+				if spec.attached[name] {
+					if j < len(a)-1 {
+						o.vals[name] = append(o.vals[name], shell.Word{Val: a[j+1:], Dynamic: args[i].Dynamic})
+					}
+					break
+				}
 				if !spec.values[name] {
 					continue
 				}

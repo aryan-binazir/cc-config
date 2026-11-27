@@ -152,7 +152,7 @@ func pushesProduction(c *ctx, g *gitCmd) bool {
 			}
 		}
 	}
-	if o.has("--all", "--branches") && c.hasLocalProduction(g) {
+	if o.has("--all") && c.hasLocalProduction(g) {
 		return true
 	}
 	if o.has("--prune") && c.pruneMayDeleteProduction(g, o, refspecs) {
@@ -246,7 +246,7 @@ func mapWildcard(src, dst string) (from string, covers bool) {
 }
 
 func (c *ctx) pruneMayDeleteProduction(g *gitCmd, o opts, refspecs []string) bool {
-	matching := o.has("--all", "--branches")
+	matching := o.has("--all")
 	for _, spec := range refspecs {
 		src, dst, ok := strings.Cut(strings.TrimPrefix(spec, "+"), ":")
 		if !ok {

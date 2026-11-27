@@ -78,10 +78,8 @@ var noSecretsCommit = hook{name: "no-secrets-commit", phase: "pre", override: "s
 // covers, and --only --amend and --fixup=reword: rewrite a commit without
 // reading the index.
 func commitsTheIndex(o opts, specs []shell.Word) bool {
-	for _, fixup := range o.vals["--fixup"] {
-		if strings.HasPrefix(fixup.Val, "reword:") {
-			return false
-		}
+	if fixups := o.vals["--fixup"]; len(fixups) > 0 && strings.HasPrefix(fixups[len(fixups)-1].Val, "reword:") {
+		return false
 	}
 	if o.has("-a") || (o.has("-o") && o.has("--amend")) {
 		return false

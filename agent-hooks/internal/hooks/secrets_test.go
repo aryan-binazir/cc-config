@@ -16,6 +16,7 @@ func TestCommitFlagsSecretsAlreadyInTheIndex(t *testing.T) {
 	r.expect("no-secrets-commit", true,
 		`git commit -m "feat(no-ticket): x"`, "git commit", "git commit --amend --no-edit", "git commit --fixup=amend:HEAD",
 		"git commit -i notes.txt -m x", "git commit --include notes.txt -m x",
+		"git commit --fixup=reword:HEAD --fixup=HEAD",                                             // git keeps the last --fixup
 		"git commit --include docs/ -m x", "git commit --patch docs/", "git commit --interactive", // each keeps what is already staged
 		// A pathspec list is not read: it could be empty, and then git commits the index.
 		"git commit --pathspec-from-file=list.txt -m x", "git commit --pathspec-from-file=- -m x <<<notes.txt", "git commit --pathspec-from-file=- -m x </dev/null",

@@ -315,6 +315,7 @@ func TestNoProduction(t *testing.T) {
 		"git merge origin/production", "git reset --hard origin/main", "gh pr merge 5 --match-head-commit abc",
 		"gh api repos/o/r/git/refs/heads/production", "echo git push origin production", "git diff main production",
 		"git checkout --force production", "git switch --force production", // --force is not --force-create
+		"git switch -B production", "git checkout -C production", // each is the other's spelling, and git rejects it
 	)
 	if res := r.run("no-production", "git push origin production"); res.Stderr != productionMessage {
 		t.Errorf("message: %q", res.Stderr)
@@ -389,7 +390,8 @@ func TestNoProductionCoversEveryPushDestination(t *testing.T) {
 	// rebase's -m is --merge and takes no value, while -x runs a command: both
 	// still check out production and rebase it.
 	r.expect("no-production", true, "git rebase -m main production", "git rebase -x true main production", "git rebase --exec true main production",
-		"git rebase -C 3 main production", "git rebase --empty drop main production")
+		"git rebase -C 3 main production", "git rebase --empty drop main production",
+		"git rebase -Sx main production", "git rebase -SC main production") // -S takes only an attached key
 	r.git("config", "remote.origin.push", "refs/heads/main:refs/heads/production")
 	r.expect("no-production", true, "git push", "git push origin")
 }
@@ -400,6 +402,7 @@ func TestNoProductionOnTheProductionBranch(t *testing.T) {
 	r.expect("no-production", true, "git branch -m renamed", "git branch -M renamed")
 	r.expect("no-production", false, "git merge --abort", "git rebase --abort", "git rebase --continue", "git merge --continue", "git pull --abort 2>/dev/null; true", "git branch -c backup",
 		"git merge --abo", "git rebase --cont")
+	r.expect("no-production", true, "git merge --message --abo feature", "git merge -F --abo feature") // --abo is the message, or its file
 }
 
 func TestNoProductionPRLookupKeepsSelectorAndRepository(t *testing.T) {
@@ -440,6 +443,7 @@ func TestCommitFormatValidatesTheMessageGitUses(t *testing.T) {
 	r.expect("commit-format", false,
 		"git commit -F - 3<<'EOF'\nbad\nEOF", "git commit -F - <<EOF\nfeat(no-ticket): $X\nEOF",
 		"git commit -F - <<EOF\nfeat(no-ticket): ok\n\n$BODY\nEOF",
+		"git commit -Sm bad", // m is -S's key: no message is given
 	)
 }
 
