@@ -1,6 +1,9 @@
 package shell
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 type wrapper struct {
 	shortValues    string
@@ -82,7 +85,7 @@ options:
 		if strings.HasPrefix(a, "--") {
 			opt, value, hasValue := strings.Cut(a, "=")
 			opt = spec.long(opt)
-			if !hasValue && contains(spec.longValues, opt) && i+1 < len(args) {
+			if !hasValue && slices.Contains(spec.longValues, opt) && i+1 < len(args) {
 				i++
 				value = args[i].Val
 			}
@@ -230,13 +233,4 @@ func isAssign(s string) bool {
 		}
 	}
 	return true
-}
-
-func contains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }

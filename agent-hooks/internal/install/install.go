@@ -55,8 +55,8 @@ func Install(p Paths, bin string, now time.Time) ([]string, error) {
 	wire := func(root *object) (bool, error) {
 		before := encode(root)
 		hooks := hooksOf(root)
-		upsert(hooks, "PreToolUse", "Bash", command("pre"), true)
-		upsert(hooks, "PostToolUse", "Bash", command("post"), true)
+		upsert(hooks, "PreToolUse", command("pre"))
+		upsert(hooks, "PostToolUse", command("post"))
 		return encode(root) != before, nil
 	}
 	return apply(now, []edit{
@@ -264,7 +264,7 @@ func hooksOf(root *object) *object {
 
 // upsert never moves a group or handler: Codex keys hook trust by group and
 // handler index.
-func upsert(hooks *object, event, matcher, command string, legacy bool) {
+func upsert(hooks *object, event, command string) {
 	v, _ := hooks.get(event)
 	groups, _ := v.([]any)
 	placed := false
@@ -277,21 +277,21 @@ func upsert(hooks *object, event, matcher, command string, legacy bool) {
 		handlers, _ := hv.([]any)
 		mine := 0
 		for _, h := range handlers {
-			if isOwned(h) || legacy && isLegacy(h) {
+			if isOwned(h) || isLegacy(h) {
 				h.(*object).set("command", command)
 				mine++
 			}
 		}
 		switch {
 		case mine > 0 && mine == len(handlers):
-			group.set("matcher", matcher)
+			group.set("matcher", "Bash")
 			placed = true
 		case mine > 0 && coversBash(group):
 			placed = true
 		}
 	}
 	if !placed {
-		groups = append(groups, group(matcher, command))
+		groups = append(groups, group("Bash", command))
 	}
 	hooks.set(event, groups)
 }

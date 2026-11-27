@@ -3,9 +3,9 @@ package hooks
 import (
 	"cmp"
 	"os"
-	"path"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
@@ -49,7 +49,44 @@ func (c *ctx) alias(g *gitCmd) []shell.Word {
 	if strings.HasPrefix(value, "!") {
 		return nil
 	}
-	words, _ := shell.Split(value)
+	return splitAlias(value)
+}
+
+// splitAlias divides an alias into words the way git does: on whitespace, with
+// single quotes, double quotes, and backslash escapes, and nothing else
+// special. It returns nil for an unclosed quote or a trailing backslash.
+func splitAlias(s string) []shell.Word {
+	var words []shell.Word
+	var word strings.Builder
+	open, quote, escaped := false, rune(0), false
+	for _, r := range s {
+		switch {
+		case escaped:
+			word.WriteRune(r)
+			open, escaped = true, false
+		case r == '\\' && quote != '\'':
+			escaped = true
+		case quote == 0 && unicode.IsSpace(r):
+			if open {
+				words = append(words, shell.Word{Val: word.String()})
+				word.Reset()
+				open = false
+			}
+		case quote == 0 && (r == '\'' || r == '"'):
+			open, quote = true, r
+		case r == quote:
+			quote = 0
+		default:
+			word.WriteRune(r)
+			open = true
+		}
+	}
+	if escaped || quote != 0 {
+		return nil
+	}
+	if open {
+		words = append(words, shell.Word{Val: word.String()})
+	}
 	return words
 }
 
@@ -77,7 +114,7 @@ func parseGit(inv shell.Invocation, home string) *gitCmd {
 			break
 		}
 		name, value, hasValue := strings.Cut(a, "=")
-		if !contains(gitGlobalValues, name) {
+		if !slices.Contains(gitGlobalValues, name) {
 			continue
 		}
 		word := shell.Word{Val: value, Dynamic: args[i].Dynamic}
@@ -175,7 +212,7 @@ func parseOpts(args []shell.Word, shortValues string, longValues []string, alias
 			o.set[name]++
 			if hasValue {
 				o.vals[name] = append(o.vals[name], shell.Word{Val: value, Dynamic: args[i].Dynamic})
-			} else if contains(longValues, name) && i+1 < len(args) {
+			} else if slices.Contains(longValues, name) && i+1 < len(args) {
 				i++
 				o.vals[name] = append(o.vals[name], args[i])
 			}
@@ -278,17 +315,6 @@ func isDir(dir, p, home string) bool {
 func exists(p string) bool {
 	_, err := os.Lstat(p)
 	return err == nil
-}
-
-func baseName(p string) string { return path.Base(strings.TrimRight(p, "/")) }
-
-func contains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }
 
 // gitInstalls lists commands every git 2.56 has: the ones compiled in (git
