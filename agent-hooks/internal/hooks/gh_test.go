@@ -265,3 +265,13 @@ func TestGhDynamicFlagBeforeTheCommandHidesNothing(t *testing.T) {
 	expectAllowed(t, "draft-prs", `gh "pr create"`)                        // gh: unknown command
 	expectBlocked(t, "pr-assignee", "gh --$OPT --hostname pr new --draft") // or the expansion takes the next word
 }
+
+func TestDraftPRsReadsTheScriptAShellIsFedOnStdin(t *testing.T) {
+	expectBlocked(t, "draft-prs", "bash -o pipefail <<'EOF'\ngh pr create\nEOF", "bash -s arg1 <<'EOF'\ngh pr create\nEOF")
+}
+
+func TestAdminMergeThroughTheAPIReadsHelpFlagValues(t *testing.T) {
+	expectBlocked(t, "no-admin-merge", "gh api -X PUT repos/o/r/pulls/1/merge",
+		"gh api --help=0 -X PUT repos/o/r/pulls/1/merge", "gh api --help=true --help=false -X PUT repos/o/r/pulls/1/merge")
+	expectAllowed(t, "no-admin-merge", "gh api --help=true -X PUT repos/o/r/pulls/1/merge", "gh api -h --help=false -X PUT repos/o/r/pulls/1/merge")
+}
