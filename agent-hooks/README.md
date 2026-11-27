@@ -109,7 +109,7 @@ and writes a `.bak-<timestamp>` copy before any change. It also removes the old
 The hooks run on every tool call, so:
 
 - Calls decided from the payload alone never start a subprocess.
-- `git` and `gh` run only for git/gh commands that need repository state. Their results are cached within the call and skipped once a hook has blocked.
+- `git` and `gh` run only for git/gh commands that need repository state. Their results are cached within the call. Lookups are skipped once a hook has blocked, and, for the rest of one hook's check of one command, once a lookup has had no answer; the block names that first lookup.
 - A git subcommand that git itself ships (`status`, `log`, `diff`, …) never needs an alias lookup. Any other costs one `git config` call.
 
 `make check` prints these numbers. Measured end to end on the built binary, process start included, with all ten hooks on:
