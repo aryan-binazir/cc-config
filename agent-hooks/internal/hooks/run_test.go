@@ -84,3 +84,9 @@ func TestOnlySelectsHooksWithinTheirPhase(t *testing.T) {
 		t.Errorf("pre hook ran in post: %+v", r)
 	}
 }
+
+func TestAnUnknownToolIsAllowed(t *testing.T) {
+	if res := run(t, "block-agy", map[string]any{"tool_name": "Mystery", "tool_input": map[string]any{"command": "agy -p hi"}}); res.Exit != 0 {
+		t.Errorf("unknown tool blocked: %+v", res)
+	}
+}

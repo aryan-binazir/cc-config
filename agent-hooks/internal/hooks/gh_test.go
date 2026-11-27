@@ -220,3 +220,13 @@ func TestShellFormsFromReview(t *testing.T) {
 	)
 	expectBlocked(t, "draft-prs", "bash -o pipefail -c 'gh pr create'", "eval -- gh pr create", "case x in $(gh pr create)) ;; esac")
 }
+
+func TestDraftPRsReadsTheScriptAShellIsFedOnStdin(t *testing.T) {
+	expectBlocked(t, "draft-prs", "bash -o pipefail <<'EOF'\ngh pr create\nEOF", "bash -s arg1 <<'EOF'\ngh pr create\nEOF")
+}
+
+func TestAdminMergeThroughTheAPIReadsHelpFlagValues(t *testing.T) {
+	expectBlocked(t, "no-admin-merge", "gh api -X PUT repos/o/r/pulls/1/merge",
+		"gh api --help=0 -X PUT repos/o/r/pulls/1/merge", "gh api --help=true --help=false -X PUT repos/o/r/pulls/1/merge")
+	expectAllowed(t, "no-admin-merge", "gh api --help=true -X PUT repos/o/r/pulls/1/merge", "gh api -h --help=false -X PUT repos/o/r/pulls/1/merge")
+}

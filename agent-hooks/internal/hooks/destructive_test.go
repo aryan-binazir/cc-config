@@ -207,3 +207,158 @@ func TestRecursiveRmOfARootBlocksWithoutForceAndThroughABareGlob(t *testing.T) {
 	r.expect("destructive-git", false, "rm -r "+link, "rm -rf "+link, "rm -rf ../link") // rm removes the link, not the repository behind it
 	r.expect("destructive-git", true, "rm -rf "+link+"/*")                              // the glob reaches through it
 }
+
+func TestDestructiveGitPushAndRm(t *testing.T) {
+	r := newRepo(t)
+	r.expect("destructive-git", true,
+		"git push --force", "git push -f origin x", "git push -fu origin x", "git push --force --force-with-lease", "git push --force-with-lease origin +x",
+		"git push origin +x", "git push origin +HEAD:x", "git push --mirror",
+		"rm -rf /", "rm -fr ~", "rm -r -f $HOME", `rm -Rf "$HOME"`, "rm --recursive --force /*", "rm -rf ~/", "rm -rf ${HOME}",
+		"sudo rm -rf /", "rm -rf "+r.dir, "rm -rf "+r.dir+"/", "rm -rf .", "cd "+r.dir+"/sub && rm -rf ..", "rm -rf -- ~/*",
+	)
+	r.expect("destructive-git", false,
+		"git push --force-with-lease", "git push origin x", "git push -n -f",
+		"rm -rf node_modules", "rm -rf /tmp/agent-hooks-x/build", "rm -f ~/.cache/x", "echo rm -rf /",
+		`rm -rf "$HOME/.cache/foo"`, "rm -rf build", "rm -rf "+r.root+"/elsewhere", "rm -rf ./src",
+	)
+	bare := filepath.Join(r.root, "bare.git")
+	gitIn(t, r.root, "init", "-q", "--bare", bare)
+	r.expect("destructive-git", true, "rm -rf "+bare)
+}
+
+func TestDestructiveGitOnlyWhenTheTreeIsDirty(t *testing.T) {
+	r := newRepo(t)
+	risky := []string{"git clean -fd", "git clean -fdx", "git clean -f", "git clean -ffdx", "git reset --hard", "git reset --hard HEAD~1", "git checkout -- .", "git checkout .", "git restore ."}
+	r.expect("destructive-git", false, risky...)
+	r.write("README.md", "changed\n")
+	r.expect("destructive-git", true, "git reset --hard", "git reset --hard HEAD", "git checkout -- .", "git checkout .", "git restore .", "git -C "+r.dir+" reset --hard", "git reset --har")
+	r.expect("destructive-git", false, "git clean -fd", "git clean -n -fd", "git reset --soft HEAD~1", "git reset", "git checkout main", "git restore --staged .")
+	r.git("add", "README.md")
+	r.expect("destructive-git", true, "git reset --hard")
+	r.expect("destructive-git", false, "git checkout -- .", "git restore .")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Change")
+	r.write("scratch.txt", "x")
+	r.expect("destructive-git", true, "git clean -fd", "git clean -f", "git clean -fdx")
+	r.expect("destructive-git", false, "git clean -nfd", "git clean -fd -n", "git reset --hard", "git clean -fd docs/")
+	r.git("add", "scratch.txt")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Scratch")
+	r.write("ignored.env", "x")
+	r.expect("destructive-git", false, "git clean -fd")
+	r.expect("destructive-git", true, "git clean -fdx", "git clean -fX")
+}
+
+func TestDestructiveForceRefspecs(t *testing.T) {
+	r := newRepo(t)
+	r.expect("destructive-git", true, "git push --force-with-lease origin +main", "git push origin -- +main", "git push --force-with-lease=main:abc origin +main:main")
+}
+
+func TestConfiguredForcedRefspecsAreForcePushes(t *testing.T) {
+	r := newRepo(t)
+	r.git("config", "remote.origin.push", "+refs/heads/main:refs/heads/main")
+	r.expect("destructive-git", true, "git push", "git push origin")
+	r.git("config", "--unset", "remote.origin.push")
+	r.git("config", "remote.backup.url", r.root+"/remote.git")
+	r.git("config", "remote.backup.push", "+refs/heads/main:refs/heads/main")
+	r.git("config", "branch.main.pushRemote", "backup")
+	r.expect("destructive-git", true, "git push", "git push -n --no-dry --force")
+}
+
+func TestDestructiveCheckoutFromACommitAndClean(t *testing.T) {
+	r := newRepo(t)
+	r.write("README.md", "staged\n")
+	r.git("add", "README.md")
+	r.expect("destructive-git", true, "git checkout HEAD .", "git checkout HEAD -- .")
+	r.expect("destructive-git", false, "git restore --source=HEAD .")        // writes only the worktree; the index keeps the staged change
+	r.expect("destructive-git", false, "git checkout --conflict merge -- .") // merge is the conflict style: this checks out from the index
+	r.git("commit", "-q", "-m", "chore(no-ticket): X")
+	r.write("nested/deep/file.txt", "x")
+	r.write("scratch.txt", "x")
+	r.expect("destructive-git", false, "git clean -fd -e scratch.txt -e nested", "git clean -f -e scratch.txt",
+		"git clean -f --exclude=scratch.txt", "git clean -f --exclude scratch.txt")
+	r.expect("destructive-git", true, "git clean -f", "git clean -fd nested", "git clean -f nested", "git clean -f --exclude=other.txt")
+	r.git("config", "clean.requireForce", "false")
+	r.expect("destructive-git", true, "git clean -d")
+}
+
+func TestCleanSparesANestedRepositoryUnlessForcedTwice(t *testing.T) {
+	r := newRepo(t)
+	r.write(".env", "x")
+	r.write("list.txt", ".env\n")
+	r.write("nested/README", "n")
+	gitIn(t, filepath.Join(r.dir, "nested"), "init", "-q")
+	r.expect("destructive-git", true, "git clean -ffd nested")
+	r.expect("destructive-git", false, "git clean -fd nested")
+}
+
+func TestCleanNeedsNoForceWhereConfigSaysSo(t *testing.T) {
+	r := newRepo(t)
+	r.write(".env", "x")
+	r.write("sub/a.txt", "a")
+	r.expect("destructive-git", true, "git -c clean.requireForce=false clean -d")
+	r.git("config", "clean.requireForce", "FALSE")
+	r.expect("destructive-git", true, "git clean")
+}
+
+func TestResetHardToACommitThatTracksAnUntrackedFile(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "other")
+	r.write("collide.txt", "tracked on other")
+	r.git("add", "collide.txt")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Collide")
+	r.git("switch", "-q", "main")
+	r.write("collide.txt", "untracked work")
+	r.expect("destructive-git", true, "git reset --hard other")
+	r.expect("destructive-git", false, "git reset --hard")
+}
+
+func TestResetHardKeepsUntrackedWork(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "other")
+	r.write("dir", "file on other")
+	r.write("sub/tracked.txt", "on other")
+	r.write("ignored.env", "on other")
+	r.git("add", "-f", "dir", "sub/tracked.txt", "ignored.env")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Other")
+	r.git("switch", "-q", "main")
+	r.write("dir/untracked.txt", "work")
+	r.expect("destructive-git", true, "git reset --hard other")
+	os.RemoveAll(filepath.Join(r.dir, "dir"))
+	r.write("ignored.env", "local secret")
+	r.expect("destructive-git", true, "git reset --hard other")
+	os.Remove(filepath.Join(r.dir, "ignored.env"))
+	r.write("sub/tracked.txt", "work")
+	if res := run(t, "destructive-git", bashIn(filepath.Join(r.dir, "sub"), "git reset --hard other")); res.Exit != 2 {
+		t.Errorf("subdirectory reset: %+v", res)
+	}
+}
+
+func TestResetHardDirectoryCollisions(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "other")
+	r.write("dir/file", "tracked")
+	r.write("build/out.txt", "tracked under an ignored dir")
+	r.git("add", "-f", "dir/file", "build/out.txt")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Other")
+	r.git("switch", "-q", "main")
+	r.write("dir", "an untracked file where other has a directory")
+	r.expect("destructive-git", true, "git reset --hard other")
+	os.Remove(filepath.Join(r.dir, "dir"))
+	r.write("build/out.txt", "local build output")
+	r.expect("destructive-git", true, "git reset --hard other")
+}
+
+func TestResetKeepsIgnoredSiblings(t *testing.T) {
+	r := newRepo(t)
+	r.git("switch", "-q", "-c", "other")
+	r.write("build/out.txt", "tracked")
+	r.git("add", "-f", "build/out.txt")
+	r.git("commit", "-q", "-m", "chore(no-ticket): Other")
+	r.git("switch", "-q", "main")
+	r.write("build/cache.log", "ignored sibling")
+	r.expect("destructive-git", false, "git reset --hard other")
+}
+
+func TestQuotedHomeIsLiteral(t *testing.T) {
+	expectAllowed(t, "destructive-git", "rm -rf '~'", `rm -rf '$HOME'`, `rm -rf "~"`, `rm -rf \~`)
+	expectBlocked(t, "destructive-git", "rm -rf ~", "rm -rf $HOME", `rm -rf "$HOME"`)
+}
