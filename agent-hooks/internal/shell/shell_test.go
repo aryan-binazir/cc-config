@@ -34,7 +34,6 @@ func argv(invs []shell.Invocation) [][]string {
 	return out
 }
 
-// named returns the invocations whose command word is name.
 func named(invs []shell.Invocation, name string) []shell.Invocation {
 	var out []shell.Invocation
 	for _, inv := range invs {
@@ -82,8 +81,8 @@ func TestParseReportsEveryCommandAWrapperOrNestedShellRuns(t *testing.T) {
 
 func TestParseSplitsEnvSplitStringTheWayEnvDoes(t *testing.T) {
 	for _, tc := range []struct {
-		src   string
-		inner [][]string // what env runs, after its own invocation
+		src     string
+		envRuns [][]string
 	}{
 		{`env -S 'target -m "a b"'`, [][]string{{"target", "-m", "a b"}}},
 		{`env --split-string='V=1 target x'`, [][]string{{"target", "x"}}},
@@ -94,8 +93,8 @@ func TestParseSplitsEnvSplitStringTheWayEnvDoes(t *testing.T) {
 		{`env -S 'echo \q' target x`, [][]string{}}, // env rejects the string and runs nothing
 	} {
 		got := argv(parse(t, tc.src))
-		if len(got) == 0 || got[0][0] != "env" || !reflect.DeepEqual(got[1:], tc.inner) {
-			t.Errorf("%q:\n got %q\nwant env then %q", tc.src, got, tc.inner)
+		if len(got) == 0 || got[0][0] != "env" || !reflect.DeepEqual(got[1:], tc.envRuns) {
+			t.Errorf("%q:\n got %q\nwant env then %q", tc.src, got, tc.envRuns)
 		}
 	}
 	if env := parse(t, `env -S 'V=1 target'`); len(env) != 2 || env[1].Assigns["V"] != "1" {
