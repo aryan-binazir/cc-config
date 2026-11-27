@@ -121,9 +121,6 @@ func (c *ctx) firstBranchCommit(g *gitCmd, bases ...string) (subject string, cou
 	for _, base := range bases {
 		out, ok := c.git(g, "log", "--first-parent", "--reverse", "--format=%s", base+"..HEAD")
 		if !ok {
-			if c.blocked || g.dir == "" {
-				return "", 0
-			}
 			continue
 		}
 		out = strings.TrimSpace(out)

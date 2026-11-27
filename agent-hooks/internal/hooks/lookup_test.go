@@ -109,3 +109,39 @@ func TestALookupKilledByASignalHasNoAnswer(t *testing.T) {
 		t.Errorf("want a block that names the override, got %+v", res)
 	}
 }
+
+func TestAHookStopsLookingUpAfterOneLookupHasNoAnswer(t *testing.T) {
+	for _, tc := range []struct{ hook, command, lookup, override string }{
+		{"commit-format", "git commit -m 'feat(AB): add a thing'", "git log", "commit-format"},
+		{"no-production", "git push", "git symbolic-ref", "production"},
+		{"destructive-git", "git push", "git symbolic-ref", "destructive"},
+	} {
+		t.Run(tc.hook, func(t *testing.T) {
+			r := newRepo(t)
+			launches := filepath.Join(t.TempDir(), "launches")
+			fakeGit(t, `echo "$*" >> "`+launches+`"; kill -TERM $$`)
+			res := r.run(tc.hook, tc.command)
+			if !blocked(t, res, tc.hook) || !strings.Contains(res.Stderr, tc.lookup+" did not finish") || !strings.Contains(res.Stderr, "AGENT_HOOKS_ALLOW="+tc.override) {
+				t.Errorf("%q: want a block that names the first lookup and the override, got %+v", tc.command, res)
+			}
+			if log, _ := os.ReadFile(launches); strings.Count(string(log), "\n") != 1 {
+				t.Errorf("%q: want one git launch, got:\n%s", tc.command, log)
+			}
+		})
+	}
+}
+
+func TestALookupWithNoAnswerStopsOnlyItsOwnInvocation(t *testing.T) {
+	r := newRepo(t)
+	r.write("untracked.txt", "new\n")
+	real, err := filepath.Abs(mustLookPath(t, "git"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := filepath.Join(t.TempDir(), "first")
+	fakeGit(t, `[ -e "`+first+`" ] || { : > "`+first+`"; kill -TERM $$; }; exec "`+real+`" "$@"`)
+	res := r.run("destructive-git", "AGENT_HOOKS_ALLOW=destructive git reset --hard && git clean -f")
+	if !blocked(t, res, "destructive-git") || !strings.Contains(res.Stderr, "git clean would delete untracked files") {
+		t.Errorf("the next command's lookups must still run, got %+v", res)
+	}
+}

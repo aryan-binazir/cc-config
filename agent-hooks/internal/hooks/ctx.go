@@ -77,7 +77,7 @@ func (c *ctx) gh(dir string, env []string, args ...string) (string, outcome) {
 }
 
 func (c *ctx) run(label string, timeout time.Duration, dir string, env []string, name string, args ...string) (string, outcome) {
-	if c.blocked || dir == "" {
+	if c.blocked || dir == "" || c.unanswered != "" {
 		return "", skipped
 	}
 	key := dir + "\x00" + strings.Join(env, "\x00") + "\x00" + name + "\x00" + strings.Join(args, "\x00")
