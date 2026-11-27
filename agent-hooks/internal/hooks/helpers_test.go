@@ -27,9 +27,9 @@ func encode(t *testing.T, payload any) []byte {
 	return data
 }
 
-func run(t *testing.T, enabled string, payload any) Result {
+func run(t *testing.T, names string, payload any) Result {
 	t.Helper()
-	return runOpts(t, Options{Phase: "pre", Only: only(enabled)}, payload)
+	return runOpts(t, Options{Phase: "pre", Only: only(names)}, payload)
 }
 
 func runOpts(t *testing.T, o Options, payload any) Result {
@@ -38,7 +38,7 @@ func runOpts(t *testing.T, o Options, payload any) Result {
 	if o.StateDir == "" {
 		o.StateDir = t.TempDir()
 	}
-	return Run(o)
+	return decide(o)
 }
 
 func only(names string) []string { return strings.Split(names, ",") }

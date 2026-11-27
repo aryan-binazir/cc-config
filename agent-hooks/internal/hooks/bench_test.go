@@ -25,7 +25,7 @@ func BenchmarkRunPayloadOnly(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			payload := benchPayload(b, "/nonexistent", command)
 			for b.Loop() {
-				if r := Run(Options{Phase: "pre", Stdin: payload}); r.Exit != 0 {
+				if r := decide(Options{Phase: "pre", Stdin: payload}); r.Exit != 0 {
 					b.Fatalf("%+v", r)
 				}
 			}
@@ -48,7 +48,7 @@ func BenchmarkRunGitLookup(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			payload := benchPayload(b, r.dir, command)
 			for b.Loop() {
-				Run(Options{Phase: "pre", Stdin: payload})
+				decide(Options{Phase: "pre", Stdin: payload})
 			}
 		})
 	}

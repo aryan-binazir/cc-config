@@ -128,6 +128,10 @@ make test    # go test ./...
 make check   # gofmt, go vet, tests, binary latency, benchmarks
 ```
 
-Tests run each hook through `hooks.Run` with real payloads. Git hooks run
-against temporary repositories cloned from a local bare remote that has a
-`production` branch, and `gh` lookups use a fake `gh` on `PATH`.
+`main` only dispatches: `pre` and `post` are `hooks.Command`, which parses the
+flags, reads the payload, and owns the 8 s deadline; `install` and `uninstall`
+are `internal/install`. Tests run each hook through the package's `decide` with
+real payloads. The binary tests pin the exact bytes of usage errors, the
+deadline answer, and agy's allow answers. Git hooks run against temporary
+repositories cloned from a local bare remote that has a `production` branch,
+and `gh` lookups use a fake `gh` on `PATH`.

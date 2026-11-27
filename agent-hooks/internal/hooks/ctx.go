@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -12,14 +13,11 @@ import (
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
 )
 
-// LookupBudget is how long the lookups of one call may take in total.
-const LookupBudget = 6 * time.Second
+// lookupBudget is how long the lookups of one call may take in total.
+const lookupBudget = 6 * time.Second
 
-var (
-	gitTimeout   = time.Second
-	ghTimeout    = 2 * time.Second
-	lookupBudget = LookupBudget
-)
+// limits bounds one call's lookups. A zero field takes its default.
+type limits struct{ git, gh, lookups time.Duration }
 
 type ctx struct {
 	opts       Options
@@ -57,7 +55,12 @@ type lookup struct {
 }
 
 func newCtx(c call, o Options) *ctx {
-	x := &ctx{opts: o, call: c, stopAt: time.Now().Add(lookupBudget)}
+	o.limits = limits{
+		git:     cmp.Or(o.limits.git, time.Second),
+		gh:      cmp.Or(o.limits.gh, 2*time.Second),
+		lookups: cmp.Or(o.limits.lookups, lookupBudget),
+	}
+	x := &ctx{opts: o, call: c, stopAt: time.Now().Add(o.limits.lookups)}
 	for _, src := range c.sources {
 		invs, unread := shell.Parse(src.text, c.cwd, o.Home)
 		x.parsed = append(x.parsed, parsed{source: src, invs: invs, unread: unread})
@@ -68,12 +71,12 @@ func newCtx(c call, o Options) *ctx {
 
 func (c *ctx) git(g *gitCmd, args ...string) (string, bool) {
 	safe := []string{"-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"}
-	out, res := c.run("git "+args[0], gitTimeout, g.dir, g.env, "git", append(safe, args...)...)
+	out, res := c.run("git "+args[0], c.opts.limits.git, g.dir, g.env, "git", append(safe, args...)...)
 	return out, res == answered
 }
 
 func (c *ctx) gh(dir string, env []string, args ...string) (string, outcome) {
-	return c.run("gh "+strings.Join(args[:2], " "), ghTimeout, dir, env, "gh", args...)
+	return c.run("gh "+strings.Join(args[:2], " "), c.opts.limits.gh, dir, env, "gh", args...)
 }
 
 func (c *ctx) run(label string, timeout time.Duration, dir string, env []string, name string, args ...string) (string, outcome) {
