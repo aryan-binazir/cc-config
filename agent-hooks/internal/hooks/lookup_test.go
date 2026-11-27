@@ -8,11 +8,9 @@ import (
 	"time"
 )
 
-func lookupLimits(t *testing.T, git, gh, budget time.Duration) {
-	t.Helper()
-	oldGit, oldGh, oldBudget := gitTimeout, ghTimeout, lookupBudget
-	gitTimeout, ghTimeout, lookupBudget = git, gh, budget
-	t.Cleanup(func() { gitTimeout, ghTimeout, lookupBudget = oldGit, oldGh, oldBudget })
+func (r *repo) runWithin(l limits, hook, command string) Result {
+	r.t.Helper()
+	return runOpts(r.t.(*testing.T), Options{Phase: "pre", Only: only(hook), limits: l}, bashIn(r.dir, command))
 }
 
 func fakeGit(t *testing.T, body string) {
@@ -46,9 +44,8 @@ func TestProductionMergeIsBlockedWhenThePRBaseCannotBeRead(t *testing.T) {
 	// gh takes the last --repo, and --repo over GH_REPO.
 	fakeGhScript(t, `case "$*" in *"--repo owner/repo"*) echo production feature ;; *) echo main feature ;; esac`)
 	r.expect("no-production", true, `gh pr merge 5 --repo "$R" --repo owner/repo`, `GH_REPO="$R" gh pr merge 5 --repo owner/repo`)
-	lookupLimits(t, time.Second, 100*time.Millisecond, time.Second)
 	fakeGhScript(t, "sleep 5; echo production feature")
-	if res := r.run("no-production", "gh pr merge 5"); !blocked(t, res, "no-production") || !strings.Contains(res.Stderr, "timed out") {
+	if res := r.runWithin(limits{time.Second, 100 * time.Millisecond, time.Second}, "no-production", "gh pr merge 5"); !blocked(t, res, "no-production") || !strings.Contains(res.Stderr, "timed out") {
 		t.Errorf("slow gh: %+v", res)
 	}
 }
@@ -67,14 +64,18 @@ func TestAPRLookupThatCannotBeMadeAllowsTheMerge(t *testing.T) {
 func TestAGitLookupWithNoAnswerBlocksHooksThatHaveAnOverride(t *testing.T) {
 	r := newRepo(t)
 	r.write("README.md", "changed\n")
-	lookupLimits(t, 100*time.Millisecond, time.Second, time.Second)
 	fakeGit(t, "sleep 5")
-	res := r.run("destructive-git", "git reset --hard")
+	fast := limits{100 * time.Millisecond, time.Second, time.Second}
+	res := r.runWithin(fast, "destructive-git", "git reset --hard")
 	if !blocked(t, res, "destructive-git") || !strings.Contains(res.Stderr, "git status timed out") || !strings.Contains(res.Stderr, "AGENT_HOOKS_ALLOW=destructive") {
 		t.Errorf("want a block that names the lookup and the override, got %+v", res)
 	}
-	r.expect("destructive-git", false, "AGENT_HOOKS_ALLOW=destructive git reset --hard", "git status", "git log -3")
-	if res := r.run("destructive-git", "git push --force"); !strings.Contains(res.Stderr, "Don't force-push") {
+	for _, command := range []string{"AGENT_HOOKS_ALLOW=destructive git reset --hard", "git status", "git log -3"} {
+		if res := r.runWithin(fast, "destructive-git", command); res.Exit != 0 {
+			t.Errorf("%q: want allowed, got %+v", command, res)
+		}
+	}
+	if res := r.runWithin(fast, "destructive-git", "git push --force"); !strings.Contains(res.Stderr, "Don't force-push") {
 		t.Errorf("a decision that needs no lookup keeps its own message: %+v", res)
 	}
 }
@@ -94,9 +95,8 @@ func TestLookupsShareOneBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lookupLimits(t, time.Second, time.Second, 300*time.Millisecond)
 	fakeGit(t, `sleep 0.2; exec "`+real+`" "$@"`)
-	res := r.run("no-production", "git push")
+	res := r.runWithin(limits{time.Second, time.Second, 300 * time.Millisecond}, "no-production", "git push")
 	if !blocked(t, res, "no-production") || !strings.Contains(res.Stderr, "ran out of time") {
 		t.Errorf("slow lookups must stop inside the budget and block, got %+v", res)
 	}

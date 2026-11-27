@@ -11,19 +11,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/hooks"
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/install"
 )
 
-const (
-	maxPayload = 16 << 20
-	deadline   = hooks.LookupBudget + 2*time.Second
-	usage      = "usage: agent-hooks pre|post [--agy] [--only=<hook>] | install | uninstall"
-)
+const usage = "usage: agent-hooks pre|post [--agy] [--only=<hook>] | install | uninstall"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
@@ -37,7 +31,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	home, homeErr := os.UserHomeDir()
 	switch {
 	case args[0] == "pre" || args[0] == "post":
-		return check(args[0], args[1:], home, stdin, stdout, stderr)
+		exit := hooks.Command(args[0], args[1:], home, stdin, stdout, stderr)
+		if exit == 64 {
+			fmt.Fprintln(stderr, usage)
+		}
+		return exit
 	case (args[0] == "install" || args[0] == "uninstall") && len(args) == 1:
 		if homeErr != nil {
 			fmt.Fprintln(stderr, "agent-hooks: cannot find the home directory:", homeErr)
@@ -47,52 +45,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stderr, usage)
 	return 64
-}
-
-func check(phase string, flags []string, home string, stdin io.Reader, stdout, stderr io.Writer) int {
-	o := hooks.Options{Phase: phase, Home: home, StateDir: stateDir(home)}
-	misuse := ""
-	for _, f := range flags {
-		name, isOnly := strings.CutPrefix(f, "--only=")
-		switch {
-		case f == "--agy":
-			o.Agy = true
-		case isOnly && len(o.Only) > 0:
-			misuse = "--only takes one hook"
-		case isOnly && slices.Contains(hooks.Names(), name):
-			o.Only = []string{name}
-		case isOnly:
-			misuse = fmt.Sprintf("no hook named %q", name)
-		default:
-			misuse = "unknown argument " + f
-		}
-	}
-	allowWith := func(exit int, reason string) int {
-		if o.Agy && phase == "pre" {
-			fmt.Fprintln(stdout, `{"decision":"allow"}`)
-		}
-		fmt.Fprintln(stderr, "agent-hooks:", reason)
-		return exit
-	}
-	if misuse != "" {
-		return allowWith(64, misuse+"\n"+usage)
-	}
-	time.AfterFunc(deadline, func() { os.Exit(allowWith(1, "timed out; allowing the call")) })
-	o.Stdin, _ = io.ReadAll(io.LimitReader(stdin, maxPayload))
-	res := hooks.Run(o)
-	io.WriteString(stdout, res.Stdout)
-	io.WriteString(stderr, res.Stderr)
-	return res.Exit
-}
-
-func stateDir(home string) string {
-	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
-		return filepath.Join(dir, "agent-hooks")
-	}
-	if home == "" {
-		return ""
-	}
-	return filepath.Join(home, ".local", "state", "agent-hooks")
 }
 
 func wire(action, home string, stdout, stderr io.Writer) int {

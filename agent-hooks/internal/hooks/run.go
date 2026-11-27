@@ -4,6 +4,7 @@ package hooks
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,6 +22,7 @@ type Options struct {
 	Agy      bool     // answer in Antigravity's JSON protocol
 	StateDir string   // where overrides.log goes
 	Home     string   // expands ~ in commands
+	limits   limits
 }
 
 // Result is what the process prints and exits with.
@@ -45,18 +47,66 @@ var catalog = []hook{
 	rgReplaceFlag,
 }
 
-// Names returns every hook name.
-func Names() []string {
-	names := make([]string, len(catalog))
-	for i, h := range catalog {
-		names[i] = h.name
+const (
+	maxPayload = 16 << 20
+	deadline   = lookupBudget + 2*time.Second
+)
+
+// Command answers `agent-hooks pre|post [--agy] [--only=<hook>]` and returns
+// the exit code. A usage error returns 64 and leaves the usage line to the
+// caller. A call still undecided after the deadline exits the process with 1
+// and is allowed. agy, flagged by --agy, gets a JSON decision either way.
+func Command(phase string, flags []string, home string, stdin io.Reader, stdout, stderr io.Writer) int {
+	o := Options{Phase: phase, Home: home, StateDir: stateDir(home)}
+	misuse := ""
+	for _, f := range flags {
+		name, isOnly := strings.CutPrefix(f, "--only=")
+		switch {
+		case f == "--agy":
+			o.Agy = true
+		case isOnly && len(o.Only) > 0:
+			misuse = "--only takes one hook"
+		case isOnly && slices.ContainsFunc(catalog, func(h hook) bool { return h.name == name }):
+			o.Only = []string{name}
+		case isOnly:
+			misuse = fmt.Sprintf("no hook named %q", name)
+		default:
+			misuse = "unknown argument " + f
+		}
 	}
-	return names
+	agyAllow := ""
+	if o.Agy && phase == "pre" {
+		agyAllow = respond(o, nil).Stdout + "\n"
+	}
+	allowWith := func(exit int, reason string) int {
+		io.WriteString(stdout, agyAllow)
+		fmt.Fprintln(stderr, "agent-hooks:", reason)
+		return exit
+	}
+	if misuse != "" {
+		return allowWith(64, misuse)
+	}
+	time.AfterFunc(deadline, func() { os.Exit(allowWith(1, "timed out; allowing the call")) })
+	o.Stdin, _ = io.ReadAll(io.LimitReader(stdin, maxPayload))
+	res := decide(o)
+	io.WriteString(stdout, res.Stdout)
+	io.WriteString(stderr, res.Stderr)
+	return res.Exit
 }
 
-// Run evaluates the payload. A malformed payload or an internal fault allows
+func stateDir(home string) string {
+	if dir := os.Getenv("XDG_STATE_HOME"); dir != "" {
+		return filepath.Join(dir, "agent-hooks")
+	}
+	if home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".local", "state", "agent-hooks")
+}
+
+// decide evaluates the payload. A malformed payload or an internal fault allows
 // the call: faults exit 1, which Claude Code and Codex report without blocking.
-func Run(o Options) (res Result) {
+func decide(o Options) (res Result) {
 	defer func() {
 		if r := recover(); r != nil {
 			res = Result{Exit: 1, Stderr: fmt.Sprintf("agent-hooks: internal error: %v", r)}
