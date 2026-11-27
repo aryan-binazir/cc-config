@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 )
 
 func isSecret(p string) bool {
-	b := baseName(p)
+	b := path.Base(p)
 	switch {
 	case b == ".env.example" || b == ".env.sample":
 		return false

@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"cmp"
 	"regexp"
 	"slices"
 	"strings"
@@ -32,7 +33,7 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 	}
 	if words, rest := ghWords(inv); len(words) == 2 && words[0] == "repo" && words[1] == "sync" {
 		o := parseOpts(rest, "bs", []string{"-b", "-s"}, map[string]string{"--branch": "-b", "--source": "-s"})
-		return names(o.vals["-b"], production)
+		return namesProduction(o.vals["-b"])
 	}
 	g := c.parseGit(inv)
 	if g == nil {
@@ -53,15 +54,15 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 		refs := append(append([]shell.Word{}, o.pos...), o.paths...)
 		switch {
 		case o.has("-d", "-D", "-f"):
-			return names(refs, production)
+			return namesProduction(refs)
 		case o.has("-m", "-M"):
-			return names(refs, production) || (len(refs) == 1 && c.currentBranch(g) == production)
+			return namesProduction(refs) || (len(refs) == 1 && c.currentBranch(g) == production)
 		case o.has("-c", "-C"):
 			return len(refs) > 0 && refs[len(refs)-1].Val == production
 		}
 	case "checkout", "switch":
 		o := parseOpts(g.args, "BCbc", []string{"-C"}, map[string]string{"--force-create": "-C"})
-		return names(o.vals["-B"], production) || names(o.vals["-C"], production)
+		return namesProduction(o.vals["-B"]) || namesProduction(o.vals["-C"])
 	case "update-ref":
 		o := parseOpts(g.args, "m", nil, nil)
 		refs := append(append([]shell.Word{}, o.pos...), o.paths...)
@@ -70,7 +71,7 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 		o := parseOpts(g.args, "", nil, resetModes)
 		moves := o.has("--hard", "--soft", "--keep", "--merge", "--mixed")
 		for _, p := range o.pos {
-			if !exists(shellPath(g.dir, p.Val, c.opts.Home)) {
+			if full := cmp.Or(shell.Resolve(g.dir, p.Val, c.opts.Home), p.Val); !exists(full) {
 				moves = true
 			}
 		}
@@ -268,18 +269,6 @@ func (c *ctx) refExists(g *gitCmd, ref string) bool {
 
 func (c *ctx) hasLocalProduction(g *gitCmd) bool { return c.refExists(g, "refs/heads/"+production) }
 
-func names(words []shell.Word, name string) bool {
-	for _, w := range words {
-		if w.Val == name {
-			return true
-		}
-	}
-	return false
-}
-
-func shellPath(dir, p, home string) string {
-	if full := shell.Resolve(dir, p, home); full != "" {
-		return full
-	}
-	return p
+func namesProduction(words []shell.Word) bool {
+	return slices.ContainsFunc(words, func(w shell.Word) bool { return w.Val == production })
 }

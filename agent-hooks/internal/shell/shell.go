@@ -34,7 +34,6 @@ type Invocation struct {
 	// StdinDynamic marks a Stdin that contains expansions, kept as source text.
 	StdinDynamic bool
 	Cwd          string // directory it runs in; "" when unknown
-	Source       string // the source text of the whole command
 	// Fed is the text that can feed this command: its source up to the end of
 	// the pipeline it is part of. Text after that cannot reach it.
 	Fed Reach
@@ -69,15 +68,6 @@ func (inv Invocation) Name() string {
 		return ""
 	}
 	return path.Base(inv.Args[0].Val)
-}
-
-// Values returns every word's value, the command name first.
-func (inv Invocation) Values() []string {
-	out := make([]string, len(inv.Args))
-	for i, w := range inv.Args {
-		out[i] = w.Val
-	}
-	return out
 }
 
 // Strings returns the argument values after the command name.
@@ -309,7 +299,7 @@ func (f frame) stmt(w *walker, s *syntax.Stmt, cwd dirs) dirs {
 	case *syntax.FuncDecl:
 		f.subshell().stmt(w, c.Body, cwd)
 	case *syntax.TimeClause:
-		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Source: f.text(s), Fed: Reach{f.src, 0, f.fedEnd}})
+		w.out = append(w.out, Invocation{Args: []Word{{Val: "time"}}, Cwd: cwd[0], Fed: Reach{f.src, 0, f.fedEnd}})
 		return f.stmt(w, c.Stmt, cwd)
 	case *syntax.CoprocClause:
 		f.subshell().stmt(w, c.Stmt, cwd)
@@ -377,7 +367,7 @@ func (f frame) call(w *walker, c *syntax.CallExpr, s *syntax.Stmt, cwd dirs) dir
 			wordsEnd = max(wordsEnd, int(r.Word.End().Offset()))
 		}
 	}
-	inv := Invocation{Assigns: env, Source: f.text(s), Fed: Reach{f.src, 0, f.fedEnd}, start: int(s.Pos().Offset()), wordsEnd: wordsEnd, hereDoc: [2]int{wordsEnd, wordsEnd}}
+	inv := Invocation{Assigns: env, Fed: Reach{f.src, 0, f.fedEnd}, start: int(s.Pos().Offset()), wordsEnd: wordsEnd, hereDoc: [2]int{wordsEnd, wordsEnd}}
 	for _, arg := range c.Args {
 		inv.Args = append(inv.Args, f.word(arg))
 	}

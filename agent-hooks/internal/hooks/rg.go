@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/aryan-binazir/cc-config/agent-hooks/internal/shell"
@@ -35,7 +36,7 @@ func rgReplaces(args []string) bool {
 			if name == "--replace" {
 				return true
 			}
-			if contains(rgLongValues, name) && !hasValue {
+			if slices.Contains(rgLongValues, name) && !hasValue {
 				i++
 			}
 		case strings.HasPrefix(arg, "-") && len(arg) > 1:

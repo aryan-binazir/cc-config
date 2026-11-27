@@ -73,8 +73,12 @@ func TestAliasWordsAreSplitTheWayGitSplitsThem(t *testing.T) {
 	r.git("config", "alias.good", `commit -m "feat(no-ticket): Cost $5 #1; it's done"`)
 	r.git("config", "alias.open", `commit -m "unclosed`)                                                // git rejects this alias
 	r.git("config", "alias.padded", `commit -m wip\ `)                                                  // an escaped space ends the message
+	r.git("config", "alias.trailing", `commit -m wip\`)                                                 // git rejects a trailing backslash
 	r.expect("commit-format", true, "git cost", "git padded", "git -c 'alias.nl=commit -m wip\\\n' nl") // an escaped newline ends that message too
 	r.expect("commit-format", false, "git good", "git open")
+	if res := r.run("commit-format", "git trailing"); res.Exit != 0 {
+		t.Errorf("git trailing: want a clean allow, got %+v", res)
+	}
 }
 
 func TestAnAliasNamedAfterACommandGitInstallsIsNeverUsed(t *testing.T) {
