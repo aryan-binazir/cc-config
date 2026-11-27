@@ -34,7 +34,11 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 			return method != "GET" && productionRef.MatchString(endpoint)
 		case "repo sync":
 			branches := cmd.vals["--branch"]
-			return len(branches) > 0 && branches[len(branches)-1].Val == production
+			if len(branches) == 0 {
+				return false
+			}
+			last := branches[len(branches)-1] // gh takes the last, which may expand to an earlier one
+			return last.Val == production || (last.Dynamic && namesProduction(branches))
 		}
 		return false
 	}

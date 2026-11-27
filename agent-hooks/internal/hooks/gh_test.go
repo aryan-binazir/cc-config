@@ -238,7 +238,7 @@ func TestGhLocatesApiAsCobraDoes(t *testing.T) {
 // is the value x, and help runs nothing.
 func TestGhRepoSyncReadsFlagsAsGhDoes(t *testing.T) {
 	expectBlocked(t, "no-production", "gh repo sync -b=production", "gh repo sync --branch=production")
-	expectBlocked(t, "no-production", "gh repo sync --branch main -b=production")
+	expectBlocked(t, "no-production", "gh repo sync --branch main -b=production", `gh repo sync -b production -b "$B"`)
 	expectAllowed(t, "no-production", "gh repo sync -b=production --branch main", "gh repo sync --bra production", "gh repo sync -b production -h", "gh repo sync -b production --help")
 }
 
