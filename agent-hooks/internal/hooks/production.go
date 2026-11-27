@@ -33,7 +33,8 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 			method, endpoint := cmd.request()
 			return method != "GET" && productionRef.MatchString(endpoint)
 		case "repo sync":
-			return namesProduction(cmd.vals["--branch"])
+			branches := cmd.vals["--branch"]
+			return len(branches) > 0 && branches[len(branches)-1].Val == production
 		}
 		return false
 	}

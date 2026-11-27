@@ -238,7 +238,8 @@ func TestGhLocatesApiAsCobraDoes(t *testing.T) {
 // is the value x, and help runs nothing.
 func TestGhRepoSyncReadsFlagsAsGhDoes(t *testing.T) {
 	expectBlocked(t, "no-production", "gh repo sync -b=production", "gh repo sync --branch=production")
-	expectAllowed(t, "no-production", "gh repo sync --bra production", "gh repo sync -b production -h", "gh repo sync -b production --help")
+	expectBlocked(t, "no-production", "gh repo sync --branch main -b=production")
+	expectAllowed(t, "no-production", "gh repo sync -b=production --branch main", "gh repo sync --bra production", "gh repo sync -b production -h", "gh repo sync -b production --help")
 }
 
 // pflag keeps the last of -d and --delete-branch, one flag under two names.
@@ -252,7 +253,7 @@ func TestGhMergeDeleteBranchLastWins(t *testing.T) {
 
 // gh shows help for any -h, even -h=false or one followed by --help=false.
 func TestGhShortHelpAlwaysShowsHelp(t *testing.T) {
-	expectAllowed(t, both, "gh pr merge 1 --admin -h --help=false", "gh pr merge 1 --admin -h=false", "gh pr create -sh=0")
+	expectAllowed(t, both, "gh pr merge 1 --admin -h --help=false", "gh pr merge 1 --admin -h=false", "gh pr create -fh=0")
 	expectBlocked(t, both, "gh pr merge 1 --admin --help --help=false", "gh pr create --help=false")
 }
 
@@ -261,5 +262,6 @@ func TestGhShortHelpAlwaysShowsHelp(t *testing.T) {
 func TestGhDynamicFlagBeforeTheCommandHidesNothing(t *testing.T) {
 	expectBlocked(t, "no-admin-merge", "gh --$OPT api -X PUT repos/o/r/pulls/1/merge")
 	expectBlocked(t, "draft-prs", `gh "--$OPT" pr create`)
+	expectAllowed(t, "draft-prs", `gh "pr create"`)                        // gh: unknown command
 	expectBlocked(t, "pr-assignee", "gh --$OPT --hostname pr new --draft") // or the expansion takes the next word
 }

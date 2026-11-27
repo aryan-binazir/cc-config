@@ -114,7 +114,7 @@ func parseGh(inv shell.Invocation) *ghCmd {
 // picks which reading to take of one.
 func ghPath(args []shell.Word, dynamicTakesValue bool) (string, []shell.Word) {
 	var words []string
-	rest := slices.Clone(args)
+	rest := args
 	for level := 0; level < 2; level++ {
 		if _, leaf := ghOptions[strings.Join(words, " ")]; leaf {
 			break
@@ -132,6 +132,9 @@ func ghPath(args []shell.Word, dynamicTakesValue bool) (string, []shell.Word) {
 			}
 			if arg == "" {
 				continue
+			}
+			if strings.Contains(arg, " ") {
+				return "", nil // no gh command has one
 			}
 			words = append(words, arg)
 			rest = append(rest[:i:i], rest[i+1:]...)
