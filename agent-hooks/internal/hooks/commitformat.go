@@ -14,7 +14,7 @@ var commitSubject = regexp.MustCompile(`^(feat|fix|chore|refactor|test|docs|buil
 var commitType = regexp.MustCompile(`^(feat|fix|chore|refactor|test|docs|build|ci|revert)\(`)
 
 var commitFormat = hook{name: "commit-format", phase: "pre", override: "commit-format", check: func(c *ctx, inv shell.Invocation) string {
-	if pr := parseGhPr(inv); pr != nil {
+	if pr := parseGh(inv); pr != nil {
 		return prTitleProblem(c, inv, pr)
 	}
 	g := c.parseGit(inv)
@@ -49,12 +49,12 @@ var commitFormat = hook{name: "commit-format", phase: "pre", override: "commit-f
 	return c.subjectProblem(g, "Commit messages", subject, o.has("--amend"))
 }}
 
-func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
-	titles := pr.values["--title"]
+func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghCmd) string {
+	titles := pr.vals["--title"]
 	_, otherRepo := inv.Assigns["GH_REPO"]
-	otherRepo = otherRepo || os.Getenv("GH_REPO") != "" || len(pr.values["--repo"]) > 0 ||
-		slices.ContainsFunc(pr.positionals, func(w shell.Word) bool { return strings.Contains(w.Val, "://") })
-	if pr.action == "merge" || len(titles) == 0 || otherRepo {
+	otherRepo = otherRepo || os.Getenv("GH_REPO") != "" || len(pr.vals["--repo"]) > 0 ||
+		slices.ContainsFunc(pr.pos, func(w shell.Word) bool { return strings.Contains(w.Val, "://") })
+	if (pr.path != "pr create" && pr.path != "pr edit") || len(titles) == 0 || otherRepo {
 		return ""
 	}
 	title := titles[len(titles)-1]
@@ -66,18 +66,18 @@ func prTitleProblem(c *ctx, inv shell.Invocation, pr *ghPr) string {
 		return formatProblem
 	}
 	var branch *gitCmd
-	forCurrentBranch := len(pr.positionals) == 0 && len(pr.values["--head"]) == 0
+	forCurrentBranch := len(pr.pos) == 0 && len(pr.vals["--head"]) == 0
 	if forCurrentBranch {
 		branch = &gitCmd{dir: inv.Cwd}
 	}
 	var bases []string
-	if given := pr.values["--base"]; len(given) > 0 {
+	if given := pr.vals["--base"]; len(given) > 0 {
 		base := given[len(given)-1]
 		if base.Dynamic {
 			branch = nil
 		}
 		bases = []string{"origin/" + base.Val, base.Val}
-	} else if branch != nil && pr.action == "create" {
+	} else if branch != nil && pr.path == "pr create" {
 		// Without --base, gh opens the pull request against this setting when
 		// the branch has it. One that is already open keeps its base.
 		if base, ok := c.git(branch, "config", "--get", "branch."+c.currentBranch(branch)+".gh-merge-base"); ok {

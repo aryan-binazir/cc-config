@@ -18,8 +18,6 @@ var noProduction = hook{name: "no-production", phase: "pre", override: "producti
 	return ""
 }}
 
-var repoSyncOptions = grammar("-b|--branch= -s|--source=")
-
 var productionRef = regexp.MustCompile(`(^|/)git/refs/heads/production/?$`)
 
 func isProduction(ref string) bool {
@@ -27,15 +25,24 @@ func isProduction(ref string) bool {
 }
 
 func touchesProduction(c *ctx, inv shell.Invocation) bool {
-	if pr := parseGhPr(inv); pr != nil {
-		return pr.action == "merge" && !pr.flags["--disable-auto"] && prTouchesProduction(c, inv, pr)
-	}
-	if api := parseGhAPI(inv); api != nil {
-		return api.method != "GET" && productionRef.MatchString(api.endpoint)
-	}
-	if words, rest := ghWords(inv); len(words) == 2 && words[0] == "repo" && words[1] == "sync" {
-		o := parseOpts(rest, repoSyncOptions)
-		return namesProduction(o.vals["-b"])
+	if cmd := parseGh(inv); cmd != nil {
+		switch cmd.path {
+		case "pr merge":
+			return !cmd.has("--disable-auto") && prTouchesProduction(c, inv, cmd)
+		case "api":
+			method, endpoint := cmd.request()
+			return method != "GET" && productionRef.MatchString(endpoint)
+		case "repo sync":
+			branches := cmd.vals["--branch"]
+			if len(branches) == 0 {
+				return false
+			}
+			// gh takes the last; one that expands or is empty (the default
+			// branch) may still be an earlier one.
+			last := branches[len(branches)-1]
+			return last.Val == production || ((last.Dynamic || last.Val == "") && namesProduction(branches))
+		}
+		return false
 	}
 	g := c.parseGit(inv)
 	if g == nil {
@@ -91,10 +98,10 @@ func touchesProduction(c *ctx, inv shell.Invocation) bool {
 	return false
 }
 
-func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghPr) bool {
-	prSelectors := slices.Clone(pr.positionals)
-	args := append([]string{"pr", "view"}, values(pr.positionals)...)
-	repos := pr.values["--repo"]
+func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghCmd) bool {
+	prSelectors := slices.Clone(pr.pos)
+	args := append([]string{"pr", "view"}, values(pr.pos)...)
+	repos := pr.vals["--repo"]
 	if len(repos) > 0 { // gh takes the last --repo, and --repo over GH_REPO
 		prSelectors = append(prSelectors, repos[len(repos)-1])
 		args = append(args, "--repo", repos[len(repos)-1].Val)
@@ -126,7 +133,7 @@ func prTouchesProduction(c *ctx, inv shell.Invocation, pr *ghPr) bool {
 		c.unanswered = "gh pr view could not say which branch this pull request merges into"
 		return false
 	}
-	return fields[0] == production || (fields[1] == production && (pr.flags["--delete-branch"] || pr.flags["-d"]))
+	return fields[0] == production || (fields[1] == production && pr.has("--delete-branch"))
 }
 
 func pushesProduction(c *ctx, g *gitCmd) bool {
