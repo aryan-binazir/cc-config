@@ -209,10 +209,10 @@ func grammar(entries string) optSpec {
 }
 
 // gitOptions holds what the hooks read of each git subcommand's grammar, from
-// git 2.56's: the options a hook checks, and the options that take a value
-// that a hook would otherwise misread as an operand. Any unambiguous prefix of a listed long name
-// stands for it, as in git, so a real option that is itself a prefix of one
-// (--recurse-submodules, --set-upstream) is listed too.
+// git 2.56's: the options a hook checks, and the options that take a value a
+// hook would otherwise misread as an operand. Any unambiguous prefix of a
+// listed long name stands for it, as in git, so a real option that is itself
+// a prefix of one (--recurse-submodules, --set-upstream) is listed too.
 var gitOptions = map[string]optSpec{
 	"add":      grammar("-A|--all|--no-ignore-removal -u|--update -f|--force -n|--dry-run -p|--patch -i|--interactive -e|--edit --chmod= --pathspec-from-file="),
 	"branch":   grammar("-d|--delete -f|--force -m|--move -c|--copy -u|--set-upstream-to= --set-upstream"),

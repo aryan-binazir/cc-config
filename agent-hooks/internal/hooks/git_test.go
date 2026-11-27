@@ -392,6 +392,8 @@ func TestNoProductionCoversEveryPushDestination(t *testing.T) {
 	r.expect("no-production", true, "git rebase -m main production", "git rebase -x true main production", "git rebase --exec true main production",
 		"git rebase -C 3 main production", "git rebase --empty drop main production",
 		"git rebase -Sx main production", "git rebase -SC main production") // -S takes only an attached key
+	r.expect("no-production", true, "git push --branches origin")
+	r.expect("no-production", false, "git push --all --no-branches origin", "git push --branches --no-all origin") // one option, two names
 	r.git("config", "remote.origin.push", "refs/heads/main:refs/heads/production")
 	r.expect("no-production", true, "git push", "git push origin")
 }
